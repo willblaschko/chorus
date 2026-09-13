@@ -193,7 +193,8 @@
     pantry:{name:"Pantry",type:"music",L:null,R:null,tray:[{id:"p1",name:"Pantry",model:"Symfonisk Bookshelf"},{id:"p2",name:"Unnamed Room",model:"Symfonisk Bookshelf"}]},
     office:{name:"Office",type:"solo",tray:[{id:"of1",name:"Office",model:"Symfonisk Frame"}]},
     kitchen:{name:"Kitchen",type:"solo",tray:[{id:"k1",name:"Kitchen",model:"Symfonisk Bookshelf"}]},
-    dining:{name:"Dining Room",type:"solo",tray:[{id:"conn",name:"Dining Room",model:"Sonos Connect"}]}
+    dining:{name:"Dining Room",type:"solo",tray:[{id:"conn",name:"Dining Room",model:"Sonos Connect"}]},
+    patio:{name:"Patio",type:"solo",tray:[]}
   };
   var CH=["LF","RF","LR","RR","SW"],CHNAME={LF:"Front L",RF:"Front R",LR:"Rear L",RR:"Rear R",SW:"Sub"};
   var TINT={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub",CC:"t-bar"};
@@ -346,8 +347,10 @@
   function unpair(r){toast("Separating…");setTimeout(function(){r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
 
   function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
-    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip">Single speaker</span></div>';$("h1",head).textContent=r.name;m.appendChild(head);
-    var sec=el("div","sec");sec.innerHTML='<h2>Speaker</h2><span class="sc">add another to pair</span>';m.appendChild(sec);
+    var head=el("div","head");var left=el("div","head-l");
+    left.innerHTML='<h1></h1><div class="chips"><span class="chip">'+(sp?"Single speaker":"Empty room")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
+    var sec=el("div","sec");sec.innerHTML='<h2>'+(sp?"Speaker":"No speakers yet")+'</h2><span class="sc">'+(sp?"add another to pair":"an HA room with no Sonos")+'</span>';m.appendChild(sec);
+    if(!sp){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">This room has no speakers</div><div class="wm" style="max-width:32ch;text-align:center">Move one in by dragging it onto “'+r.name+'” in the sidebar.</div>';m.appendChild(e);return;}
     var s=el("div","solo");var t=orb(sp,"t-neutral");s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
     var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
 
