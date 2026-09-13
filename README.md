@@ -1,4 +1,6 @@
-# Sonos Studio
+# Ensemble
+
+*A Sonos speaker manager for Home Assistant.*
 
 A Home Assistant integration for **configuring Sonos bonding** — stereo pairs and
 home-theater surrounds, including **dedicated front surrounds and mixed-model

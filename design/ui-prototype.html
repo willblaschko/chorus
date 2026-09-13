@@ -1,4 +1,4 @@
-<title>Sonos Studio — bonding UI prototype</title>
+<title>Ensemble — a Sonos speaker manager for Home Assistant</title>
 <style>
   :root{
     --bg:#f2f2f7;--card:#fff;--tile:#e9e9ee;--hair:rgba(60,60,67,.2);--hair-2:rgba(60,60,67,.32);
@@ -169,11 +169,23 @@
     box-shadow:0 18px 44px -14px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.32s cubic-bezier(.34,1.4,.6,1);display:flex;align-items:center;gap:9px}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
   .toast .w{color:var(--accent);display:grid;place-items:center}.toast .w svg{width:17px;height:17px}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;z-index:80;opacity:0;transition:opacity .2s;pointer-events:none}
+  .modal-back.on{opacity:1;pointer-events:auto}
+  .modal{background:var(--card);border-radius:20px;box-shadow:0 30px 90px -24px rgba(0,0,0,.55);padding:22px 22px 18px;width:322px;max-width:90vw;transform:scale(.92);transition:transform .22s cubic-bezier(.34,1.4,.6,1)}
+  .modal-back.on .modal{transform:none}
+  .modal h3{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;text-align:center}
+  .modal p{font-size:13px;color:var(--text-2);margin:0 0 16px;text-align:center}
+  .modal input{width:100%;font:inherit;font-size:15px;padding:11px 13px;border-radius:11px;border:none;background:var(--tile);color:var(--text);outline:none;margin-bottom:16px}
+  .modal input:focus{box-shadow:0 0 0 2px var(--accent)}
+  .modal-btns{display:flex;gap:9px}
+  .modal-btns button{flex:1;font:inherit;font-size:14px;font-weight:600;padding:10px;border-radius:11px;border:none;cursor:pointer}
+  .mbtn-cancel{background:var(--tile);color:var(--text)}.mbtn-cancel:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
+  .mbtn-ok{background:var(--accent);color:#fff}.mbtn-ok:disabled{opacity:.4;cursor:default}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
 <div class="wrap">
-  <div class="top"><span class="mark"><i></i></span><b>Sonos&nbsp;Studio</b><span class="s">Bonding</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
+  <div class="top"><span class="mark"><i></i></span><b>Ensemble</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
   <div class="grid">
     <div><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
     <div id="main"></div>
@@ -241,17 +253,31 @@
     var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>New room</b><span>drag a speaker here</span></span>';
     nr.addEventListener("dragover",function(e){if(drag){e.preventDefault();nr.classList.add("droproom")}});
     nr.addEventListener("dragleave",function(){nr.classList.remove("droproom")});
-    nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");createRoomWith(drag)});
+    nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");var d=drag;if(!d)return;
+      nameModal({title:"New room",message:"Name this room for "+d.sp.name,placeholder:"Room name",confirmLabel:"Create",onConfirm:function(name){createRoomWith(d,name)}});});
     box.appendChild(nr);
   }
   var newRoomN=0;
-  function createRoomWith(d){if(!d)return;var sp=d.sp,src=rooms[d.roomKey];
+  function createRoomWith(d,name){if(!d)return;var sp=d.sp,src=rooms[d.roomKey];
     if(src.tray)src.tray=src.tray.filter(function(x){return x.id!==sp.id});
     if(src.slots)Object.keys(src.slots).forEach(function(k){if(src.slots[k]&&src.slots[k].id===sp.id)src.slots[k]=null});
     if(src.L&&src.L.id===sp.id)src.L=null;if(src.R&&src.R.id===sp.id)src.R=null;normalizeRoom(src);
     newRoomN++;var key="new"+newRoomN;sp.height=false;
-    rooms[key]={name:newRoomN>1?"New Room "+newRoomN:"New Room",type:"solo",tray:[sp]};
+    rooms[key]={name:(name&&name.trim())||"New Room",type:"solo",tray:[sp]};
     drag=null;current=key;toast("Created “"+rooms[key].name+"” with "+sp.name);render();}
+  function nameModal(opts){var back=el("div","modal-back"),modal=el("div","modal");
+    modal.innerHTML='<h3></h3><p></p><input type="text" autocomplete="off"><div class="modal-btns"><button class="mbtn-cancel">Cancel</button><button class="mbtn-ok"></button></div>';
+    $("h3",modal).textContent=opts.title;$("p",modal).textContent=opts.message||"";
+    var inp=$("input",modal);inp.value=opts.value||"";inp.placeholder=opts.placeholder||"";
+    var ok=$(".mbtn-ok",modal);ok.textContent=opts.confirmLabel||"Create";
+    function upd(){ok.disabled=!inp.value.trim()}upd();
+    function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
+    function go(){var v=inp.value.trim();if(!v)return;close();opts.onConfirm(v)}
+    inp.addEventListener("input",upd);inp.addEventListener("keydown",function(e){if(e.key==="Enter")go();else if(e.key==="Escape")close()});
+    $(".mbtn-cancel",modal).onclick=close;ok.onclick=go;
+    back.addEventListener("click",function(e){if(e.target===back)close()});
+    back.appendChild(modal);document.body.appendChild(back);
+    requestAnimationFrame(function(){back.classList.add("on");inp.focus()});}
   function allSpeakers(r){var a=[];if(r.slots)Object.keys(r.slots).forEach(function(k){if(r.slots[k])a.push(r.slots[k])});if(r.tray)r.tray.forEach(function(s){a.push(s)});return a;}
   function saveLayout(r){r.saved=r.saved||[];r.saved.push({name:"Layout "+(r.saved.length+1),slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “Layout "+r.saved.length+"”");render();}
   function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
@@ -288,10 +314,10 @@
     var grp=el("div","group");var rowsEl=el("div","rows");
     if(!r.tray.length)rowsEl.appendChild(el("div","empty-note","Every speaker is in use."));
     r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);
-    var hint=el("div","drop-hint","drag a bonded speaker here to remove it");m.appendChild(hint);
+    var hint=el("div","drop-hint","drag a speaker here to remove it from the home theater");m.appendChild(hint);
     [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
 
-    var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom bonds.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
+    var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom setups.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
   }
   function speakerRow(r,sp){var row=el("div","row");var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";
     var meta=el("div","rx");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=sp.name;$("span",meta).textContent=sm(sp.model);
@@ -310,7 +336,7 @@
         if(ch!=="CC"){var ctl=el("div","ctl");
           ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(cur.name!=="Bookshelf"&&cur.name!=="Picture frame"?cur.name:CHNAME[ch],badge)}));
           if(ch!=="SW")ctl.appendChild(cbtn(cur.height?"on":"","↑","Toggle height",function(){cur.height=!cur.height;paint();var cc=$(".readout code");if(cc)cc.innerHTML=chanMap(r)}));
-          ctl.appendChild(cbtn("x","✕","Unbond",function(){unbond(r,ch)}));t.appendChild(ctl);}
+          ctl.appendChild(cbtn("x","✕","Remove",function(){unbond(r,ch)}));t.appendChild(ctl);}
       }else{
         t.appendChild(el("div","badge empty-badge",ch));
         var m2=el("div","pmeta");m2.innerHTML='<b style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</b><span>Empty</span>';t.appendChild(m2);
