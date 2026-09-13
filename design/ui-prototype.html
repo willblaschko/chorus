@@ -2,7 +2,7 @@
 <style>
   :root{
     --bg:#f2f2f7;--card:#fff;--tile:#e9e9ee;--hair:rgba(60,60,67,.2);--hair-2:rgba(60,60,67,.32);
-    --text:#1d1d1f;--text-2:rgba(60,60,67,.6);--text-3:rgba(60,60,67,.32);
+    --text:#1d1d1f;--text-2:rgba(60,60,67,.74);--text-3:rgba(60,60,67,.55);
     --accent:#007aff;--danger:#ff3b30;
     --c-front:#007aff;--c-rear:#30b0c7;--c-sub:#5856d6;--c-bar:#007aff;
     --shadow:0 1px 2px rgba(0,0,0,.05),0 10px 26px -18px rgba(0,0,0,.22);
@@ -11,13 +11,13 @@
   }
   @media(prefers-color-scheme:dark){:root{
     --bg:#000;--card:#1c1c1e;--tile:#2c2c2e;--hair:rgba(235,235,245,.16);--hair-2:rgba(235,235,245,.26);
-    --text:#f5f5f7;--text-2:rgba(235,235,245,.6);--text-3:rgba(235,235,245,.3);
+    --text:#f5f5f7;--text-2:rgba(235,235,245,.74);--text-3:rgba(235,235,245,.58);
     --accent:#0a84ff;--danger:#ff453a;
     --c-front:#0a84ff;--c-rear:#40cbe0;--c-sub:#7d7aff;--c-bar:#0a84ff;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -18px rgba(0,0,0,.7);
   }}
-  :root[data-theme="light"]{--bg:#f2f2f7;--card:#fff;--tile:#e9e9ee;--hair:rgba(60,60,67,.2);--hair-2:rgba(60,60,67,.32);--text:#1d1d1f;--text-2:rgba(60,60,67,.6);--text-3:rgba(60,60,67,.32);--accent:#007aff;--danger:#ff3b30;--c-front:#007aff;--c-rear:#30b0c7;--c-sub:#5856d6;--c-bar:#007aff;--shadow:0 1px 2px rgba(0,0,0,.05),0 10px 26px -18px rgba(0,0,0,.22);}
-  :root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--tile:#2c2c2e;--hair:rgba(235,235,245,.16);--hair-2:rgba(235,235,245,.26);--text:#f5f5f7;--text-2:rgba(235,235,245,.6);--text-3:rgba(235,235,245,.3);--accent:#0a84ff;--danger:#ff453a;--c-front:#0a84ff;--c-rear:#40cbe0;--c-sub:#7d7aff;--c-bar:#0a84ff;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -18px rgba(0,0,0,.7);}
+  :root[data-theme="light"]{--bg:#f2f2f7;--card:#fff;--tile:#e9e9ee;--hair:rgba(60,60,67,.2);--hair-2:rgba(60,60,67,.32);--text:#1d1d1f;--text-2:rgba(60,60,67,.74);--text-3:rgba(60,60,67,.55);--accent:#007aff;--danger:#ff3b30;--c-front:#007aff;--c-rear:#30b0c7;--c-sub:#5856d6;--c-bar:#007aff;--shadow:0 1px 2px rgba(0,0,0,.05),0 10px 26px -18px rgba(0,0,0,.22);}
+  :root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--tile:#2c2c2e;--hair:rgba(235,235,245,.16);--hair-2:rgba(235,235,245,.26);--text:#f5f5f7;--text-2:rgba(235,235,245,.74);--text-3:rgba(235,235,245,.58);--accent:#0a84ff;--danger:#ff453a;--c-front:#0a84ff;--c-rear:#40cbe0;--c-sub:#7d7aff;--c-bar:#0a84ff;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -18px rgba(0,0,0,.7);}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);letter-spacing:-.014em;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 90px}
@@ -185,11 +185,22 @@
   .modal-btns button{flex:1;font:inherit;font-size:14px;font-weight:600;padding:10px;border-radius:11px;border:none;cursor:pointer}
   .mbtn-cancel{background:var(--tile);color:var(--text)}.mbtn-cancel:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
   .mbtn-ok{background:var(--accent);color:#fff}.mbtn-ok:disabled{opacity:.4;cursor:default}
+  .tbtn.help{width:30px;height:30px;padding:0;justify-content:center;font-weight:700;font-size:15px}
+  .modal.wide{width:404px;max-width:92vw;padding:26px}
+  .ov-dots{display:flex;gap:7px;justify-content:center;margin:2px 0 16px}
+  .ov-dots i{width:11px;height:11px;border-radius:50%;display:block}
+  .ov-title{font-size:22px;font-weight:700;letter-spacing:-.02em;text-align:center;margin:0 0 5px}
+  .ov-sub{font-size:13.5px;color:var(--text-2);text-align:center;line-height:1.5;margin:0 0 18px}
+  .ov-tip{display:flex;gap:13px;align-items:flex-start;padding:8px 0}
+  .ov-tip .ti{width:40px;height:40px;border-radius:11px;flex:none;display:grid;place-items:center}
+  .ov-tip .ti svg{width:22px;height:22px}
+  .ov-tip .tt b{display:block;font-size:14px;font-weight:600;margin-bottom:1px}
+  .ov-tip .tt span{font-size:12.5px;color:var(--text-2);line-height:1.45}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
 <div class="wrap">
-  <div class="top"><span class="mark"><i></i></span><b>Chorus</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
+  <div class="top"><span class="mark"><i></i></span><b>Chorus</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn help" id="helpBtn" aria-label="Overview" title="Overview">?</button><button class="tbtn" id="themeBtn">Appearance</button></div>
   <div class="grid">
     <div><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
     <div id="main"></div>
@@ -254,7 +265,7 @@
       b.addEventListener("dragleave",function(){b.classList.remove("droproom")});
       b.addEventListener("drop",function(e){e.preventDefault();b.classList.remove("droproom");moveSpeaker(drag,k)});
       box.appendChild(b);});
-    var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>New room</b><span>drag a speaker here</span></span>';
+    var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>New room</b><span>drop a speaker here</span></span>';
     nr.addEventListener("dragover",function(e){if(drag){e.preventDefault();nr.classList.add("droproom")}});
     nr.addEventListener("dragleave",function(){nr.classList.remove("droproom")});
     nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");var d=drag;if(!d)return;
@@ -282,6 +293,23 @@
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(modal);document.body.appendChild(back);
     requestAnimationFrame(function(){back.classList.add("on");inp.focus()});}
+  var MOVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="17" y2="12"/><polyline points="12 7 17 12 12 17"/></svg>';
+  var SAVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20l-7-4.2L5 20V5.5a1 1 0 0 1 1-1z"/></svg>';
+  function overviewModal(){var back=el("div","modal-back"),modal=el("div","modal wide");
+    function tip(cls,icon,title,text){return '<div class="ov-tip"><div class="ti '+cls+'">'+icon+'</div><div class="tt"><b>'+title+'</b><span>'+text+'</span></div></div>'}
+    modal.innerHTML='<div class="ov-dots"><i></i><i></i><i></i><i></i><i></i></div>'+
+      '<h2 class="ov-title">Welcome to Chorus</h2>'+
+      '<p class="ov-sub">Set up your Sonos speakers — home theaters, stereo pairs, and rooms — right here in Home Assistant.</p>'+
+      tip("t-front",ICON.soundbar,"Build a home theater","Drag speakers onto the Front, Rear, and Sub spots around your seat.")+
+      tip("t-rear",MOVE,"Move between rooms","Drag a speaker onto any room to move it there — or onto “New room” to make one.")+
+      tip("t-sub",WAVE,"Find a speaker","Two look the same? Tap the chime and listen for which one it is.")+
+      tip("t-bar",SAVE,"Save your setups","Keep layouts like “Movie 5.1” and switch anytime from a room’s ••• menu.")+
+      '<button class="btn fill" style="width:100%;margin-top:18px">Got it</button>';
+    var cols=["var(--c-bar)","var(--c-front)","var(--c-front)","var(--c-rear)","var(--c-rear)"],dots=modal.querySelectorAll(".ov-dots i");
+    for(var i=0;i<dots.length;i++)dots[i].style.background=cols[i];
+    function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
+    modal.querySelector(".btn").onclick=close;back.addEventListener("click",function(e){if(e.target===back)close()});
+    back.appendChild(modal);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
   function allSpeakers(r){var a=[];if(r.slots)Object.keys(r.slots).forEach(function(k){if(r.slots[k])a.push(r.slots[k])});if(r.tray)r.tray.forEach(function(s){a.push(s)});return a;}
   function saveLayout(r,name){r.saved=r.saved||[];var nm=(name&&name.trim())||("Layout "+(r.saved.length+1));r.saved.push({name:nm,slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “"+nm+"”");render();}
   function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
@@ -306,7 +334,7 @@
     $("h1",left).textContent=r.name;head.appendChild(left);
     head.appendChild(roomMenu(r));m.appendChild(head);
 
-    var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">drag speakers into position</span>';m.appendChild(sec);
+    var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">hover a speaker for options</span>';m.appendChild(sec);
     var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","T V"));
     var b1=el("div","prow");b1.appendChild(pos(r,"CC"));stage.appendChild(b1);
     var f=el("div","prow fronts");f.appendChild(pos(r,"LF"));f.appendChild(pos(r,"RF"));stage.appendChild(f);
@@ -315,11 +343,11 @@
     var s=el("div","psub");s.appendChild(pos(r,"SW"));stage.appendChild(s);
     m.appendChild(stage);
 
-    var sec2=el("div","sec");sec2.innerHTML='<h2>Available speakers</h2><span class="sc">drag onto a room to move it</span>';m.appendChild(sec2);
+    var sec2=el("div","sec");sec2.innerHTML='<h2>Available speakers</h2><span class="sc">drag onto a position, or a room to move it</span>';m.appendChild(sec2);
     var grp=el("div","group");var rowsEl=el("div","rows");
     if(!r.tray.length)rowsEl.appendChild(el("div","empty-note","Every speaker is in use."));
     r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);
-    var hint=el("div","drop-hint","drag a speaker here to remove it from the home theater");m.appendChild(hint);
+    var hint=el("div","drop-hint","drop a speaker here to remove it from the home theater");m.appendChild(hint);
     [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
 
     var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom setups.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
@@ -381,7 +409,7 @@
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip">'+(sp?"Single speaker":"Empty room")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>'+(sp?"Speaker":"No speakers yet")+'</h2><span class="sc">'+(sp?"add another to pair":"an HA room with no Sonos")+'</span>';m.appendChild(sec);
-    if(!sp){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">This room has no speakers</div><div class="wm" style="max-width:32ch;text-align:center">Move one in by dragging it onto “'+r.name+'” in the sidebar.</div>';m.appendChild(e);return;}
+    if(!sp){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">This room has no speakers</div><div class="wm" style="max-width:32ch;text-align:center">Move one in by dropping it onto “'+r.name+'” in the sidebar.</div>';m.appendChild(e);return;}
     var s=el("div","solo");var t=orb(sp,"t-neutral");s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
     var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
 
@@ -414,6 +442,8 @@
   function setThemeBtn(){var t=curTheme();$("#themeBtn").innerHTML=(t==="dark"?MOON+"<span>Dark</span>":SUN+"<span>Light</span>")}
   $("#themeBtn").onclick=function(){document.documentElement.setAttribute("data-theme",curTheme()==="dark"?"light":"dark");setThemeBtn()};
   setThemeBtn();
+  $("#helpBtn").onclick=overviewModal;
   render();
+  overviewModal();
 })();
 </script>
