@@ -69,6 +69,10 @@
   .menu button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
   .menu button.danger{color:var(--danger)}.menu button.danger:hover{background:color-mix(in srgb,var(--danger) 10%,transparent)}
   .menu .sep{height:.5px;background:var(--hair);margin:5px 9px}
+  .menu .mlabel{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;padding:8px 11px 3px}
+  .menu .mlayout{justify-content:space-between}
+  .mdel{color:var(--text-3);font-size:12px;line-height:1;padding:3px 5px;border-radius:6px;margin:-3px -3px -3px 8px}
+  .mdel:hover{color:var(--danger);background:color-mix(in srgb,var(--danger) 13%,transparent)}
   .head h1{font-size:29px;font-weight:700;letter-spacing:-.03em;margin:0}
   .chips{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
   .chip{font-size:12px;font-weight:600;padding:4px 11px;border-radius:980px;background:var(--tile);color:var(--text-2)}
@@ -281,6 +285,7 @@
   function allSpeakers(r){var a=[];if(r.slots)Object.keys(r.slots).forEach(function(k){if(r.slots[k])a.push(r.slots[k])});if(r.tray)r.tray.forEach(function(s){a.push(s)});return a;}
   function saveLayout(r,name){r.saved=r.saved||[];var nm=(name&&name.trim())||("Layout "+(r.saved.length+1));r.saved.push({name:nm,slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “"+nm+"”");render();}
   function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
+  function deleteLayout(r,saved){r.saved=(r.saved||[]).filter(function(x){return x!==saved});toast("Deleted “"+saved.name+"”");render();}
   function normalizeRoom(r){if(r.type==="ht")return;
     if(r.type==="pair"&&!(r.L&&r.R)){if(r.L){r.tray.push(r.L);r.L=null}if(r.R){r.tray.push(r.R);r.R=null}r.type="music";}
     if(r.type!=="pair"){var n=(r.tray?r.tray.length:0)+(r.L?1:0)+(r.R?1:0);r.type=n>=2?"music":"solo";}}
@@ -385,14 +390,20 @@
   document.addEventListener("click",closeMenus);
   function roomMenu(r){var items=[];
     if(r.type==="ht"){items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
-      (r.saved||[]).forEach(function(s){items.push(["Restore "+s.name,0,function(){restoreLayout(r,s)}])});
+      if(r.saved&&r.saved.length){items.push(["header","Saved layouts"]);r.saved.forEach(function(s){items.push(["layout",s])});}
       items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);}
     else if(r.type==="pair"){items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);
       items.push(["sep"]);items.push(["Unpair",1,function(){unpair(r)}]);}
     else return null;
     var wrap=el("div","menu-wrap");var btn=el("button","hmenu-btn");btn.innerHTML=DOTS;btn.title="Room options";btn.setAttribute("aria-label","Room options");
     var menu=el("div","menu");
-    items.forEach(function(it){if(it[0]==="sep"){menu.appendChild(el("div","sep"));return;}
+    items.forEach(function(it){
+      if(it[0]==="sep"){menu.appendChild(el("div","sep"));return;}
+      if(it[0]==="header"){menu.appendChild(el("div","mlabel",it[1]));return;}
+      if(it[0]==="layout"){var s=it[1],row=el("button","mlayout"),nm=el("span",null,s.name),dl=el("span","mdel","✕");
+        row.appendChild(nm);row.appendChild(dl);row.title="Restore “"+s.name+"”";
+        row.onclick=function(e){e.stopPropagation();closeMenus();restoreLayout(r,s)};
+        dl.title="Delete";dl.onclick=function(e){e.stopPropagation();deleteLayout(r,s)};menu.appendChild(row);return;}
       var b=el("button",it[1]?"danger":"");b.textContent=it[0];b.onclick=function(e){e.stopPropagation();closeMenus();it[2]()};menu.appendChild(b)});
     btn.onclick=function(e){e.stopPropagation();var was=menu.classList.contains("open");closeMenus();if(!was)menu.classList.add("open")};
     wrap.appendChild(btn);wrap.appendChild(menu);return wrap;}
