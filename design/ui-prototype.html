@@ -290,7 +290,6 @@
     var hint=el("div","drop-hint","drag a bonded speaker here to remove it");m.appendChild(hint);
     [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
 
-    var ro=el("div","readout");ro.innerHTML='<div class="rl">HTSatChanMapSet · one satellite per call</div><code></code>';$("code",ro).innerHTML=chanMap(r);m.appendChild(ro);
     var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom bonds.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
   }
   function speakerRow(r,sp){var row=el("div","row");var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";
@@ -337,7 +336,6 @@
     if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
       var grp=el("div","group");var rowsEl=el("div","rows");r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
     if(!paired){var act2=el("div","actions");var b=el("button","btn fill","Create stereo pair");b.disabled=!(r.L&&r.R);b.onclick=function(){toast("Creating stereo pair…");setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)};act2.appendChild(b);m.appendChild(act2);}
-    else{var ro=el("div","readout");ro.innerHTML='<div class="rl">ChannelMapSet</div><code></code>';$("code",ro).innerHTML="<b>"+r.L.id+"</b>:LF,LF;<b>"+r.R.id+"</b>:RF,RF";m.appendChild(ro);}
   }
   function well(r,side){var w=el("div","well");var sp=r[side];w.appendChild(el("div","side",side));
     if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
