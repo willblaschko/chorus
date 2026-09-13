@@ -220,6 +220,12 @@
   .aset-row+.aset-row{border-top:.5px solid var(--hair)}
   .aset-row .rl{font-size:14.5px}.aset-row .rc{display:flex;align-items:center;gap:11px}
   .aset-row .rv{font-family:var(--mono);font-size:11px;color:var(--text-3);min-width:48px;text-align:right}
+  .pairsub{display:flex;justify-content:center;margin-top:14px}
+  .addsub{font:inherit;font-size:13px;font-weight:500;color:var(--accent);background:none;border:1.5px dashed var(--hair-2);border-radius:13px;padding:9px 16px;cursor:pointer}
+  .addsub:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .subchip{display:flex;align-items:center;gap:11px;background:var(--card);box-shadow:var(--shadow);border-radius:14px;padding:9px 15px 9px 10px;cursor:pointer}
+  .subchip .badge svg{width:20px;height:20px}
+  .subchip .sc-meta b{display:block;font-size:13.5px;font-weight:600}.subchip .sc-meta span{font-family:var(--mono);font-size:10px;color:var(--text-3)}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -239,8 +245,8 @@
       slots:{LF:{id:"sym-bk1",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},RF:{id:"sym-bk2",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},
         LR:{id:"sym-pf1",name:"Picture frame",model:"Symfonisk Picture frame",height:false},RR:{id:"sym-pf2",name:"Picture frame",model:"Symfonisk Picture frame",height:false},SW:{id:"submini",name:"Sub Mini",model:"Sonos Sub Mini"}},
       tray:[{id:"era1",name:"Media Room 2",model:"Era 300"},{id:"era2",name:"Media Room 3",model:"Era 300"}]},
-    bedroom:{name:"Bedroom",type:"pair",L:{id:"lamp1",name:"Bedroom",model:"Symfonisk Lamp"},R:{id:"lamp2",name:"Bedroom",model:"Symfonisk Lamp"},tray:[]},
-    guest:{name:"Guest Bedroom",type:"pair",L:{id:"gl1",name:"Guest",model:"Symfonisk Lamp"},R:{id:"gl2",name:"Guest",model:"Symfonisk Lamp"},tray:[]},
+    bedroom:{name:"Bedroom",type:"pair",L:{id:"lamp1",name:"Bedroom",model:"Symfonisk Lamp"},R:{id:"lamp2",name:"Bedroom",model:"Symfonisk Lamp"},tray:[],sub:null},
+    guest:{name:"Guest Bedroom",type:"pair",L:{id:"gl1",name:"Guest",model:"Symfonisk Lamp"},R:{id:"gl2",name:"Guest",model:"Symfonisk Lamp"},tray:[],sub:null},
     pantry:{name:"Pantry",type:"solo",tray:[{id:"p1",name:"Pantry",model:"Symfonisk Bookshelf"}]},
     office:{name:"Office",type:"solo",tray:[{id:"of1",name:"Office",model:"Symfonisk Frame"}]},
     kitchen:{name:"Kitchen",type:"solo",tray:[{id:"k1",name:"Kitchen",model:"Symfonisk Bookshelf"}]},
@@ -249,7 +255,7 @@
   };
   var CH=["LF","RF","LR","RR","SW"],CHNAME={LF:"Front L",RF:"Front R",LR:"Rear L",RR:"Rear R",SW:"Sub"};
   var TINT={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub",CC:"t-bar"};
-  var current="media",drag=null;
+  var current="media",drag=null,looseSubs=[{id:"freesub",name:"Sub",model:"Sonos Sub"}];
   var $=function(s,r){return (r||document).querySelector(s)};
   function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
   function sm(m){return m.replace("Sonos ","").replace("Symfonisk ","")}
@@ -278,7 +284,7 @@
 
   function roomTint(r){return r.type==="ht"?"t-bar":r.type==="pair"?"t-front":"t-neutral"}
   function rGlyph(r){var m=r.type==="ht"?r.bar.model:(r.L?r.L.model:(r.tray[0]?r.tray[0].model:""));return iconFor(m)}
-  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?"Stereo pair":n+" speakers, unpaired";}
+  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?(r.sub?"Stereo pair · Sub":"Stereo pair"):n+" speakers, unpaired";}
   function buildRooms(){var box=$("#rooms");box.innerHTML="";
     Object.keys(rooms).forEach(function(k){var r=rooms[k],b=el("button","room"+(k===current?" sel":""));b.setAttribute("aria-pressed",k===current);
       var tint=roomTint(r);
@@ -354,7 +360,7 @@
 
   function renderHT(r){var m=$("#main");m.innerHTML="";
     var head=el("div","head");var left=el("div","head-l");
-    left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span><span class="chip">Trueplay off</span></div>';
+    left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
     $("h1",left).textContent=r.name;head.appendChild(left);
     head.appendChild(roomMenu(r));m.appendChild(head);
 
@@ -374,7 +380,7 @@
     var hint=el("div","drop-hint","drop a speaker here to remove it from the home theater");m.appendChild(hint);
     [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
 
-    var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom setups.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
+    var w=el("div","warn");w.innerHTML='<b>Heads up:</b> custom layouts like this are ones the Sonos app won’t build itself, so some of its tuning (like Trueplay) may not fully apply. Everything else works normally.';m.appendChild(w);
   }
   function speakerRow(r,sp){var row=el("div","row");var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";
     var meta=el("div","rx");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=sp.name;$("span",meta).textContent=sm(sp.model);
@@ -421,6 +427,13 @@
     var mn=roomMenu(r);if(mn)head.appendChild(mn);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Stereo pair</h2><span class="sc">'+(paired?"":"drop a speaker on each side")+'</span>';m.appendChild(sec);
     var wells=el("div","wells");wells.appendChild(well(r,"L"));var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);wells.appendChild(well(r,"R"));m.appendChild(wells);
+    if(paired){var subw=el("div","pairsub");
+      if(r.sub){var st=el("div","subchip");st.innerHTML='<div class="badge t-sub" style="width:36px;height:36px;border-radius:10px">'+ICON.sub+'</div><div class="sc-meta"><b>Sub</b><span></span></div>';st.querySelector(".sc-meta span").textContent=sm(r.sub.model);
+        st.onclick=function(){actionSheet("Sub",sm(r.sub.model),[{label:"Identify",icon:WAVE,fn:function(){identify("Sub",st)}},{label:"Remove sub",danger:true,icon:RMI,fn:function(){looseSubs.push(r.sub);r.sub=null;renderPair(r);buildRooms()}}])};subw.appendChild(st);}
+      else{var add=el("button","addsub");add.textContent="＋ Add a Sub";
+        add.onclick=function(){if(!looseSubs.length){toast("No free Sub — power one on, or free one from another set");return;}
+          actionSheet("Add a Sub","Choose a Sub to bond to this pair",looseSubs.map(function(s){return {label:s.name+" · "+sm(s.model),icon:ICON.sub,fn:function(){r.sub=s;looseSubs=looseSubs.filter(function(x){return x!==s});renderPair(r);buildRooms()}}}))};subw.appendChild(add);}
+      m.appendChild(subw);}
     if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
       var grp=el("div","group");var rowsEl=el("div","rows");r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
     if(!paired){var act2=el("div","actions");var b=el("button","btn fill","Create stereo pair");b.disabled=!(r.L&&r.R);b.onclick=function(){toast("Creating stereo pair…");setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)};act2.appendChild(b);m.appendChild(act2);}
@@ -431,7 +444,7 @@
     }else w.appendChild(el("div","empty-note","Empty"));
     w.addEventListener("dragover",function(e){if(drag){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
     w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;renderPair(r)});return w;}
-  function unpair(r){toast("Separating…");setTimeout(function(){r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
+  function unpair(r){toast("Separating…");setTimeout(function(){if(r.sub){looseSubs.push(r.sub);r.sub=null}r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
 
   function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
     var head=el("div","head");var left=el("div","head-l");
