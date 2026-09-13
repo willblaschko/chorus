@@ -1,152 +1,150 @@
 <title>Sonos Studio — bonding UI prototype</title>
 <style>
   :root{
-    --bg:#f5f5f7;--panel:#fff;--fill:#ececed;--fill-2:#e4e4e6;--hair:rgba(0,0,0,.09);--hair-2:rgba(0,0,0,.16);
-    --text:#1d1d1f;--text-2:rgba(0,0,0,.5);--text-3:rgba(0,0,0,.32);--accent:#0071e3;--danger:#d70015;
+    --bg:#f2f2f7;--card:#fff;--tile:#eef0f3;--hair:rgba(0,0,0,.08);--hair-2:rgba(0,0,0,.14);
+    --text:#1d1d1f;--text-2:rgba(0,0,0,.52);--text-3:rgba(0,0,0,.34);
+    --accent:#0071e3;--danger:#d70015;
+    --c-front:#0a84ff;--c-rear:#009cb0;--c-sub:#5e5ce6;--c-bar:#0071e3;
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 10px 26px -18px rgba(0,0,0,.22);
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;
-    --mono:ui-monospace,"SF Mono",Menlo,monospace;--r:20px;--r-sm:13px;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
   }
   @media(prefers-color-scheme:dark){:root{
-    --bg:#000;--panel:#1c1c1e;--fill:#2c2c2e;--fill-2:#3a3a3c;--hair:rgba(255,255,255,.1);--hair-2:rgba(255,255,255,.22);
-    --text:#f5f5f7;--text-2:rgba(255,255,255,.56);--text-3:rgba(255,255,255,.34);--accent:#2997ff;--danger:#ff453a;
+    --bg:#000;--card:#1c1c1e;--tile:#2c2c2e;--hair:rgba(255,255,255,.09);--hair-2:rgba(255,255,255,.2);
+    --text:#f5f5f7;--text-2:rgba(255,255,255,.56);--text-3:rgba(255,255,255,.36);
+    --accent:#0a84ff;--danger:#ff453a;
+    --c-front:#0a84ff;--c-rear:#40cbe0;--c-sub:#7d7aff;--c-bar:#409cff;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -18px rgba(0,0,0,.7);
   }}
-  :root[data-theme="light"]{--bg:#f5f5f7;--panel:#fff;--fill:#ececed;--fill-2:#e4e4e6;--hair:rgba(0,0,0,.09);--hair-2:rgba(0,0,0,.16);--text:#1d1d1f;--text-2:rgba(0,0,0,.5);--text-3:rgba(0,0,0,.32);--accent:#0071e3;--danger:#d70015;}
-  :root[data-theme="dark"]{--bg:#000;--panel:#1c1c1e;--fill:#2c2c2e;--fill-2:#3a3a3c;--hair:rgba(255,255,255,.1);--hair-2:rgba(255,255,255,.22);--text:#f5f5f7;--text-2:rgba(255,255,255,.56);--text-3:rgba(255,255,255,.34);--accent:#2997ff;--danger:#ff453a;}
+  :root[data-theme="light"]{--bg:#f2f2f7;--card:#fff;--tile:#eef0f3;--hair:rgba(0,0,0,.08);--hair-2:rgba(0,0,0,.14);--text:#1d1d1f;--text-2:rgba(0,0,0,.52);--text-3:rgba(0,0,0,.34);--accent:#0071e3;--danger:#d70015;--c-front:#0a84ff;--c-rear:#009cb0;--c-sub:#5e5ce6;--c-bar:#0071e3;--shadow:0 1px 2px rgba(0,0,0,.05),0 10px 26px -18px rgba(0,0,0,.22);}
+  :root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--tile:#2c2c2e;--hair:rgba(255,255,255,.09);--hair-2:rgba(255,255,255,.2);--text:#f5f5f7;--text-2:rgba(255,255,255,.56);--text-3:rgba(255,255,255,.36);--accent:#0a84ff;--danger:#ff453a;--c-front:#0a84ff;--c-rear:#40cbe0;--c-sub:#7d7aff;--c-bar:#409cff;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -18px rgba(0,0,0,.7);}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);letter-spacing:-.014em;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:1080px;margin:0 auto;padding:22px 26px 90px}
-  .top{display:flex;align-items:center;gap:10px;margin:8px 4px 30px}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);letter-spacing:-.014em;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 90px}
+  .top{display:flex;align-items:center;gap:10px;margin:6px 4px 26px}
   .mark{width:26px;height:26px;border-radius:7px;background:var(--text);display:grid;place-items:center}
   .mark i{width:10px;height:10px;border-radius:50%;border:2.4px solid var(--bg)}
-  .top b{font-size:15px;font-weight:600}.top .s{font-size:15px;color:var(--text-3);font-weight:400}
-  .top .sp{flex:1}
-  .tbtn{font:inherit;font-size:13px;color:var(--text-2);background:none;border:none;cursor:pointer;padding:6px}
-  .tbtn:hover{color:var(--text)}
+  .top b{font-size:15px;font-weight:600}.top .s{font-size:15px;color:var(--text-3)}
+  .top .sp{flex:1}.tbtn{font:inherit;font-size:13px;color:var(--text-2);background:none;border:none;cursor:pointer;padding:6px}.tbtn:hover{color:var(--text)}
 
-  .grid{display:grid;grid-template-columns:226px 1fr;gap:34px;align-items:start}
-  @media(max-width:800px){.grid{grid-template-columns:1fr;gap:22px}}
+  .grid{display:grid;grid-template-columns:238px 1fr;gap:26px;align-items:start}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  .eyebrow{font-size:12px;font-weight:600;color:var(--text-3);letter-spacing:.02em;margin:0 8px 8px}
 
-  .eyebrow{font-size:12px;font-weight:600;color:var(--text-3);letter-spacing:.02em;margin:0 6px 10px}
-  .rooms{display:flex;flex-direction:column;gap:2px}
+  /* grouped surface */
+  .group{background:var(--card);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+
+  /* room list — inset grouped, tinted icons, chevrons */
   .room{width:100%;border:none;background:none;font:inherit;color:inherit;cursor:pointer;text-align:left;
-    padding:11px 12px;border-radius:12px;display:flex;align-items:center;gap:12px;transition:background .13s}
-  .room:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
-  .room.sel{background:var(--panel)}
-  .ricon{width:30px;height:30px;flex:none;display:grid;place-items:center;color:var(--text-2)}
-  .ricon svg{width:22px;height:22px}
-  .room.sel .ricon{color:var(--accent)}
-  .rmeta{flex:1;min-width:0}
-  .rmeta b{display:block;font-size:14.5px;font-weight:500}
-  .rmeta span{font-size:12px;color:var(--text-3)}
+    padding:11px 13px;display:flex;align-items:center;gap:12px;position:relative;transition:background .12s}
+  .room+.room::before{content:"";position:absolute;top:0;left:53px;right:0;height:.5px;background:var(--hair)}
+  .room:hover{background:color-mix(in srgb,var(--text) 4%,transparent)}
+  .room.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .room.sel::before,.room.sel+.room::before{background:transparent}
+  .ric{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center}
+  .ric svg{width:19px;height:19px}
+  .rmeta{flex:1;min-width:0}.rmeta b{display:block;font-size:14.5px;font-weight:500}.rmeta span{font-size:12px;color:var(--text-3)}
+  .chev{color:var(--text-3);font-size:16px;opacity:.7}.room.sel .chev{color:var(--accent);opacity:1}
 
-  .head h1{font-size:30px;font-weight:700;letter-spacing:-.03em;margin:0 0 4px;text-wrap:balance}
-  .head p{margin:0;font-size:15px;color:var(--text-2);max-width:54ch;line-height:1.5}
-  .actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
-  .btn{font:inherit;font-size:14px;font-weight:500;border-radius:980px;padding:8px 17px;cursor:pointer;border:none;transition:.12s}
+  .head{margin:0 2px 16px}
+  .head h1{font-size:29px;font-weight:700;letter-spacing:-.03em;margin:0}
+  .chips{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:600;padding:4px 11px;border-radius:980px;background:var(--tile);color:var(--text-2)}
+  .chip.accent{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+  .actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .btn{font:inherit;font-size:14px;font-weight:500;border-radius:980px;padding:8px 16px;cursor:pointer;border:none;transition:.12s}
   .btn:active{transform:scale(.98)}
   .btn.fill{background:var(--accent);color:#fff}.btn.fill:disabled{opacity:.4;cursor:default}
-  .btn.soft{background:var(--fill);color:var(--text)}
-  .btn.text{background:none;color:var(--danger);padding:8px 10px}
-  .btn.text:hover{background:color-mix(in srgb,var(--danger) 10%,transparent)}
+  .btn.soft{background:var(--tile);color:var(--text)}
+  .btn.text{background:none;color:var(--danger);padding:8px 8px}.btn.text:hover{text-decoration:underline}
 
-  /* ===== stage: airy, flat, no box ===== */
-  .stage{margin:26px 0 10px;position:relative;padding:8px 0 4px}
-  .tv{width:min(300px,52%);height:5px;border-radius:3px;background:var(--hair-2);margin:0 auto 4px;opacity:.7}
-  .tvl{text-align:center;font-size:11px;color:var(--text-3);margin-bottom:16px;letter-spacing:.02em}
-  .prow{display:flex;justify-content:center;gap:clamp(48px,22vw,240px)}
-  .prow.rear{margin-top:46px}
-  .psub{display:flex;justify-content:center;margin-top:30px}
+  .sec{display:flex;align-items:center;gap:8px;margin:22px 4px 11px}
+  .sec h2{font-size:19px;font-weight:700;letter-spacing:-.02em;margin:0}
+  .sec .sc{font-size:12px;color:var(--text-3);margin-left:auto}
+
+  /* ===== STAGE on a grouped card ===== */
+  .stage{position:relative;padding:26px 20px 30px;background:
+    radial-gradient(130% 90% at 50% 0%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 58%),var(--card);
+    border-radius:18px;box-shadow:var(--shadow)}
+  .tv{width:min(280px,54%);height:5px;border-radius:3px;background:var(--hair-2);margin:0 auto 5px;opacity:.8}
+  .tvl{text-align:center;font-size:10.5px;color:var(--text-3);letter-spacing:.08em;margin-bottom:16px}
+  .prow{display:flex;justify-content:center;gap:clamp(40px,20vw,220px)}.prow.rear{margin-top:44px}
+  .psub{display:flex;justify-content:center;margin-top:28px}
   .lp{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
-  .lp .r{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--hair-2);margin:0 auto 7px;position:relative}
-  .lp .r::after{content:"";position:absolute;inset:0;margin:auto;width:6px;height:6px;border-radius:50%;background:var(--text-3)}
-  .lp small{font-size:11px;color:var(--text-3)}
+  .lp .r{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--hair-2);margin:0 auto 6px;position:relative}
+  .lp .r::after{content:"";position:absolute;inset:0;margin:auto;width:5px;height:5px;border-radius:50%;background:var(--text-3)}
+  .lp small{font-size:10.5px;color:var(--text-3)}
 
-  .pos{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;width:120px}
-  .tile{width:66px;height:66px;border-radius:50%;display:grid;place-items:center;position:relative;
-    background:var(--fill);transition:background .18s,box-shadow .18s,transform .25s cubic-bezier(.34,1.4,.6,1)}
-  .tile svg{width:30px;height:30px;color:var(--text-2)}
-  .tile.empty{background:none;border:1.5px dashed var(--hair-2)}
+  .pos{position:relative;display:flex;flex-direction:column;align-items:center;gap:9px;width:118px}
+  .tile{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;position:relative;transition:transform .25s cubic-bezier(.34,1.4,.6,1),box-shadow .15s}
+  .tile svg{width:28px;height:28px}
+  .tile.empty{border:1.5px dashed var(--hair-2)}
   .tile.empty .cc{font-family:var(--mono);font-size:12px;color:var(--text-3);letter-spacing:.05em}
-  .tile.over{box-shadow:0 0 0 3px var(--accent);transform:scale(1.08)}
-  .tile.bonded{background:var(--fill)}
-  .tile.bar{width:112px;height:48px;border-radius:16px}
-  .plabel{text-align:center;line-height:1.25}
-  .plabel .nm{font-size:12.5px;font-weight:600}
-  .plabel .md{font-family:var(--mono);font-size:9.5px;color:var(--text-3)}
-  .ctl{position:absolute;top:-6px;right:16px;display:flex;gap:5px;opacity:0;transform:translateY(2px);transition:.14s}
-  .pos:hover .ctl,.card:hover .ctl{opacity:1;transform:none}
-  .cbtn{width:26px;height:26px;border-radius:50%;background:var(--panel);border:.5px solid var(--hair);color:var(--text-2);
-    cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px -3px rgba(0,0,0,.25);padding:0}
-  .cbtn svg{width:15px;height:15px}
-  .cbtn:hover{color:var(--text)}.cbtn.x:hover{color:var(--danger)}
-  .cbtn.on{color:var(--accent);border-color:var(--accent)}
-  .st{position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--accent);white-space:nowrap}
-  .spin{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--accent);border-top-color:transparent;
-    animation:spin .7s linear infinite;vertical-align:-1px;margin-right:4px}
+  .t-front{background:color-mix(in srgb,var(--c-front) 16%,var(--card));color:var(--c-front)}
+  .t-rear{background:color-mix(in srgb,var(--c-rear) 17%,var(--card));color:var(--c-rear)}
+  .t-sub{background:color-mix(in srgb,var(--c-sub) 16%,var(--card));color:var(--c-sub)}
+  .t-bar{background:color-mix(in srgb,var(--c-bar) 16%,var(--card));color:var(--c-bar)}
+  .t-neutral{background:var(--tile);color:var(--text-2)}
+  .tile.t-bar{width:104px;height:46px;border-radius:15px}
+  .tile.over{box-shadow:0 0 0 3px var(--accent);transform:scale(1.09)}
+  .plabel{text-align:center;line-height:1.25}.plabel .nm{font-size:12.5px;font-weight:600}.plabel .md{font-family:var(--mono);font-size:9px;color:var(--text-3)}
+  .ctl{position:absolute;top:-6px;right:14px;display:flex;gap:5px;opacity:0;transform:translateY(2px);transition:.14s}
+  .pos:hover .ctl{opacity:1;transform:none}
+  .cbtn{width:26px;height:26px;border-radius:50%;background:var(--card);border:.5px solid var(--hair);color:var(--text-2);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow);padding:0}
+  .cbtn svg{width:14px;height:14px}.cbtn:hover{color:var(--text)}.cbtn.x:hover{color:var(--danger)}.cbtn.on{color:var(--accent);border-color:var(--accent)}
+  .st{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--accent);white-space:nowrap}
+  .spin{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid var(--accent);border-top-color:transparent;animation:spin .7s linear infinite;vertical-align:-1px;margin-right:4px}
   @keyframes spin{to{transform:rotate(360deg)}}
-
-  /* draggable speaker (flat) */
-  .orb{cursor:grab;transition:transform .1s}
-  .orb:active{cursor:grabbing;transform:scale(.95)}
-  .orb.dragging{opacity:.35}
+  .orb{cursor:grab}.orb:active{cursor:grabbing;transform:scale(.94)}.orb.dragging{opacity:.35}
   .orb .rip{position:absolute;inset:0;border-radius:50%;pointer-events:none}
-  .orb.chirp .rip::before,.orb.chirp .rip::after{content:"";position:absolute;inset:0;border-radius:50%;
-    border:1.5px solid var(--accent);animation:ripple 1.1s ease-out forwards}
+  .orb.chirp .rip::before,.orb.chirp .rip::after{content:"";position:absolute;inset:0;border-radius:50%;border:1.5px solid currentColor;animation:ripple 1.1s ease-out forwards}
   .orb.chirp .rip::after{animation-delay:.35s}
   @keyframes ripple{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.3);opacity:0}}
 
-  /* shelf: hairline row, not a box */
-  .shelf-h{display:flex;align-items:baseline;justify-content:space-between;margin:30px 4px 4px;
-    padding-top:22px;border-top:.5px solid var(--hair)}
-  .shelf-h b{font-size:15px;font-weight:600}.shelf-h span{font-size:12.5px;color:var(--text-3)}
-  .shelf{display:flex;gap:26px;flex-wrap:wrap;padding:20px 4px 4px}
-  .shelf .empty-note{color:var(--text-3);font-size:13.5px}
-  .card{display:flex;flex-direction:column;align-items:center;gap:9px;width:96px;text-align:center;position:relative}
-  .card .cn{font-size:12.5px;font-weight:600}.card .cm{font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-top:-3px}
-  .chime{margin-top:4px;width:34px;height:34px;border-radius:50%;border:.5px solid var(--hair);background:var(--panel);
-    color:var(--accent);cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px -4px rgba(0,0,0,.2)}
-  .chime svg{width:18px;height:18px}
-  .chime:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  /* available speakers — Home-style grouped rows */
+  .rows .row{display:flex;align-items:center;gap:13px;padding:11px 14px;position:relative}
+  .rows .row+.row::before{content:"";position:absolute;top:0;left:60px;right:0;height:.5px;background:var(--hair)}
+  .rows .rt{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--tile);color:var(--text-2)}
+  .rows .rt svg{width:24px;height:24px}
+  .rows .rx{flex:1;min-width:0}.rows .rx b{display:block;font-size:14.5px;font-weight:600}.rows .rx span{font-size:11.5px;font-family:var(--mono);color:var(--text-3)}
+  .chime{width:38px;height:38px;border-radius:50%;border:.5px solid var(--hair);background:var(--bg);color:var(--accent);cursor:pointer;display:grid;place-items:center;flex:none}
+  .chime svg{width:19px;height:19px}.chime:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .rows .empty-note{padding:16px;color:var(--text-3);font-size:13.5px}
+  .drop-hint{border:1.5px dashed var(--hair-2);border-radius:14px;padding:10px;text-align:center;font-size:12px;color:var(--text-3);margin-top:12px}
 
-  .readout{margin-top:26px;padding-top:18px;border-top:.5px solid var(--hair)}
-  .readout .rl{font-family:var(--mono);font-size:11px;color:var(--text-3);letter-spacing:.02em;margin-bottom:8px}
-  .readout code{display:block;font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--text-2);word-break:break-all}
+  .readout{margin-top:22px}.readout .rl{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:7px}
+  .readout code{display:block;font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--text-2);word-break:break-all;
+    background:var(--card);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
   .readout code b{color:var(--accent);font-weight:500}
-  .warn{font-size:12.5px;color:var(--text-3);margin-top:18px;max-width:60ch;line-height:1.5}
-  .warn b{color:var(--text-2);font-weight:600}
+  .warn{font-size:12.5px;color:var(--text-3);margin-top:16px;max-width:62ch;line-height:1.5}.warn b{color:var(--text-2);font-weight:600}
 
   /* pair */
-  .wells{display:flex;align-items:center;gap:16px;justify-content:center;margin:22px 0 6px;max-width:560px}
-  .well{flex:1;min-height:170px;border-radius:var(--r);background:var(--fill);display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:12px;position:relative;transition:.2s;padding:16px}
-  .well.over{box-shadow:0 0 0 3px var(--accent) inset}
-  .well .side{position:absolute;top:14px;left:18px;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text-3)}
+  .wells{display:flex;align-items:stretch;gap:14px;margin:6px 0;max-width:560px}
+  .well{flex:1;min-height:172px;border-radius:18px;background:var(--card);box-shadow:var(--shadow);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:11px;position:relative;transition:.2s;padding:16px}
+  .well.over{box-shadow:0 0 0 3px var(--accent),var(--shadow)}
+  .well .side{position:absolute;top:14px;left:18px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--c-front)}
+  .well:last-child .side{color:var(--c-rear)}
   .well .wn{font-size:14.5px;font-weight:600}.well .wm{font-family:var(--mono);font-size:10px;color:var(--text-3)}
   .well .empty-note{color:var(--text-3);font-size:13.5px}
-  .swap{width:38px;height:38px;border-radius:50%;border:.5px solid var(--hair);background:var(--panel);cursor:pointer;
-    color:var(--text-2);flex:none;display:grid;place-items:center;font-size:16px}
+  .swap{width:38px;height:38px;border-radius:50%;border:.5px solid var(--hair);background:var(--card);cursor:pointer;color:var(--text-2);align-self:center;flex:none;display:grid;place-items:center;font-size:16px;box-shadow:var(--shadow)}
   .swap:hover{color:var(--accent)}
-  .solo{margin-top:16px;display:flex;flex-direction:column;align-items:center;gap:14px;padding:44px;
-    border-radius:var(--r);background:var(--fill)}
+  .solo{display:flex;flex-direction:column;align-items:center;gap:13px;padding:40px;border-radius:18px;background:var(--card);box-shadow:var(--shadow)}
   .solo .wn{font-size:16px;font-weight:600}.solo .wm{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+  .ctl.pin{position:absolute;top:12px;right:14px;opacity:1;transform:none}
 
-  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px) scale(.97);z-index:60;
-    background:var(--panel);border:.5px solid var(--hair);color:var(--text);font-size:13.5px;font-weight:500;
-    padding:12px 20px;border-radius:980px;box-shadow:0 18px 44px -14px rgba(0,0,0,.35);opacity:0;pointer-events:none;
-    transition:.32s cubic-bezier(.34,1.4,.6,1);display:flex;align-items:center;gap:9px}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px) scale(.97);z-index:60;background:var(--card);
+    border:.5px solid var(--hair);color:var(--text);font-size:13.5px;font-weight:500;padding:12px 20px;border-radius:980px;
+    box-shadow:0 18px 44px -14px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.32s cubic-bezier(.34,1.4,.6,1);display:flex;align-items:center;gap:9px}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
   .toast .w{color:var(--accent);display:grid;place-items:center}.toast .w svg{width:17px;height:17px}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
 <div class="wrap">
-  <div class="top">
-    <span class="mark"><i></i></span><b>Sonos&nbsp;Studio</b><span class="s">Bonding</span>
-    <span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button>
-  </div>
+  <div class="top"><span class="mark"><i></i></span><b>Sonos&nbsp;Studio</b><span class="s">Bonding</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
   <div class="grid">
-    <div><div class="eyebrow">Rooms</div><div class="rooms" id="rooms"></div></div>
+    <div><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
     <div id="main"></div>
   </div>
 </div>
@@ -155,14 +153,9 @@
 (function(){
   "use strict";
   var rooms={
-    media:{name:"Media Room",type:"ht",
-      bar:{id:"arc",name:"Arc SL",model:"Arc SL"},
-      slots:{
-        LF:{id:"sym-bk1",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},
-        RF:{id:"sym-bk2",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},
-        LR:{id:"sym-pf1",name:"Picture frame",model:"Symfonisk Picture frame",height:false},
-        RR:{id:"sym-pf2",name:"Picture frame",model:"Symfonisk Picture frame",height:false},
-        SW:{id:"submini",name:"Sub Mini",model:"Sonos Sub Mini"}},
+    media:{name:"Media Room",type:"ht",bar:{id:"arc",name:"Arc SL",model:"Arc SL"},
+      slots:{LF:{id:"sym-bk1",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},RF:{id:"sym-bk2",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},
+        LR:{id:"sym-pf1",name:"Picture frame",model:"Symfonisk Picture frame",height:false},RR:{id:"sym-pf2",name:"Picture frame",model:"Symfonisk Picture frame",height:false},SW:{id:"submini",name:"Sub Mini",model:"Sonos Sub Mini"}},
       tray:[{id:"era1",name:"Media Room 2",model:"Era 300"},{id:"era2",name:"Media Room 3",model:"Era 300"}]},
     bedroom:{name:"Bedroom",type:"pair",L:{id:"lamp1",name:"Bedroom",model:"Symfonisk Lamp"},R:{id:"lamp2",name:"Bedroom",model:"Symfonisk Lamp"},tray:[]},
     guest:{name:"Guest Bedroom",type:"pair",L:{id:"gl1",name:"Guest",model:"Symfonisk Lamp"},R:{id:"gl2",name:"Guest",model:"Symfonisk Lamp"},tray:[]},
@@ -172,6 +165,7 @@
     dining:{name:"Dining Room",type:"solo",tray:[{id:"conn",name:"Dining Room",model:"Sonos Connect"}]}
   };
   var CH=["LF","RF","LR","RR","SW"],CHNAME={LF:"Front L",RF:"Front R",LR:"Rear L",RR:"Rear R",SW:"Sub"};
+  var TINT={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub",CC:"t-bar"};
   var current="media",drag=null;
   var $=function(s,r){return (r||document).querySelector(s)};
   function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
@@ -187,49 +181,41 @@
     connect:svg('<rect x="3.5" y="8" width="17" height="8" rx="2.5"/><circle cx="17" cy="12" r="1.1" fill="currentColor" stroke="none"/>'),
     driver:svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4"/>')
   };
-  function iconFor(m){m=(m||"").toLowerCase();
-    return /arc|beam|ray/.test(m)?ICON.soundbar:/sub/.test(m)?ICON.sub:/era/.test(m)?ICON.era:/lamp/.test(m)?ICON.lamp
-      :/frame|picture/.test(m)?ICON.frame:/bookshelf/.test(m)?ICON.book:/connect|port|amp/.test(m)?ICON.connect:ICON.driver}
+  function iconFor(m){m=(m||"").toLowerCase();return /arc|beam|ray/.test(m)?ICON.soundbar:/sub/.test(m)?ICON.sub:/era/.test(m)?ICON.era:/lamp/.test(m)?ICON.lamp:/frame|picture/.test(m)?ICON.frame:/bookshelf/.test(m)?ICON.book:/connect|port|amp/.test(m)?ICON.connect:ICON.driver}
   var WAVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.3L11.5 18V6L7.3 9.5H4z" fill="currentColor" stroke="none"/><path d="M15 9.3a4 4 0 0 1 0 5.4"/><path d="M17.7 6.5a8 8 0 0 1 0 11"/></svg>';
 
   var toastEl=null,tT=null;
-  function toast(m){if(!toastEl){toastEl=el("div","toast");toastEl.innerHTML='<span class="w">'+WAVE+'</span><span></span>';document.body.appendChild(toastEl);}
-    toastEl.lastChild.textContent=m;toastEl.classList.add("on");clearTimeout(tT);tT=setTimeout(function(){toastEl.classList.remove("on")},2700);}
+  function toast(m){if(!toastEl){toastEl=el("div","toast");toastEl.innerHTML='<span class="w">'+WAVE+'</span><span></span>';document.body.appendChild(toastEl);}toastEl.lastChild.textContent=m;toastEl.classList.add("on");clearTimeout(tT);tT=setTimeout(function(){toastEl.classList.remove("on")},2700);}
   function identify(name,node){toast("Chiming on “"+name+"” — listen for the speaker");if(node){node.classList.add("chirp");setTimeout(function(){node.classList.remove("chirp")},1150);}}
 
-  function tile(sp,cls){var t=el("div","tile orb"+(cls?" "+cls:""));t.draggable=true;t.innerHTML=iconFor(sp.model)+'<span class="rip"></span>';
+  function orb(sp,tintCls){var t=el("div","tile orb "+(tintCls||"t-neutral"));t.draggable=true;t.innerHTML=iconFor(sp.model)+'<span class="rip"></span>';
     t.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};t.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id)}catch(_){}} );
     t.addEventListener("dragend",function(){t.classList.remove("dragging");drag=null});return t;}
-  function cbtn(cls,inner,title,fn){var b=el("button","cbtn"+(cls?" "+cls:""));b.innerHTML=inner;b.title=title;
-    b.addEventListener("mousedown",function(e){e.stopPropagation()});b.addEventListener("click",function(e){e.stopPropagation();fn()});return b;}
+  function cbtn(cls,inner,title,fn){var b=el("button","cbtn"+(cls?" "+cls:""));b.innerHTML=inner;b.title=title;b.addEventListener("mousedown",function(e){e.stopPropagation()});b.addEventListener("click",function(e){e.stopPropagation();fn()});return b;}
 
-  function rGlyph(r){var m = r.type==="ht"?r.bar.model : (r.L?r.L.model:(r.tray[0]?r.tray[0].model:""));return iconFor(m)}
-  function roomState(r){
-    if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";
-    var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);
-    if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";
-    return (r.L&&r.R)?"Stereo pair":n+" speakers, unpaired";
-  }
+  function roomTint(r){return r.type==="ht"?"t-bar":r.type==="pair"?"t-front":"t-neutral"}
+  function rGlyph(r){var m=r.type==="ht"?r.bar.model:(r.L?r.L.model:(r.tray[0]?r.tray[0].model:""));return iconFor(m)}
+  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?"Stereo pair":n+" speakers, unpaired";}
   function buildRooms(){var box=$("#rooms");box.innerHTML="";
-    Object.keys(rooms).forEach(function(k){var r=rooms[k],b=el("button","room"+(k===current?" sel":""));
-      b.setAttribute("aria-pressed",k===current);
-      b.innerHTML='<span class="ricon">'+rGlyph(r)+'</span><span class="rmeta"><b></b><span></span></span>';
-      $("b",b).textContent=r.name;$(".rmeta span",b).textContent=roomState(r);
-      b.onclick=function(){current=k;render()};box.appendChild(b);});
+    Object.keys(rooms).forEach(function(k){var r=rooms[k],b=el("button","room"+(k===current?" sel":""));b.setAttribute("aria-pressed",k===current);
+      var tint=roomTint(r);
+      b.innerHTML='<span class="ric '+tint+'" style="border-radius:8px">'+rGlyph(r)+'</span><span class="rmeta"><b></b><span></span></span><span class="chev">›</span>';
+      $(".ric",b).style.width="30px";$(".ric",b).style.height="30px";
+      $("b",b).textContent=r.name;$(".rmeta span",b).textContent=roomState(r);b.onclick=function(){current=k;render()};box.appendChild(b);});
   }
 
-  function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;
-    if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
+  function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
   function renderHT(r){var m=$("#main");m.innerHTML="";
-    var head=el("div","head");head.innerHTML='<h1></h1><p>Place any speaker in any position — mix Era 300s, Symfonisk, whatever you own. Drag one onto a spot to bond it.</p>';
+    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span><span class="chip">Trueplay off</span></div>';
     $("h1",head).textContent=r.name;
     var act=el("div","actions");
     act.appendChild((function(){var b=el("button","btn text","Separate all speakers");b.onclick=function(){dissolve(r)};return b})());
     act.appendChild((function(){var b=el("button","btn soft","Snapshot");b.onclick=function(){toast("Saved a restore point of this layout")};return b})());
     head.appendChild(act);m.appendChild(head);
 
-    var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","TV"));
+    var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">drag speakers into position</span>';m.appendChild(sec);
+    var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","T V"));
     var b1=el("div","prow");b1.appendChild(pos(r,"CC"));stage.appendChild(b1);
     var f=el("div","prow");f.appendChild(pos(r,"LF"));f.appendChild(pos(r,"RF"));stage.appendChild(f);
     var lp=el("div","lp");lp.innerHTML='<div class="r"></div><small>You</small>';stage.appendChild(lp);
@@ -237,89 +223,68 @@
     var s=el("div","psub");s.appendChild(pos(r,"SW"));stage.appendChild(s);
     m.appendChild(stage);
 
-    var sh=el("div","shelf-h");sh.innerHTML='<b>Available speakers</b><span>drag onto a position · chime to identify</span>';m.appendChild(sh);
-    var shelf=el("div","shelf");
-    if(!r.tray.length)shelf.appendChild(el("div","empty-note","Everything’s in use."));
-    r.tray.forEach(function(sp){shelf.appendChild(card(r,sp))});
-    shelf.addEventListener("dragover",function(e){if(drag){e.preventDefault()}});
-    shelf.addEventListener("drop",function(e){e.preventDefault();unbondToShelf(r)});
-    m.appendChild(shelf);
+    var sec2=el("div","sec");sec2.innerHTML='<h2>Available speakers</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
+    var grp=el("div","group");var rowsEl=el("div","rows");
+    if(!r.tray.length)rowsEl.appendChild(el("div","empty-note","Every speaker is in use."));
+    r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);
+    var hint=el("div","drop-hint","drag a bonded speaker here to remove it");m.appendChild(hint);
+    [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
 
-    var ro=el("div","readout");ro.innerHTML='<div class="rl">HTSatChanMapSet · one satellite per call</div><code></code>';
-    $("code",ro).innerHTML=chanMap(r);m.appendChild(ro);
+    var ro=el("div","readout");ro.innerHTML='<div class="rl">HTSatChanMapSet · one satellite per call</div><code></code>';$("code",ro).innerHTML=chanMap(r);m.appendChild(ro);
     var w=el("div","warn");w.innerHTML='<b>Trueplay is off for custom bonds.</b> These layouts are exactly what the Sonos app won’t create, so its room tuning doesn’t apply — everything else works normally.';m.appendChild(w);
   }
-  function card(r,sp){var c=el("div","card");var t=tile(sp);c.appendChild(t);
-    c.appendChild(el("div","cn",sp.name));c.appendChild(el("div","cm",sm(sp.model)));
+  function speakerRow(r,sp){var row=el("div","row");var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";
+    var meta=el("div","rx");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=sp.name;$("span",meta).textContent=sm(sp.model);
     var id=el("button","chime");id.innerHTML=WAVE;id.title="Chime "+sp.name;id.setAttribute("aria-label","Chime "+sp.name);
-    id.addEventListener("mousedown",function(e){e.stopPropagation()});
-    id.addEventListener("click",function(e){e.stopPropagation();identify(sp.name,t)});
-    c.appendChild(id);return c;}
-  function pos(r,ch){var wrap=el("div","pos"+(ch==="CC"?" cc":""));paint();return wrap;
+    id.addEventListener("click",function(e){e.stopPropagation();identify(sp.name,rt.firstChild)});
+    row.appendChild(rt);row.appendChild(meta);row.appendChild(id);return row;}
+  function pos(r,ch){var wrap=el("div","pos");paint();return wrap;
     function paint(){wrap.innerHTML="";var cur=ch==="CC"?r.bar:r.slots[ch];
-      if(cur){var t=tile(cur,ch==="CC"?"bar bonded":"bonded");wrap.appendChild(t);
+      if(cur){var t=orb(cur,TINT[ch]);wrap.appendChild(t);
         var lab=el("div","plabel");lab.innerHTML='<div class="nm">'+(ch==="CC"?cur.name:CHNAME[ch])+'</div><div class="md">'+sm(cur.model)+'</div>';wrap.appendChild(lab);
-        if(ch!=="CC"){var ctl=el("div","ctl");
-          ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(cur.name!=="Bookshelf"&&cur.name!=="Picture frame"?cur.name:CHNAME[ch],t)}));
-          if(ch!=="SW")ctl.appendChild(cbtn(cur.height?"on":"","↑","Toggle height channel",function(){cur.height=!cur.height;paint();var cc=$(".readout code");if(cc)cc.innerHTML=chanMap(r)}));
+        if(ch!=="CC"){var ctl=el("div","ctl");ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(cur.name!=="Bookshelf"&&cur.name!=="Picture frame"?cur.name:CHNAME[ch],t)}));
+          if(ch!=="SW")ctl.appendChild(cbtn(cur.height?"on":"","↑","Toggle height",function(){cur.height=!cur.height;paint();var cc=$(".readout code");if(cc)cc.innerHTML=chanMap(r)}));
           ctl.appendChild(cbtn("x","✕","Unbond",function(){unbond(r,ch)}));wrap.appendChild(ctl);}
-      } else {var t=el("div","tile empty");t.innerHTML='<span class="cc">'+ch+'</span>';wrap.appendChild(t);
-        wrap.appendChild((function(){var l=el("div","plabel");l.innerHTML='<div class="nm" style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</div>';return l})());
-      }
+      }else{var e=el("div","tile empty");e.innerHTML='<span class="cc">'+ch+'</span>';wrap.appendChild(e);
+        var l=el("div","plabel");l.innerHTML='<div class="nm" style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</div>';wrap.appendChild(l);}
       var target=wrap.querySelector(".tile");
-      if(ch!=="CC"){target.addEventListener("dragover",function(e){if(drag){e.preventDefault();target.classList.add("over")}});
-        target.addEventListener("dragleave",function(){target.classList.remove("over")});
-        target.addEventListener("drop",function(e){e.preventDefault();target.classList.remove("over");dropPos(r,ch,target,paint)});}
+      if(ch!=="CC"){target.addEventListener("dragover",function(e){if(drag){e.preventDefault();target.classList.add("over")}});target.addEventListener("dragleave",function(){target.classList.remove("over")});target.addEventListener("drop",function(e){e.preventDefault();target.classList.remove("over");dropPos(r,ch,target,paint)});}
     }
   }
   function dropPos(r,ch,tileEl,paint){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;
-    r.tray=r.tray.filter(function(x){return x.id!==sp.id});
-    Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id)r.slots[k]=null});
+    r.tray=r.tray.filter(function(x){return x.id!==sp.id});Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id)r.slots[k]=null});
     if(r.slots[ch]){r.slots[ch].height=false;r.tray.push(r.slots[ch])}
     var st=el("div","st");st.innerHTML='<span class="spin"></span>applying';tileEl.parentNode.appendChild(st);
     setTimeout(function(){st.innerHTML='<span class="spin"></span>settling'},600);
-    setTimeout(function(){r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms()},1300);
-  }
+    setTimeout(function(){r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms()},1300);}
   function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);renderHT(r);buildRooms()}
-  function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;
-    Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
-  function dissolve(r){toast("Separating — every speaker returns to standalone");
-    Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k]);r.slots[k]=null}});
-    setTimeout(function(){renderHT(r);buildRooms()},800)}
+  function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
+  function dissolve(r){toast("Separating — every speaker returns to standalone");Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k]);r.slots[k]=null}});setTimeout(function(){renderHT(r);buildRooms()},800)}
 
   function renderPair(r){var m=$("#main");m.innerHTML="";var paired=r.L&&r.R;
-    var head=el("div","head");head.innerHTML='<h1></h1><p></p>';$("h1",head).textContent=r.name;
-    $("p",head).textContent=paired?"A stereo pair — two speakers playing as one room’s left and right.":"Drop a speaker on each side to pair them. Not sure which is which? Chime one to find it.";
-    if(paired){var act=el("div","actions");var u=el("button","btn text","Unpair");u.onclick=function(){unpair(r)};act.appendChild(u);head.appendChild(act)}
-    m.appendChild(head);
-    var wells=el("div","wells");wells.appendChild(well(r,"L"));
-    var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);
-    wells.appendChild(well(r,"R"));m.appendChild(wells);
-    if(r.tray.length){var sh=el("div","shelf-h");sh.innerHTML='<b>Speakers in this room</b><span>drag to L or R · chime to identify</span>';m.appendChild(sh);
-      var shelf=el("div","shelf");r.tray.forEach(function(sp){shelf.appendChild(card(r,sp))});m.appendChild(shelf);}
-    if(!paired){var act2=el("div","actions");var b=el("button","btn fill","Create stereo pair");b.disabled=!(r.L&&r.R);
-      b.onclick=function(){toast("Creating stereo pair…");setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)};act2.appendChild(b);m.appendChild(act2);}
+    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",head).textContent=r.name;
+    if(paired){var act=el("div","actions");var u=el("button","btn text","Unpair");u.onclick=function(){unpair(r)};act.appendChild(u);head.appendChild(act)}m.appendChild(head);
+    var sec=el("div","sec");sec.innerHTML='<h2>Stereo pair</h2><span class="sc">'+(paired?"":"drop a speaker on each side")+'</span>';m.appendChild(sec);
+    var wells=el("div","wells");wells.appendChild(well(r,"L"));var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);wells.appendChild(well(r,"R"));m.appendChild(wells);
+    if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
+      var grp=el("div","group");var rowsEl=el("div","rows");r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
+    if(!paired){var act2=el("div","actions");var b=el("button","btn fill","Create stereo pair");b.disabled=!(r.L&&r.R);b.onclick=function(){toast("Creating stereo pair…");setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)};act2.appendChild(b);m.appendChild(act2);}
     else{var ro=el("div","readout");ro.innerHTML='<div class="rl">ChannelMapSet</div><code></code>';$("code",ro).innerHTML="<b>"+r.L.id+"</b>:LF,LF;<b>"+r.R.id+"</b>:RF,RF";m.appendChild(ro);}
   }
   function well(r,side){var w=el("div","well");var sp=r[side];w.appendChild(el("div","side",side));
-    if(sp){var t=tile(sp);w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
-      var ctl=el("div","ctl");ctl.style.cssText="top:12px;right:14px";
-      ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(sp.name,t)}));
-      ctl.appendChild(cbtn("x","✕","Remove",function(){r.tray.push(sp);r[side]=null;renderPair(r)}));w.appendChild(ctl);
-    } else w.appendChild(el("div","empty-note","Empty"));
-    w.addEventListener("dragover",function(e){if(drag){e.preventDefault();w.classList.add("over")}});
-    w.addEventListener("dragleave",function(){w.classList.remove("over")});
-    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;
-      r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;
-      if(r[side])r.tray.push(r[side]);r[side]=s2;renderPair(r)});return w;
-  }
+    if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
+      var ctl=el("div","ctl pin");ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(sp.name,t)}));ctl.appendChild(cbtn("x","✕","Remove",function(){r.tray.push(sp);r[side]=null;renderPair(r)}));w.appendChild(ctl);
+    }else w.appendChild(el("div","empty-note","Empty"));
+    w.addEventListener("dragover",function(e){if(drag){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
+    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;renderPair(r)});return w;}
   function unpair(r){toast("Separating…");setTimeout(function(){r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
 
   function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
-    var head=el("div","head");head.innerHTML='<h1></h1><p>One speaker here. Add another Sonos to this room to make a stereo pair.</p>';$("h1",head).textContent=r.name;m.appendChild(head);
-    var s=el("div","solo");var t=tile(sp);s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
-    var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);
-  }
+    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip">Single speaker</span></div>';$("h1",head).textContent=r.name;m.appendChild(head);
+    var sec=el("div","sec");sec.innerHTML='<h2>Speaker</h2><span class="sc">add another to pair</span>';m.appendChild(sec);
+    var s=el("div","solo");var t=orb(sp,"t-neutral");s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
+    var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
+
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
   $("#themeBtn").onclick=function(){var root=document.documentElement,c=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",c==="dark"?"light":"dark")};
   render();
