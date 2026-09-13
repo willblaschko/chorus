@@ -25,7 +25,10 @@
   .mark{width:26px;height:26px;border-radius:7px;background:var(--text);display:grid;place-items:center}
   .mark i{width:10px;height:10px;border-radius:50%;border:2.4px solid var(--bg)}
   .top b{font-size:15px;font-weight:600}.top .s{font-size:15px;color:var(--text-3)}
-  .top .sp{flex:1}.tbtn{font:inherit;font-size:13px;color:var(--text-2);background:none;border:none;cursor:pointer;padding:6px}.tbtn:hover{color:var(--text)}
+  .top .sp{flex:1}
+  .tbtn{font:inherit;font-size:13px;font-weight:500;color:var(--text-2);background:var(--tile);border:none;cursor:pointer;
+    padding:6px 13px 6px 11px;border-radius:980px;display:inline-flex;align-items:center;gap:6px}
+  .tbtn:hover{color:var(--text)}.tbtn svg{width:15px;height:15px}
 
   .grid{display:grid;grid-template-columns:238px 1fr;gap:26px;align-items:start}
   @media(max-width:800px){.grid{grid-template-columns:1fr}}
@@ -286,7 +289,12 @@
     var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
 
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
-  $("#themeBtn").onclick=function(){var root=document.documentElement,c=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",c==="dark"?"light":"dark")};
+  var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
+  var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
+  function curTheme(){return document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light")}
+  function setThemeBtn(){var t=curTheme();$("#themeBtn").innerHTML=(t==="dark"?MOON+"<span>Dark</span>":SUN+"<span>Light</span>")}
+  $("#themeBtn").onclick=function(){document.documentElement.setAttribute("data-theme",curTheme()==="dark"?"light":"dark");setThemeBtn()};
+  setThemeBtn();
   render();
 })();
 </script>
