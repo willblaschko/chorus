@@ -196,6 +196,14 @@
   .ov-tip .ti svg{width:22px;height:22px}
   .ov-tip .tt b{display:block;font-size:14px;font-weight:600;margin-bottom:1px}
   .ov-tip .tt span{font-size:12.5px;color:var(--text-2);line-height:1.45}
+  .sheet{background:var(--card);border-radius:20px;box-shadow:0 30px 90px -24px rgba(0,0,0,.55);width:300px;max-width:90vw;padding:8px}
+  .sheet .sh-h{text-align:center;padding:12px 10px 9px}
+  .sheet .sh-h b{font-size:15px;font-weight:600}.sheet .sh-h span{display:block;font-size:11.5px;font-family:var(--mono);color:var(--text-2);margin-top:1px}
+  .sheet button{display:flex;align-items:center;gap:12px;width:100%;border:none;background:none;font:inherit;font-size:15px;color:var(--text);padding:12px 14px;border-radius:12px;cursor:pointer;text-align:left}
+  .sheet button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
+  .sheet button svg{width:19px;height:19px;color:var(--text-2);flex:none}
+  .sheet button.danger{color:var(--danger)}.sheet button.danger svg{color:var(--danger)}
+  .sheet button.cancel{justify-content:center;font-weight:600;background:var(--tile);margin-top:5px}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -334,7 +342,7 @@
     $("h1",left).textContent=r.name;head.appendChild(left);
     head.appendChild(roomMenu(r));m.appendChild(head);
 
-    var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">hover a speaker for options</span>';m.appendChild(sec);
+    var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">tap a speaker for options</span>';m.appendChild(sec);
     var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","T V"));
     var b1=el("div","prow");b1.appendChild(pos(r,"CC"));stage.appendChild(b1);
     var f=el("div","prow fronts");f.appendChild(pos(r,"LF"));f.appendChild(pos(r,"RF"));stage.appendChild(f);
@@ -366,10 +374,14 @@
         badge.addEventListener("dragend",function(){badge.classList.remove("dragging");drag=null});
         t.appendChild(badge);
         var meta=el("div","pmeta");meta.innerHTML='<b>'+(ch==="CC"?cur.name:CHNAME[ch])+'</b><span>'+(ch==="CC"?"Center":sm(cur.model))+'</span>';t.appendChild(meta);
-        if(ch!=="CC"){var ctl=el("div","ctl");
-          ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(cur.name!=="Bookshelf"&&cur.name!=="Picture frame"?cur.name:CHNAME[ch],badge)}));
-          if(ch!=="SW")ctl.appendChild(cbtn(cur.height?"on":"","↑","Toggle height",function(){cur.height=!cur.height;paint();var cc=$(".readout code");if(cc)cc.innerHTML=chanMap(r)}));
-          ctl.appendChild(cbtn("x","✕","Remove",function(){unbond(r,ch)}));t.appendChild(ctl);}
+        t.style.cursor="pointer";
+        t.addEventListener("click",function(){
+          var nm=ch==="CC"?cur.name:((cur.name==="Bookshelf"||cur.name==="Picture frame")?CHNAME[ch]:cur.name);
+          var items=[{label:"Identify",icon:WAVE,fn:function(){identify(nm,badge)}}];
+          if(ch!=="CC"&&ch!=="SW")items.push({label:cur.height?"Remove height channel":"Add height channel",icon:UPI,fn:function(){cur.height=!cur.height;paint()}});
+          if(ch!=="CC")items.push({label:"Remove from home theater",danger:true,icon:RMI,fn:function(){unbond(r,ch)}});
+          actionSheet(ch==="CC"?cur.name:CHNAME[ch],sm(cur.model),items);
+        });
       }else{
         t.appendChild(el("div","badge empty-badge",ch));
         var m2=el("div","pmeta");m2.innerHTML='<b style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</b><span>Empty</span>';t.appendChild(m2);
@@ -435,6 +447,15 @@
       var b=el("button",it[1]?"danger":"");b.textContent=it[0];b.onclick=function(e){e.stopPropagation();closeMenus();it[2]()};menu.appendChild(b)});
     btn.onclick=function(e){e.stopPropagation();var was=menu.classList.contains("open");closeMenus();if(!was)menu.classList.add("open")};
     wrap.appendChild(btn);wrap.appendChild(menu);return wrap;}
+  var UPI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 14 12 8.5 18 14"/></svg>';
+  var RMI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+  function actionSheet(title,subtitle,items){var back=el("div","modal-back"),sheet=el("div","sheet");
+    var h=el("div","sh-h");h.innerHTML='<b></b><span></span>';$("b",h).textContent=title;$("span",h).textContent=subtitle||"";sheet.appendChild(h);
+    function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
+    items.forEach(function(it){var b=el("button",it.danger?"danger":"");b.innerHTML=(it.icon||"")+'<span></span>';b.querySelector("span").textContent=it.label;b.onclick=function(e){e.stopPropagation();close();it.fn()};sheet.appendChild(b)});
+    var c=el("button","cancel");c.textContent="Cancel";c.onclick=close;sheet.appendChild(c);
+    back.addEventListener("click",function(e){if(e.target===back)close()});
+    back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
