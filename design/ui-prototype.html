@@ -45,13 +45,30 @@
   .room.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
   .room.droproom{box-shadow:inset 0 0 0 2px var(--accent);border-radius:12px}
   .room.droproom::before{opacity:0}
+  .newroom .ric{background:none;border:1.5px dashed var(--hair-2);color:var(--text-3);border-radius:8px}
+  .newroom .rmeta b{color:var(--text-2)}.ric-new{font-size:19px;font-weight:400;line-height:1}
+  .layouts{display:flex;gap:7px;flex-wrap:wrap;margin:2px 2px 8px}
+  .savepill{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:980px;background:var(--tile);color:var(--text);border:none;cursor:pointer}
+  .savepill:hover{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
   .room.sel::before,.room.sel+.room::before{background:transparent}
   .ric{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center}
   .ric svg{width:19px;height:19px}
   .rmeta{flex:1;min-width:0}.rmeta b{display:block;font-size:14.5px;font-weight:500}.rmeta span{font-size:12px;color:var(--text-3)}
   .chev{color:var(--text-3);font-size:16px;opacity:.7}.room.sel .chev{color:var(--accent);opacity:1}
 
-  .head{margin:0 2px 16px}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:0 2px 18px}
+  .head-l{min-width:0}
+  .menu-wrap{position:relative;flex:none}
+  .hmenu-btn{width:34px;height:34px;border-radius:50%;background:var(--tile);border:none;color:var(--text-2);cursor:pointer;display:grid;place-items:center}
+  .hmenu-btn svg{width:20px;height:20px}.hmenu-btn:hover{color:var(--text)}
+  .menu{position:absolute;top:42px;right:0;min-width:224px;background:var(--card);border-radius:14px;border:.5px solid var(--hair);
+    box-shadow:0 14px 44px -12px rgba(0,0,0,.34);padding:6px;opacity:0;transform:scale(.96) translateY(-4px);transform-origin:top right;
+    pointer-events:none;transition:.16s cubic-bezier(.34,1.4,.6,1);z-index:40}
+  .menu.open{opacity:1;transform:none;pointer-events:auto}
+  .menu button{display:flex;align-items:center;width:100%;border:none;background:none;font:inherit;font-size:14px;color:var(--text);text-align:left;padding:9px 11px;border-radius:9px;cursor:pointer}
+  .menu button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
+  .menu button.danger{color:var(--danger)}.menu button.danger:hover{background:color-mix(in srgb,var(--danger) 10%,transparent)}
+  .menu .sep{height:.5px;background:var(--hair);margin:5px 9px}
   .head h1{font-size:29px;font-weight:700;letter-spacing:-.03em;margin:0}
   .chips{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
   .chip{font-size:12px;font-weight:600;padding:4px 11px;border-radius:980px;background:var(--tile);color:var(--text-2)}
@@ -220,7 +237,23 @@
       b.addEventListener("dragleave",function(){b.classList.remove("droproom")});
       b.addEventListener("drop",function(e){e.preventDefault();b.classList.remove("droproom");moveSpeaker(drag,k)});
       box.appendChild(b);});
+    var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>New room</b><span>drag a speaker here</span></span>';
+    nr.addEventListener("dragover",function(e){if(drag){e.preventDefault();nr.classList.add("droproom")}});
+    nr.addEventListener("dragleave",function(){nr.classList.remove("droproom")});
+    nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");createRoomWith(drag)});
+    box.appendChild(nr);
   }
+  var newRoomN=0;
+  function createRoomWith(d){if(!d)return;var sp=d.sp,src=rooms[d.roomKey];
+    if(src.tray)src.tray=src.tray.filter(function(x){return x.id!==sp.id});
+    if(src.slots)Object.keys(src.slots).forEach(function(k){if(src.slots[k]&&src.slots[k].id===sp.id)src.slots[k]=null});
+    if(src.L&&src.L.id===sp.id)src.L=null;if(src.R&&src.R.id===sp.id)src.R=null;normalizeRoom(src);
+    newRoomN++;var key="new"+newRoomN;sp.height=false;
+    rooms[key]={name:newRoomN>1?"New Room "+newRoomN:"New Room",type:"solo",tray:[sp]};
+    drag=null;current=key;toast("Created “"+rooms[key].name+"” with "+sp.name);render();}
+  function allSpeakers(r){var a=[];if(r.slots)Object.keys(r.slots).forEach(function(k){if(r.slots[k])a.push(r.slots[k])});if(r.tray)r.tray.forEach(function(s){a.push(s)});return a;}
+  function saveLayout(r){r.saved=r.saved||[];r.saved.push({name:"Layout "+(r.saved.length+1),slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “Layout "+r.saved.length+"”");render();}
+  function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
   function normalizeRoom(r){if(r.type==="ht")return;
     if(r.type==="pair"&&!(r.L&&r.R)){if(r.L){r.tray.push(r.L);r.L=null}if(r.R){r.tray.push(r.R);r.R=null}r.type="music";}
     if(r.type!=="pair"){var n=(r.tray?r.tray.length:0)+(r.L?1:0)+(r.R?1:0);r.type=n>=2?"music":"solo";}}
@@ -236,12 +269,10 @@
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
   function renderHT(r){var m=$("#main");m.innerHTML="";
-    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span><span class="chip">Trueplay off</span></div>';
-    $("h1",head).textContent=r.name;
-    var act=el("div","actions");
-    act.appendChild((function(){var b=el("button","btn text","Separate all speakers");b.onclick=function(){dissolve(r)};return b})());
-    act.appendChild((function(){var b=el("button","btn soft","Snapshot");b.onclick=function(){toast("Saved a restore point of this layout")};return b})());
-    head.appendChild(act);m.appendChild(head);
+    var head=el("div","head");var left=el("div","head-l");
+    left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span><span class="chip">Trueplay off</span></div>';
+    $("h1",left).textContent=r.name;head.appendChild(left);
+    head.appendChild(roomMenu(r));m.appendChild(head);
 
     var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">drag speakers into position</span>';m.appendChild(sec);
     var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","T V"));
@@ -299,8 +330,8 @@
   function dissolve(r){toast("Separating — every speaker returns to standalone");Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k]);r.slots[k]=null}});setTimeout(function(){renderHT(r);buildRooms()},800)}
 
   function renderPair(r){var m=$("#main");m.innerHTML="";var paired=r.L&&r.R;
-    var head=el("div","head");head.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",head).textContent=r.name;
-    if(paired){var act=el("div","actions");var u=el("button","btn text","Unpair");u.onclick=function(){unpair(r)};act.appendChild(u);head.appendChild(act)}m.appendChild(head);
+    var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);
+    var mn=roomMenu(r);if(mn)head.appendChild(mn);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Stereo pair</h2><span class="sc">'+(paired?"":"drop a speaker on each side")+'</span>';m.appendChild(sec);
     var wells=el("div","wells");wells.appendChild(well(r,"L"));var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);wells.appendChild(well(r,"R"));m.appendChild(wells);
     if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
@@ -322,6 +353,22 @@
     var s=el("div","solo");var t=orb(sp,"t-neutral");s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
     var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
 
+  var DOTS='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>';
+  function closeMenus(){var o=document.querySelectorAll(".menu.open");for(var i=0;i<o.length;i++)o[i].classList.remove("open")}
+  document.addEventListener("click",closeMenus);
+  function roomMenu(r){var items=[];
+    if(r.type==="ht"){items.push(["Save current layout",0,function(){saveLayout(r)}]);
+      (r.saved||[]).forEach(function(s){items.push(["Restore "+s.name,0,function(){restoreLayout(r,s)}])});
+      items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);}
+    else if(r.type==="pair"){items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);
+      items.push(["sep"]);items.push(["Unpair",1,function(){unpair(r)}]);}
+    else return null;
+    var wrap=el("div","menu-wrap");var btn=el("button","hmenu-btn");btn.innerHTML=DOTS;btn.title="Room options";btn.setAttribute("aria-label","Room options");
+    var menu=el("div","menu");
+    items.forEach(function(it){if(it[0]==="sep"){menu.appendChild(el("div","sep"));return;}
+      var b=el("button",it[1]?"danger":"");b.textContent=it[0];b.onclick=function(e){e.stopPropagation();closeMenus();it[2]()};menu.appendChild(b)});
+    btn.onclick=function(e){e.stopPropagation();var was=menu.classList.contains("open");closeMenus();if(!was)menu.classList.add("open")};
+    wrap.appendChild(btn);wrap.appendChild(menu);return wrap;}
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
