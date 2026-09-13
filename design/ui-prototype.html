@@ -1,4 +1,4 @@
-<title>Ensemble — a Sonos speaker manager for Home Assistant</title>
+<title>Chorus — a Sonos speaker manager for Home Assistant</title>
 <style>
   :root{
     --bg:#f2f2f7;--card:#fff;--tile:#e9e9ee;--hair:rgba(60,60,67,.2);--hair-2:rgba(60,60,67,.32);
@@ -185,7 +185,7 @@
 </style>
 
 <div class="wrap">
-  <div class="top"><span class="mark"><i></i></span><b>Ensemble</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
+  <div class="top"><span class="mark"><i></i></span><b>Chorus</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn" id="themeBtn">Appearance</button></div>
   <div class="grid">
     <div><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
     <div id="main"></div>
@@ -279,7 +279,7 @@
     back.appendChild(modal);document.body.appendChild(back);
     requestAnimationFrame(function(){back.classList.add("on");inp.focus()});}
   function allSpeakers(r){var a=[];if(r.slots)Object.keys(r.slots).forEach(function(k){if(r.slots[k])a.push(r.slots[k])});if(r.tray)r.tray.forEach(function(s){a.push(s)});return a;}
-  function saveLayout(r){r.saved=r.saved||[];r.saved.push({name:"Layout "+(r.saved.length+1),slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “Layout "+r.saved.length+"”");render();}
+  function saveLayout(r,name){r.saved=r.saved||[];var nm=(name&&name.trim())||("Layout "+(r.saved.length+1));r.saved.push({name:nm,slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “"+nm+"”");render();}
   function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
   function normalizeRoom(r){if(r.type==="ht")return;
     if(r.type==="pair"&&!(r.L&&r.R)){if(r.L){r.tray.push(r.L);r.L=null}if(r.R){r.tray.push(r.R);r.R=null}r.type="music";}
@@ -384,7 +384,7 @@
   function closeMenus(){var o=document.querySelectorAll(".menu.open");for(var i=0;i<o.length;i++)o[i].classList.remove("open")}
   document.addEventListener("click",closeMenus);
   function roomMenu(r){var items=[];
-    if(r.type==="ht"){items.push(["Save current layout",0,function(){saveLayout(r)}]);
+    if(r.type==="ht"){items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
       (r.saved||[]).forEach(function(s){items.push(["Restore "+s.name,0,function(){restoreLayout(r,s)}])});
       items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);}
     else if(r.type==="pair"){items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);

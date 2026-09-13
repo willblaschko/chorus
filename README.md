@@ -1,4 +1,4 @@
-# Ensemble
+# Chorus
 
 *A Sonos speaker manager for Home Assistant.*
 
