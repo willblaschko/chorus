@@ -204,6 +204,22 @@
   .sheet button svg{width:19px;height:19px;color:var(--text-2);flex:none}
   .sheet button.danger{color:var(--danger)}.sheet button.danger svg{color:var(--danger)}
   .sheet button.cancel{justify-content:center;font-weight:600;background:var(--tile);margin-top:5px}
+  .sw{position:relative;width:44px;height:26px;flex:none}
+  .sw input{opacity:0;width:100%;height:100%;margin:0;cursor:pointer;position:relative;z-index:2}
+  .sw .tr{position:absolute;inset:0;border-radius:999px;background:var(--hair-2);transition:.2s}
+  .sw .kn{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.2s}
+  .sw input:checked~.tr{background:#34c759}.sw input:checked~.kn{transform:translateX(18px)}
+  .sl{-webkit-appearance:none;appearance:none;width:148px;height:4px;border-radius:2px;background:var(--hair-2);outline:none;cursor:pointer}
+  .sl::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35),0 0 0 .5px rgba(0,0,0,.05);cursor:pointer}
+  .sl::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:none;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .aset{width:362px;max-width:92vw;max-height:82vh;overflow-y:auto;padding:20px}
+  .aset-h{text-align:center;padding:2px 0 6px}.aset-h b{font-size:16px;font-weight:700}.aset-h div{font-size:12px;color:var(--text-2)}
+  .aset-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);margin:16px 4px 7px}
+  .aset-group{background:var(--tile);border-radius:13px;overflow:hidden}
+  .aset-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 14px;min-height:46px}
+  .aset-row+.aset-row{border-top:.5px solid var(--hair)}
+  .aset-row .rl{font-size:14.5px}.aset-row .rc{display:flex;align-items:center;gap:11px}
+  .aset-row .rv{font-family:var(--mono);font-size:11px;color:var(--text-3);min-width:48px;text-align:right}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -429,10 +445,10 @@
   function closeMenus(){var o=document.querySelectorAll(".menu.open");for(var i=0;i<o.length;i++)o[i].classList.remove("open")}
   document.addEventListener("click",closeMenus);
   function roomMenu(r){var items=[];
-    if(r.type==="ht"){items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
+    if(r.type==="ht"){items.push(["Audio settings",0,function(){audioSheet(r)}]);items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
       if(r.saved&&r.saved.length){items.push(["header","Saved layouts"]);r.saved.forEach(function(s){items.push(["layout",s])});}
       items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);}
-    else if(r.type==="pair"){items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);
+    else if(r.type==="pair"){items.push(["Audio settings",0,function(){audioSheet(r)}]);items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);
       items.push(["sep"]);items.push(["Unpair",1,function(){unpair(r)}]);}
     else return null;
     var wrap=el("div","menu-wrap");var btn=el("button","hmenu-btn");btn.innerHTML=DOTS;btn.title="Room options";btn.setAttribute("aria-label","Room options");
@@ -454,6 +470,28 @@
     function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
     items.forEach(function(it){var b=el("button",it.danger?"danger":"");b.innerHTML=(it.icon||"")+'<span></span>';b.querySelector("span").textContent=it.label;b.onclick=function(e){e.stopPropagation();close();it.fn()};sheet.appendChild(b)});
     var c=el("button","cancel");c.textContent="Cancel";c.onclick=close;sheet.appendChild(c);
+    back.addEventListener("click",function(e){if(e.target===back)close()});
+    back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
+  function audioSheet(r){
+    r.audio=r.audio||{bass:0,treble:0,loudness:false,sub:6,surround:6,height:4,night:false,dialog:false,trueplay:true,balance:0};
+    var a=r.audio,back=el("div","modal-back"),sheet=el("div","modal aset");
+    function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
+    var h=el("div","aset-h");h.innerHTML='<b>Audio</b><div></div>';h.querySelector("div").textContent=r.name;sheet.appendChild(h);
+    function lbl(t){return el("div","aset-lbl",t)}
+    function sliderRow(label,key,min,max,fmt){var row=el("div","aset-row");row.appendChild(el("div","rl",label));
+      var rc=el("div","rc"),val=el("span","rv"),inp=el("input","sl");inp.type="range";inp.min=min;inp.max=max;inp.step=1;inp.value=a[key];
+      function upd(){val.textContent=fmt(a[key])}inp.addEventListener("input",function(){a[key]=+inp.value;upd()});upd();
+      rc.appendChild(val);rc.appendChild(inp);row.appendChild(rc);return row;}
+    function toggleRow(label,key){var row=el("div","aset-row");row.appendChild(el("div","rl",label));
+      var sw=el("label","sw"),inp=el("input");inp.type="checkbox";inp.checked=!!a[key];inp.addEventListener("change",function(){a[key]=inp.checked});
+      sw.appendChild(inp);sw.appendChild(el("span","tr"));sw.appendChild(el("span","kn"));row.appendChild(sw);return row;}
+    var dB=function(v){return (v>0?"+":"")+v+" dB"},lvl=function(v){return ""+v},bal=function(v){return v===0?"Center":(v<0?"L "+(-v):"R "+v)};
+    function group(rows){var g=el("div","aset-group");rows.forEach(function(x){g.appendChild(x)});return g}
+    sheet.appendChild(lbl("Tone"));sheet.appendChild(group([sliderRow("Bass","bass",-10,10,dB),sliderRow("Treble","treble",-10,10,dB),toggleRow("Loudness","loudness")]));
+    if(r.type==="ht"){sheet.appendChild(lbl("Home theater"));sheet.appendChild(group([sliderRow("Sub level","sub",0,10,lvl),sliderRow("Surround level","surround",0,10,lvl),sliderRow("Height level","height",0,10,lvl),toggleRow("Night sound","night"),toggleRow("Speech clarity","dialog")]));}
+    if(r.type==="pair"){sheet.appendChild(lbl("Stereo pair"));sheet.appendChild(group([sliderRow("Balance","balance",-5,5,bal)]));}
+    sheet.appendChild(lbl("Tuning"));sheet.appendChild(group([toggleRow("Trueplay","trueplay")]));
+    var done=el("button","btn fill");done.textContent="Done";done.style.cssText="width:100%;margin-top:18px";done.onclick=close;sheet.appendChild(done);
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
