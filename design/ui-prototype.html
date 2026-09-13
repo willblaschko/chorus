@@ -202,6 +202,7 @@
   .sheet button{display:flex;align-items:center;gap:12px;width:100%;border:none;background:none;font:inherit;font-size:15px;color:var(--text);padding:12px 14px;border-radius:12px;cursor:pointer;text-align:left}
   .sheet button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
   .sheet button svg{width:19px;height:19px;color:var(--text-2);flex:none}
+  .sheet .ai-txt{display:flex;flex-direction:column;line-height:1.25}.sheet .ai-nm{font-size:15px}.sheet .ai-sub{font-size:11.5px;font-family:var(--mono);color:var(--text-3)}
   .sheet button.danger{color:var(--danger)}.sheet button.danger svg{color:var(--danger)}
   .sheet button.cancel{justify-content:center;font-weight:600;background:var(--tile);margin-top:5px}
   .sw{position:relative;width:44px;height:26px;flex:none}
@@ -271,6 +272,8 @@
     driver:svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4"/>')
   };
   function iconFor(m){m=(m||"").toLowerCase();return /arc|beam|ray/.test(m)?ICON.soundbar:/sub/.test(m)?ICON.sub:/era/.test(m)?ICON.era:/lamp/.test(m)?ICON.lamp:/frame|picture/.test(m)?ICON.frame:/bookshelf/.test(m)?ICON.book:/connect|port|amp/.test(m)?ICON.connect:ICON.driver}
+  function isBar(m){return /arc|beam|ray/.test((m||"").toLowerCase())}
+  function barIn(r){if(!r.tray)return null;for(var i=0;i<r.tray.length;i++)if(isBar(r.tray[i].model))return r.tray[i];return null}
   var WAVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.3L11.5 18V6L7.3 9.5H4z" fill="currentColor" stroke="none"/><path d="M15 9.3a4 4 0 0 1 0 5.4"/><path d="M17.7 6.5a8 8 0 0 1 0 11"/></svg>';
 
   var toastEl=null,tT=null;
@@ -284,7 +287,7 @@
 
   function roomTint(r){return r.type==="ht"?"t-bar":r.type==="pair"?"t-front":"t-neutral"}
   function rGlyph(r){var m=r.type==="ht"?r.bar.model:(r.L?r.L.model:(r.tray[0]?r.tray[0].model:""));return iconFor(m)}
-  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?(r.sub?"Stereo pair · Sub":"Stereo pair"):n+" speakers, unpaired";}
+  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";if(barIn(r))return "Soundbar · standalone";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?(r.sub?"Stereo pair · Sub":"Stereo pair"):n+" speakers, unpaired";}
   function buildRooms(){var box=$("#rooms");box.innerHTML="";
     Object.keys(rooms).forEach(function(k){var r=rooms[k],b=el("button","room"+(k===current?" sel":""));b.setAttribute("aria-pressed",k===current);
       var tint=roomTint(r);
@@ -355,6 +358,12 @@
     sp.height=false;if(!tgt.tray)tgt.tray=[];tgt.tray.push(sp);
     normalizeRoom(src);normalizeRoom(tgt);drag=null;
     toast(sp.name+" moved to "+tgt.name);render();}
+  function allSubs(target){var out=[];
+    looseSubs.forEach(function(s){out.push({sub:s,loc:"Available",take:function(){looseSubs=looseSubs.filter(function(x){return x!==s})}})});
+    Object.keys(rooms).forEach(function(k){var rm=rooms[k];if(rm===target)return;
+      if(rm.type==="ht"&&rm.slots&&rm.slots.SW){var s=rm.slots.SW;out.push({sub:s,loc:"in "+rm.name,take:function(){rm.slots.SW=null}})}
+      if(rm.sub){var s2=rm.sub;out.push({sub:s2,loc:"in "+rm.name,take:function(){rm.sub=null}})}});
+    return out;}
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
@@ -420,30 +429,41 @@
     setTimeout(function(){r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms()},1300);}
   function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);renderHT(r);buildRooms()}
   function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
-  function dissolve(r){toast("Separating — every speaker returns to standalone");Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k]);r.slots[k]=null}});setTimeout(function(){renderHT(r);buildRooms()},800)}
+  function dissolve(r){toast("Separating — every speaker returns to standalone");setTimeout(function(){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};r.type="music";render()},800)}
 
+  function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";toast("Home theater ready — drag speakers onto the positions");renderHT(r);buildRooms();}
+  function renderBarSetup(r){var m=$("#main");m.innerHTML="";var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
+    var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip">Soundbar</span><span class="chip">Standalone</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
+    var sec=el("div","sec");sec.innerHTML='<h2>Home theater</h2><span class="sc">not set up yet</span>';m.appendChild(sec);
+    var hero=el("div","solo");var t=orb(bar,"t-bar");hero.appendChild(t);hero.appendChild(el("div","wn",bar.name));hero.appendChild(el("div","wm",sm(bar.model)+" · standalone"));
+    var p=el("div","wm");p.style.cssText="max-width:38ch;text-align:center;margin-top:4px";p.textContent="Set up a home theater to add front, rear, and sub speakers around your seat.";hero.appendChild(p);
+    var b=el("button","btn fill");b.textContent="Set up home theater";b.style.marginTop="16px";b.onclick=function(){setupHT(r)};hero.appendChild(b);
+    var idb=el("button","btn soft");idb.textContent="Chime to identify";idb.style.marginTop="8px";idb.onclick=function(){identify(bar.name,t)};hero.appendChild(idb);
+    m.appendChild(hero);
+    if(others.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">available to add as surrounds</span>';m.appendChild(sec2);
+      var grp=el("div","group"),rowsEl=el("div","rows");others.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
+  }
+  function commitPair(r){toast("Creating stereo pair…");renderPair(r);setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)}
   function renderPair(r){var m=$("#main");m.innerHTML="";var paired=r.L&&r.R;
     var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);
     var mn=roomMenu(r);if(mn)head.appendChild(mn);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Stereo pair</h2><span class="sc">'+(paired?"":"drop a speaker on each side")+'</span>';m.appendChild(sec);
     var wells=el("div","wells");wells.appendChild(well(r,"L"));var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);wells.appendChild(well(r,"R"));m.appendChild(wells);
-    if(paired){var subw=el("div","pairsub");
-      if(r.sub){var st=el("div","subchip");st.innerHTML='<div class="badge t-sub" style="width:36px;height:36px;border-radius:10px">'+ICON.sub+'</div><div class="sc-meta"><b>Sub</b><span></span></div>';st.querySelector(".sc-meta span").textContent=sm(r.sub.model);
-        st.onclick=function(){actionSheet("Sub",sm(r.sub.model),[{label:"Identify",icon:WAVE,fn:function(){identify("Sub",st)}},{label:"Remove sub",danger:true,icon:RMI,fn:function(){looseSubs.push(r.sub);r.sub=null;renderPair(r);buildRooms()}}])};subw.appendChild(st);}
-      else{var add=el("button","addsub");add.textContent="＋ Add a Sub";
-        add.onclick=function(){if(!looseSubs.length){toast("No free Sub — power one on, or free one from another set");return;}
-          actionSheet("Add a Sub","Choose a Sub to bond to this pair",looseSubs.map(function(s){return {label:s.name+" · "+sm(s.model),icon:ICON.sub,fn:function(){r.sub=s;looseSubs=looseSubs.filter(function(x){return x!==s});renderPair(r);buildRooms()}}}))};subw.appendChild(add);}
-      m.appendChild(subw);}
+    if(paired){
+      if(r.sub){var subw=el("div","pairsub"),st=el("div","subchip");st.innerHTML='<div class="badge t-sub" style="width:36px;height:36px;border-radius:10px">'+ICON.sub+'</div><div class="sc-meta"><b></b><span></span></div>';st.querySelector("b").textContent=r.sub.name;st.querySelector(".sc-meta span").textContent=sm(r.sub.model);
+        st.onclick=function(){actionSheet(r.sub.name,sm(r.sub.model),[{label:"Identify",icon:WAVE,fn:function(){identify(r.sub.name,st)}},{label:"Remove sub",danger:true,icon:RMI,fn:function(){looseSubs.push(r.sub);r.sub=null;renderPair(r);buildRooms()}}])};subw.appendChild(st);m.appendChild(subw);}
+      else{var opts=allSubs(r);if(opts.length){var subw2=el("div","pairsub"),add=el("button","addsub");add.textContent="＋ Add a Sub";
+        add.onclick=function(){actionSheet("Add a Sub","Choose a Sub to bond to this pair",opts.map(function(o){return {label:o.sub.name+" · "+sm(o.sub.model),sub:o.loc,icon:ICON.sub,fn:function(){o.take();r.sub=Object.assign({},o.sub);toast(o.loc==="Available"?("Added "+o.sub.name):(o.sub.name+" moved from "+o.loc.slice(3)));renderPair(r);buildRooms()}}}))};subw2.appendChild(add);m.appendChild(subw2);}}
+    }
     if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
       var grp=el("div","group");var rowsEl=el("div","rows");r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
-    if(!paired){var act2=el("div","actions");var b=el("button","btn fill","Create stereo pair");b.disabled=!(r.L&&r.R);b.onclick=function(){toast("Creating stereo pair…");setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)};act2.appendChild(b);m.appendChild(act2);}
   }
   function well(r,side){var w=el("div","well");var sp=r[side];w.appendChild(el("div","side",side));
     if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
       var ctl=el("div","ctl pin");ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(sp.name,t)}));ctl.appendChild(cbtn("x","✕","Remove",function(){r.tray.push(sp);r[side]=null;renderPair(r)}));w.appendChild(ctl);
     }else w.appendChild(el("div","empty-note","Empty"));
     w.addEventListener("dragover",function(e){if(drag){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
-    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;renderPair(r)});return w;}
+    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;if(r.L&&r.R&&r.type!=="pair"){commitPair(r)}else{renderPair(r)}});return w;}
   function unpair(r){toast("Separating…");setTimeout(function(){if(r.sub){looseSubs.push(r.sub);r.sub=null}r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
 
   function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
@@ -481,7 +501,7 @@
   function actionSheet(title,subtitle,items){var back=el("div","modal-back"),sheet=el("div","sheet");
     var h=el("div","sh-h");h.innerHTML='<b></b><span></span>';$("b",h).textContent=title;$("span",h).textContent=subtitle||"";sheet.appendChild(h);
     function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
-    items.forEach(function(it){var b=el("button",it.danger?"danger":"");b.innerHTML=(it.icon||"")+'<span></span>';b.querySelector("span").textContent=it.label;b.onclick=function(e){e.stopPropagation();close();it.fn()};sheet.appendChild(b)});
+    items.forEach(function(it){var b=el("button",it.danger?"danger":"");b.innerHTML=(it.icon||"")+'<span class="ai-txt"><span class="ai-nm"></span>'+(it.sub?'<span class="ai-sub"></span>':'')+'</span>';b.querySelector(".ai-nm").textContent=it.label;if(it.sub)b.querySelector(".ai-sub").textContent=it.sub;b.onclick=function(e){e.stopPropagation();close();it.fn()};sheet.appendChild(b)});
     var c=el("button","cancel");c.textContent="Cancel";c.onclick=close;sheet.appendChild(c);
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
@@ -507,7 +527,7 @@
     var done=el("button","btn fill");done.textContent="Done";done.style.cssText="width:100%;margin-top:18px";done.onclick=close;sheet.appendChild(done);
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
-  function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):r.type==="solo"?renderSolo(r):renderPair(r)}
+  function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):barIn(r)?renderBarSetup(r):r.type==="solo"?renderSolo(r):renderPair(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
   function curTheme(){return document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light")}
