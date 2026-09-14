@@ -18,8 +18,10 @@ from .const import (
     CHANNELS,
     DOMAIN,
     ERR_PRIMARY_NOT_SOUNDBAR,
+    SERVICE_ADD_PAIR_SUB,
     SERVICE_CREATE_STEREO_PAIR,
     SERVICE_MOVE,
+    SERVICE_REMOVE_PAIR_SUB,
     SERVICE_RENAME,
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_RESTORE,
@@ -41,6 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 _ALL_SERVICES = (
     SERVICE_CREATE_STEREO_PAIR,
     SERVICE_SEPARATE,
+    SERVICE_ADD_PAIR_SUB,
+    SERVICE_REMOVE_PAIR_SUB,
     SERVICE_SET_HOME_THEATER,
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_MOVE,
@@ -145,6 +149,21 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await run(backend.separate_stereo_pair, left["ip"], left["uid"], right_uid)
         await coordinator.async_request_refresh()
 
+    async def add_pair_sub(call: ServiceCall) -> None:
+        # left is the pair's visible primary (resolvable); right + sub are UIDs.
+        left = resolve(call.data["left"])
+        await run(
+            backend.add_pair_sub, left["ip"], left["uid"], call.data["right"], call.data["sub"]
+        )
+        await coordinator.async_request_refresh()
+
+    async def remove_pair_sub(call: ServiceCall) -> None:
+        left = resolve(call.data["left"])
+        await run(
+            backend.remove_pair_sub, left["ip"], left["uid"], call.data["right"], call.data["sub"]
+        )
+        await coordinator.async_request_refresh()
+
     # --- home theater -----------------------------------------------------
     async def set_home_theater(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
@@ -232,6 +251,13 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     hass.services.async_register(
         DOMAIN, SERVICE_SEPARATE, separate,
         schema=vol.Schema({vol.Required("left"): name, vol.Required("right"): name}),
+    )
+    pair_sub_schema = vol.Schema(
+        {vol.Required("left"): name, vol.Required("right"): name, vol.Required("sub"): name}
+    )
+    hass.services.async_register(DOMAIN, SERVICE_ADD_PAIR_SUB, add_pair_sub, schema=pair_sub_schema)
+    hass.services.async_register(
+        DOMAIN, SERVICE_REMOVE_PAIR_SUB, remove_pair_sub, schema=pair_sub_schema
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SET_HOME_THEATER, set_home_theater,

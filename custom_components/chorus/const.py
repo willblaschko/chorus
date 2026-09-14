@@ -16,6 +16,8 @@ ERR_NOT_SETTLED_OR_BAD = "800"
 # Service names.
 SERVICE_CREATE_STEREO_PAIR = "create_stereo_pair"
 SERVICE_SEPARATE = "separate"
+SERVICE_ADD_PAIR_SUB = "add_pair_sub"  # bond a sub to a stereo pair (ChannelMapSet SW,SW)
+SERVICE_REMOVE_PAIR_SUB = "remove_pair_sub"
 SERVICE_SET_HOME_THEATER = "set_home_theater"
 SERVICE_REMOVE_HOME_THEATER = "remove_home_theater"
 SERVICE_MOVE = "move"  # SetZoneAttributes rename + HA Area reassign == move rooms

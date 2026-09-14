@@ -163,6 +163,38 @@ class SonosBackend:
         body = f"<ChannelMapSet>{left_uid}:LF,LF;{right_uid}:RF,RF</ChannelMapSet>"
         return self._dp(left_ip, "SeparateStereoPair", body)
 
+    # -- sub bonded to a stereo pair (verified on hardware) ----------------
+    # A sub joins a pair by RE-ISSUING CreateStereoPair with the sub appended to the
+    # pair's ChannelMapSet as `SW,SW` (CreateStereoPair is additive on an existing
+    # pair). Removing it can't shrink the map (returns 402), so we SeparateStereoPair
+    # the whole 3-member set, then re-create the 2-member pair.
+    @staticmethod
+    def _pair_map(left_uid: str, right_uid: str, sub_uid: str | None = None) -> str:
+        m = f"{left_uid}:LF,LF;{right_uid}:RF,RF"
+        return f"{m};{sub_uid}:SW,SW" if sub_uid else m
+
+    def add_pair_sub(self, left_ip: str, left_uid: str, right_uid: str, sub_uid: str) -> str:
+        body = f"<ChannelMapSet>{self._pair_map(left_uid, right_uid, sub_uid)}</ChannelMapSet>"
+        # The sub is an (invisible) standalone, immediately available; just retry
+        # transients. No wait_uid — a sub is Invisible whether bonded or free, so the
+        # standalone poll would never pass.
+        return self._apply_with_settle(lambda: self._dp(left_ip, "CreateStereoPair", body))
+
+    def remove_pair_sub(self, left_ip: str, left_uid: str, right_uid: str, sub_uid: str) -> str:
+        # Dissolve the whole 3-member set, then re-pair the two speakers (sub falls free).
+        self._dp(
+            left_ip,
+            "SeparateStereoPair",
+            f"<ChannelMapSet>{self._pair_map(left_uid, right_uid, sub_uid)}</ChannelMapSet>",
+        )
+        body = f"<ChannelMapSet>{self._pair_map(left_uid, right_uid)}</ChannelMapSet>"
+        # Wait for the right half to settle to a visible standalone, then re-pair.
+        return self._apply_with_settle(
+            lambda: self._dp(left_ip, "CreateStereoPair", body),
+            wait_uid=right_uid,
+            wait_ip=left_ip,
+        )
+
     # -- home theater ------------------------------------------------------
     def add_ht_satellite(
         self, soundbar_ip, soundbar_uid, sat_uid, channel, sat_ip=None

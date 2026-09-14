@@ -32,6 +32,49 @@ separate:
       selector:
         text:
 
+add_pair_sub:
+  name: Add a sub to a stereo pair
+  description: Bond a sub to an existing stereo pair (re-issues CreateStereoPair with the sub appended to the pair's channel map).
+  fields:
+    left:
+      name: Pair left speaker
+      description: The pair's visible left/primary speaker (name or UID).
+      required: true
+      selector:
+        text:
+    right:
+      name: Pair right speaker
+      description: The pair's right speaker (UID).
+      required: true
+      selector:
+        text:
+    sub:
+      name: Sub
+      description: The sub to bond (UID).
+      required: true
+      selector:
+        text:
+
+remove_pair_sub:
+  name: Remove a sub from a stereo pair
+  description: Unbond a sub from a stereo pair (separates the whole set, then re-pairs the two speakers).
+  fields:
+    left:
+      name: Pair left speaker
+      required: true
+      selector:
+        text:
+    right:
+      name: Pair right speaker
+      required: true
+      selector:
+        text:
+    sub:
+      name: Sub
+      required: true
+      selector:
+        text:
+
 set_home_theater:
   name: Set up home theater
   description: Bond surrounds and a sub to a soundbar. Each channel is added one at a time (poll + retry), and the layout is snapshotted first.

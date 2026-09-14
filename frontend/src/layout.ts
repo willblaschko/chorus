@@ -40,10 +40,12 @@ export function roomsToLayout(rooms: Room[]): LayoutMap {
         map[p.uid] = { room: r.name, role: "pairL", anchorUid: p.uid, name: p.name };
         const rf = set.slots.RF;
         if (rf) map[rf.uid] = { room: r.name, role: "pairR", anchorUid: p.uid, name: rf.name };
-        // set.slots.SW (pair sub) intentionally omitted — no validated op yet.
+        const sw = set.slots.SW;
+        // A sub bonded to a pair is a real op now (add_pair_sub/remove_pair_sub).
+        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
       } else {
         map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: p.name };
-        // set.slots.SW (speaker sub) intentionally omitted — no validated op yet.
+        // set.slots.SW (a sub on a lone SPEAKER) still omitted — not yet verified.
       }
     }
     for (const s of r.tray) {

@@ -264,12 +264,23 @@ describe("available subs — one SW path across HTs and pairs", () => {
     expect(after.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["OLD"]);
   });
 
-  it("a sub can be placed on a PAIR set (same SW path) but is GATED — no op yet", () => {
+  it("placing a sub on a PAIR set emits add_pair_sub (left/right/sub)", () => {
     const before = [pairRoom()[0], pool(sub("SUB"))];
     const after = assignSubToChannel(before, "Living Room", "PL", "SUB");
-    // model holds it on the pair's SW slot...
     expect(pairOf(after, "Living Room").slots.SW?.uid).toBe("SUB");
-    // ...but there's no validated pair+sub service, so it diffs to nothing.
-    expect(computeOps(roomsToLayout(before), roomsToLayout(after))).toEqual([]);
+    const ops = computeOps(roomsToLayout(before), roomsToLayout(after));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "add_pair_sub" });
+    expect(ops[0].service.data).toMatchObject({ left: "PL", right: "PR", sub: "SUB" });
+  });
+
+  it("removing a sub from a PAIR set emits remove_pair_sub", () => {
+    const withSub = [pairRoom()[0], pool(sub("SUB"))];
+    const bonded = assignSubToChannel(withSub, "Living Room", "PL", "SUB");
+    const after = clearChannel(bonded, "Living Room", "PL", "SW");
+    const ops = computeOps(roomsToLayout(bonded), roomsToLayout(after));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "remove_pair_sub" });
+    expect(ops[0].service.data).toMatchObject({ left: "PL", right: "PR", sub: "SUB" });
   });
 });

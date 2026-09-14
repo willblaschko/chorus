@@ -10,7 +10,17 @@
 // plan (ops sharing a device serialise, disjoint ops run in parallel).
 
 // A speaker's placement in the layout.
-export type Role = "CC" | "LF" | "RF" | "LR" | "RR" | "SW" | "pairL" | "pairR" | "solo";
+export type Role =
+  | "CC"
+  | "LF"
+  | "RF"
+  | "LR"
+  | "RR"
+  | "SW"
+  | "pairL"
+  | "pairR"
+  | "pairSub" // a sub bonded to a stereo pair (ChannelMapSet SW,SW)
+  | "solo";
 
 export interface Placement {
   room: string; // the Sonos zone/room name it belongs to
@@ -23,7 +33,14 @@ export interface Placement {
 // speakerUid -> placement. One map for the last-applied state, one for the staged/working state.
 export type LayoutMap = Record<string, Placement>;
 
-export type OpType = "separate" | "move" | "create_pair" | "add_ht" | "remove_ht";
+export type OpType =
+  | "separate"
+  | "move"
+  | "create_pair"
+  | "add_ht"
+  | "remove_ht"
+  | "add_pair_sub"
+  | "remove_pair_sub";
 
 export interface Op {
   type: OpType;
@@ -59,10 +76,12 @@ const CHANNEL_FIELD: Record<string, string> = {
 // Phase within a lane: separate(0) -> move(1) -> create_pair/add_ht/remove_ht(2).
 const PHASE: Record<OpType, number> = {
   separate: 0,
+  remove_pair_sub: 0,
   move: 1,
   create_pair: 2,
   add_ht: 2,
   remove_ht: 2,
+  add_pair_sub: 2,
 };
 
 function isHTSat(p: Placement | undefined): p is Placement {
@@ -205,6 +224,39 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         },
         summary: `${b.room} — add ${CHANNEL_LABEL[b.role] ?? b.role}`,
       });
+    }
+  }
+
+  // ── Sub bonded to a stereo pair (add/remove) ─────────────────────────────────
+  // A pairSub is applied by re-issuing CreateStereoPair with the sub appended (add)
+  // or dissolving the set and re-pairing (remove) — both need the pair's left+right.
+  const pairRightOf = (map: LayoutMap, left: string): string | undefined =>
+    Object.keys(map).find((u) => map[u].role === "pairR" && map[u].anchorUid === left);
+  for (const uid of allUids) {
+    const a = applied[uid];
+    const b = working[uid];
+    const wasSub = a?.role === "pairSub";
+    const isSubNow = b?.role === "pairSub";
+    if (isSubNow && !wasSub) {
+      const left = b.anchorUid;
+      const right = pairRightOf(working, left);
+      if (right)
+        ops.push({
+          type: "add_pair_sub",
+          touches: [uid, left, right],
+          service: { domain: "chorus", service: "add_pair_sub", data: { left, right, sub: uid } },
+          summary: `${b.room} — add Sub to pair`,
+        });
+    } else if (wasSub && !isSubNow) {
+      const left = a.anchorUid;
+      const right = pairRightOf(applied, left);
+      if (right)
+        ops.push({
+          type: "remove_pair_sub",
+          touches: [uid, left, right],
+          service: { domain: "chorus", service: "remove_pair_sub", data: { left, right, sub: uid } },
+          summary: `${a.room} — remove Sub from pair`,
+        });
     }
   }
 

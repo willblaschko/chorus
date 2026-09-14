@@ -81,11 +81,13 @@ const MOVE_MS = 4000;
 export function expectedSettleMs(opTypes: readonly OpType[]): number {
   const has = (t: OpType): boolean => opTypes.indexOf(t) !== -1;
   const count = (t: OpType): number => opTypes.filter((o) => o === t).length;
-  const releases = has("remove_ht") || has("separate");
+  // remove_pair_sub dissolves the whole set and re-pairs, so it pays the same
+  // rediscovery cost as any other release.
+  const releases = has("remove_ht") || has("separate") || has("remove_pair_sub");
   return (
     BASE_MS +
     (releases ? REMOVAL_REDISCOVERY_MS : 0) +
-    (count("add_ht") + count("create_pair")) * ADD_MS +
+    (count("add_ht") + count("create_pair") + count("add_pair_sub")) * ADD_MS +
     count("move") * MOVE_MS
   );
 }
