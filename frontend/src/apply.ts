@@ -131,7 +131,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
       service: {
         domain: "chorus",
         service: "separate",
-        data: { left: p.leftName, right: p.rightName },
+        data: { left: p.left, right: p.right }, // UIDs — names are ambiguous
       },
       summary: `${p.room} — separate stereo pair`,
     });
@@ -142,14 +142,13 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
     const a = applied[uid];
     const b = working[uid];
     if (isHTSat(a) && !sameHTSat(a, b)) {
-      const barName = applied[a.anchorUid]?.name ?? a.room;
       ops.push({
         type: "remove_ht",
         touches: [uid, a.anchorUid],
         service: {
           domain: "chorus",
           service: "remove_home_theater",
-          data: { soundbar: barName, channel: a.role },
+          data: { soundbar: a.anchorUid, channel: a.role },
         },
         summary: `${a.room} — remove ${CHANNEL_LABEL[a.role] ?? a.role}`,
       });
@@ -167,7 +166,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         service: {
           domain: "chorus",
           service: "move",
-          data: { speaker: b.name, name: b.room },
+          data: { speaker: uid, name: b.room },
         },
         summary: `${b.name} — move to ${b.room}`,
       });
@@ -184,7 +183,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
       service: {
         domain: "chorus",
         service: "create_stereo_pair",
-        data: { left: p.leftName, right: p.rightName },
+        data: { left: p.left, right: p.right }, // UIDs — names are ambiguous
       },
       summary: `${p.room} — create stereo pair`,
     });
@@ -195,7 +194,6 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
     const a = applied[uid];
     const b = working[uid];
     if (isHTSat(b) && !sameHTSat(a, b)) {
-      const barName = working[b.anchorUid]?.name ?? b.room;
       const field = CHANNEL_FIELD[b.role];
       ops.push({
         type: "add_ht",
@@ -203,7 +201,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         service: {
           domain: "chorus",
           service: "set_home_theater",
-          data: { soundbar: barName, [field]: b.name },
+          data: { soundbar: b.anchorUid, [field]: uid },
         },
         summary: `${b.room} — add ${CHANNEL_LABEL[b.role] ?? b.role}`,
       });

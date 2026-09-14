@@ -293,17 +293,27 @@ export class ChorusEditor extends LitElement {
     const sp = ht.slots[ch];
     const eligible = r.tray.some((s) => positionAccepts(ch, s.model));
     if (!sp) {
+      const add = () => {
+        if (eligible) this._picker = { roomKey: r.key, ch };
+      };
+      // A <div> (not <button>) so it matches the filled tile's box model exactly.
       return html`
-        <button
-          type="button"
+        <div
           class="postile empty ${eligible ? "actionable" : ""}"
-          ?disabled=${!eligible}
+          role=${eligible ? "button" : nothing}
+          tabindex=${eligible ? "0" : nothing}
           title=${eligible ? `Add ${CHANNEL_NAME[ch]}` : "No eligible speaker in this room"}
-          @click=${() => eligible && (this._picker = { roomKey: r.key, ch })}
+          @click=${add}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              add();
+            }
+          }}
         >
           <span class="badge empty-badge">${ch}</span>
           <span class="pmeta"><b>${CHANNEL_NAME[ch]}</b><span>${eligible ? "Tap to add" : "Empty"}</span></span>
-        </button>
+        </div>
       `;
     }
     return html`

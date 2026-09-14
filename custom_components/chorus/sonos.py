@@ -80,6 +80,22 @@ class SonosBackend:
         )
         return match.group(1) if match else ""
 
+    def speaker_ips(self, ip: str) -> dict:
+        """{uid: ip} for EVERY speaker in the topology (bonded + standalone), from a
+        FRESH ZoneGroupState read.
+
+        Lets us locate a speaker by UID even when the coordinator's discovery cache is
+        stale mid-Apply (a just-removed satellite isn't in soco.discover yet). UUID
+        precedes Location in both ZoneGroupMember and Satellite elements.
+        """
+        state = self.zone_group_state(ip)
+        out: dict[str, str] = {}
+        for m in re.finditer(
+            r'UUID="(RINCON_[0-9A-F]+)"[^>]*?Location="https?://([0-9.]+):1400', state
+        ):
+            out.setdefault(m.group(1), m.group(2))
+        return out
+
     def _member(self, state: str, uid: str) -> dict | None:
         match = re.search(
             rf"<(?:ZoneGroupMember|Satellite)([^>]*UUID=\"{re.escape(uid)}\"[^>]*)/?>", state

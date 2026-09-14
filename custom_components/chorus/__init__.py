@@ -70,11 +70,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> None:
     backend = coordinator.backend
 
-    def resolve(name: str) -> dict:
-        player = coordinator.by_name(name)
+    def resolve(id_or_name: str) -> dict:
+        # Accept a RINCON UID (unambiguous — bonded satellites share the soundbar's
+        # zone name, so names can't identify them) OR a friendly name (for the
+        # Developer Tools / YAML path).
+        player = coordinator.players.get(id_or_name) or coordinator.by_name(id_or_name)
         if not player:
-            raise HomeAssistantError(f"No Sonos speaker named '{name}' was found")
+            raise HomeAssistantError(f"No Sonos speaker '{id_or_name}' was found")
         return player
+
+    def resolve_sat(ident: str, ip_map: dict) -> dict:
+        # Locate a to-be-bonded satellite by UID even when discovery is stale — a
+        # just-removed satellite isn't in soco.discover yet, so fall back to a fresh
+        # ZGS UID->IP map and fetch its model directly. Blocking (fetch_model): call
+        # from an executor.
+        player = coordinator.players.get(ident)
+        if player:
+            return player
+        ip = ip_map.get(ident)
+        if ip:
+            return {"uid": ident, "ip": ip, "name": ident, "model": backend.fetch_model(ip)}
+        player = coordinator.by_name(ident)
+        if player:
+            return player
+        raise HomeAssistantError(f"No Sonos speaker '{ident}' was found")
 
     async def run(fn, *args):
         try:
@@ -99,8 +118,12 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await coordinator.async_request_refresh()
 
     async def separate(call: ServiceCall) -> None:
-        left, right = resolve(call.data["left"]), resolve(call.data["right"])
-        await run(backend.separate_stereo_pair, left["ip"], left["uid"], right["uid"])
+        left = resolve(call.data["left"])
+        # The right channel is an invisible member (shares the pair's name); take its
+        # UID as-is, only resolving if a friendly name was passed.
+        right = call.data["right"]
+        right_uid = right if right.startswith("RINCON_") else resolve(right)["uid"]
+        await run(backend.separate_stereo_pair, left["ip"], left["uid"], right_uid)
         await coordinator.async_request_refresh()
 
     # --- home theater -----------------------------------------------------
@@ -108,15 +131,17 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         bar = resolve(call.data["soundbar"])
         if not is_soundbar(bar["model"]):
             raise HomeAssistantError(f"{bar['name']} ({bar['model']}) is not a soundbar")
+        # Fresh topology so satellites resolve by UID even if discovery is stale.
+        ip_map = await hass.async_add_executor_job(backend.speaker_ips, bar["ip"])
         # Snapshot first so a mid-sequence failure is recoverable.
         coordinator.snapshots[bar["uid"]] = {
             "map": await hass.async_add_executor_job(backend.snapshot_ht, bar["ip"], bar["uid"]),
         }
         for channel in CHANNELS:
-            name = call.data.get(channel.lower())
-            if not name:
+            ident = call.data.get(channel.lower())
+            if not ident:
                 continue
-            sat = resolve(name)
+            sat = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
             ok = is_sub(sat["model"]) if channel == "SW" else can_surround(sat["model"])
             if not ok:
                 raise HomeAssistantError(

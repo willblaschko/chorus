@@ -56,7 +56,7 @@ describe("computeOps — home theater satellites", () => {
     expect(op.service).toEqual({
       domain: "chorus",
       service: "set_home_theater",
-      data: { soundbar: "Arc", lr: "Media Room Rear L" },
+      data: { soundbar: ARC, lr: LR },
     });
     expect(op.touches.sort()).toEqual([ARC, LR].sort());
     expect(op.summary).toBe("Media Room — add Rear L");
@@ -74,7 +74,7 @@ describe("computeOps — home theater satellites", () => {
     expect(op.service).toEqual({
       domain: "chorus",
       service: "remove_home_theater",
-      data: { soundbar: "Arc", channel: "SW" },
+      data: { soundbar: ARC, channel: "SW" },
     });
     expect(op.touches.sort()).toEqual([ARC, SW].sort());
     expect(op.summary).toBe("Media Room — remove Sub");
@@ -116,7 +116,7 @@ describe("computeOps — stereo pairs", () => {
     expect(create[0].service).toEqual({
       domain: "chorus",
       service: "create_stereo_pair",
-      data: { left: "Office L", right: "Office R" },
+      data: { left: L, right: R },
     });
     expect(create[0].touches.sort()).toEqual([L, R].sort());
   });
@@ -136,7 +136,7 @@ describe("computeOps — stereo pairs", () => {
     expect(sep[0].service).toEqual({
       domain: "chorus",
       service: "separate",
-      data: { left: "Office L", right: "Office R" },
+      data: { left: L, right: R },
     });
     expect(sep[0].touches.sort()).toEqual([L, R].sort());
   });
@@ -157,7 +157,7 @@ describe("computeOps — moves", () => {
     expect(ops[0].service).toEqual({
       domain: "chorus",
       service: "move",
-      data: { speaker: "Kitchen Speaker", name: "Office" },
+      data: { speaker: uid, name: "Office" },
     });
     expect(ops[0].touches).toEqual([uid]);
     expect(ops[0].summary).toBe("Kitchen Speaker — move to Office");

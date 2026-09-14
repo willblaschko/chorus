@@ -121,7 +121,7 @@ describe("location change -> service op (via computeOps)", () => {
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "add_ht" });
     expect(ops[0].service.service).toBe("set_home_theater");
-    expect(ops[0].service.data).toMatchObject({ soundbar: "Media Room", lf: "Media Room 2" });
+    expect(ops[0].service.data).toMatchObject({ soundbar: "BAR", lf: "E1" });
   });
 
   it("clearing a channel emits one remove_ht (remove_home_theater by channel)", () => {
@@ -130,7 +130,7 @@ describe("location change -> service op (via computeOps)", () => {
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "remove_ht" });
     expect(ops[0].service.service).toBe("remove_home_theater");
-    expect(ops[0].service.data).toMatchObject({ soundbar: "Media Room", channel: "LR" });
+    expect(ops[0].service.data).toMatchObject({ soundbar: "BAR", channel: "LR" });
   });
 
   it("creating a pair emits one create_pair (create_stereo_pair)", () => {
@@ -138,7 +138,7 @@ describe("location change -> service op (via computeOps)", () => {
     const ops = opsFor(before, createPair(before, "Media Room", "E1", "E2"));
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "create_pair" });
-    expect(ops[0].service.data).toMatchObject({ left: "Media Room 2", right: "Media Room 3" });
+    expect(ops[0].service.data).toMatchObject({ left: "E1", right: "E2" });
   });
 
   it("no edit -> no ops", () => {
