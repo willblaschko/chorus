@@ -6,6 +6,7 @@ topology, so what it draws always matches the speakers.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 
@@ -21,9 +22,17 @@ _LOGGER = logging.getLogger(__name__)
 PANEL_URL_PATH = "chorus"
 STATIC_URL = "/chorus_static"
 PANEL_ELEMENT = "chorus-panel"
-# Bump to bust the browser cache when the panel JS changes.
-_CACHE_BUST = "0.1.0-1"
 _FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+
+
+def _bundle_version() -> str:
+    """Content hash of the built panel JS — cache-busts the module URL on every
+    build so HA/the browser never serves a stale panel bundle."""
+    try:
+        with open(os.path.join(_FRONTEND_DIR, f"{PANEL_ELEMENT}.js"), "rb") as fh:
+            return hashlib.md5(fh.read()).hexdigest()[:10]
+    except OSError:
+        return "dev"
 _UI = f"{DOMAIN}_ui"  # scratch namespace kept OUT of hass.data[DOMAIN] (coordinators)
 
 
@@ -54,7 +63,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         config={
             "_panel_custom": {
                 "name": PANEL_ELEMENT,
-                "module_url": f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={_CACHE_BUST}",
+                "module_url": f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={_bundle_version()}",
                 "embed_iframe": False,
                 "trust_external": False,
             }
