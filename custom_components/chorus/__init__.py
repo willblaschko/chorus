@@ -233,7 +233,16 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
 
     async def rename(call: ServiceCall) -> None:
         # Rename the speaker's Sonos zone only — keep its room (no Area change).
-        speaker = resolve(call.data["speaker"])
+        # Resolve by UID against a fresh topology if discovery is stale (a speaker that
+        # was just re-bonded/moved earlier in the same Apply).
+        ident = call.data["speaker"]
+        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
+        if not speaker:
+            seed = next(iter(coordinator.players.values()), None)
+            if not seed:
+                raise HomeAssistantError("No Sonos speakers available to query")
+            ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
+            speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
         await run(backend.set_zone_name, speaker["ip"], call.data["name"])
         await coordinator.async_request_refresh()
 

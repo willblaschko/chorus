@@ -28,6 +28,7 @@ import {
   swapPair,
   dissolveHT,
   moveSpeaker,
+  renameSpeaker,
   setupHT,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
@@ -364,10 +365,10 @@ export class ChorusEditor extends LitElement {
     const target = this._renameFor;
     this._renameFor = undefined;
     if (!target || !value || value === target.current) return;
-    // Applies immediately (renames the Sonos zone); then reload so the name shows.
-    void this.hass.callService("chorus", "rename", { speaker: target.uid, name: value });
-    this._toast(`Renamed to ${value}`);
-    this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
+    // Stage it like every other edit — it shows in the change bar and applies on Apply.
+    this._working = renameSpeaker(this._rooms, target.uid, value);
+    this._dirty = true;
+    this._toast(`Rename to ${value}`);
   }
 
   private _renameOverlay(): TemplateResult | typeof nothing {

@@ -273,6 +273,33 @@ export function moveSpeaker(rooms: Room[], speakerUid: string, targetRoom: strin
   return next;
 }
 
+// ── stage a manual rename: set a speaker's display name wherever it lives ───────
+export function renameSpeaker(rooms: Room[], uid: string, newName: string): Room[] {
+  const next = cloneRooms(rooms);
+  for (const r of next) {
+    for (const s of r.tray) {
+      if (s.uid === uid) {
+        s.name = newName;
+        return next;
+      }
+    }
+    for (const set of r.sets) {
+      if (set.primary.uid === uid) {
+        set.primary.name = newName;
+        return next;
+      }
+      for (const ch of CHANNELS) {
+        const sp = set.slots[ch];
+        if (sp?.uid === uid) {
+          sp.name = newName;
+          return next;
+        }
+      }
+    }
+  }
+  return next;
+}
+
 // ── set up a home theater from a standalone soundbar in the tray ────────────────
 export function setupHT(rooms: Room[], roomKey: string, barUid: string): Room[] {
   const next = cloneRooms(rooms);

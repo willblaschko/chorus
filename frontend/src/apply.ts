@@ -40,6 +40,7 @@ export type LayoutMap = Record<string, Placement>;
 export type OpType =
   | "separate"
   | "move"
+  | "rename"
   | "create_pair"
   | "add_ht"
   | "remove_ht"
@@ -78,15 +79,17 @@ const CHANNEL_FIELD: Record<string, string> = {
 };
 
 // Phase within a lane: separate(0) -> move(1) -> create_pair/add_ht/remove_ht(2).
+// Ordering within a lane: 0 UNBOND (free speakers) -> 1 MOVE (re-home the freed
+// speakers, so a later pair/HT forms in the right room) -> 2 BOND -> 3 RENAME.
 const PHASE: Record<OpType, number> = {
   separate: 0,
-  remove_pair_sub: 0,
   remove_ht: 0,
-  create_pair: 1,
-  add_ht: 1,
-  add_pair_sub: 1,
-  // Moves run LAST: a speaker must be fully unbonded before we rename/re-home it.
-  move: 2,
+  remove_pair_sub: 0,
+  move: 1,
+  create_pair: 2,
+  add_ht: 2,
+  add_pair_sub: 2,
+  rename: 3,
 };
 
 function isHTSat(p: Placement | undefined): p is Placement {
@@ -188,10 +191,12 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
   for (const uid of allUids) {
     const a = applied[uid];
     const b = working[uid];
-    // Exclude the synthetic available-subs pool — a sub unbonding TO the pool (or a
-    // sub coming FROM it) is not a room move; those are handled as pairSub add/remove.
+    // Any speaker whose ROOM changed needs a move (rename its zone + reassign its HA
+    // area) — even one that ends up bonded (moved, then paired/bonded in the new room;
+    // the move runs before the bond so the set forms in the right room). Excludes the
+    // synthetic available-subs pool (unbonding a sub is not a move).
     const poolInvolved = a?.room === AVAILABLE_SUBS_KEY || b?.room === AVAILABLE_SUBS_KEY;
-    if (a && b && b.role === "solo" && a.room !== b.room && !poolInvolved) {
+    if (a && b && a.room !== b.room && !poolInvolved) {
       ops.push({
         type: "move",
         touches: [uid],
@@ -277,6 +282,23 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           data: right ? { left, right, sub: uid } : { left, sub: uid },
         },
         summary: `${a.room} — remove Sub`,
+      });
+    }
+  }
+
+  // ── rename: a speaker whose staged name differs from its live name ───────────
+  // Covers both a manual rename and the automatic "Room — Position" naming applied
+  // when a speaker is bonded (set in the layout mutations). Pooled subs are excluded
+  // (their room is the sentinel, and their name only carries a fallback).
+  for (const uid of allUids) {
+    const a = applied[uid];
+    const b = working[uid];
+    if (a && b && b.name && a.name !== b.name && a.room !== AVAILABLE_SUBS_KEY) {
+      ops.push({
+        type: "rename",
+        touches: [uid],
+        service: { domain: "chorus", service: "rename", data: { speaker: uid, name: b.name } },
+        summary: `Rename to ${b.name}`,
       });
     }
   }

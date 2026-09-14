@@ -10,6 +10,7 @@ import {
   swapPair,
   dissolveHT,
   moveSpeaker,
+  renameSpeaker,
   setupHT,
 } from "./layout.js";
 import { computeOps, planLanes } from "./apply.js";
@@ -205,6 +206,34 @@ describe("location change -> service op (via computeOps)", () => {
   it("no edit -> no ops", () => {
     const before = mediaRoom();
     expect(opsFor(before, mediaRoom())).toEqual([]);
+  });
+
+  it("move two speakers to a room, THEN pair them: 3 ops (move, move, pair) in order", () => {
+    const before: Room[] = [
+      { key: "A", name: "A", area: "A", sets: [], tray: [spk("S1", "A")] },
+      { key: "B", name: "B", area: "B", sets: [], tray: [spk("S2", "B")] },
+    ];
+    const m1 = moveSpeaker(before, "S1", "Living Room");
+    const m2 = moveSpeaker(m1, "S2", "Living Room");
+    const paired = createPair(m2, "Living Room", "S1", "S2");
+    const ops = opsFor(before, paired);
+    // Before the fix the two moves were dropped (S1/S2 ended as pairL/pairR, not solo)
+    // and the pair formed in a starting room. Now: move, move, pair.
+    expect(ops.filter((o) => o.type === "move")).toHaveLength(2);
+    expect(ops.filter((o) => o.type === "create_pair")).toHaveLength(1);
+    expect(ops).toHaveLength(3);
+    const lane = planLanes(ops).find((l) => l.some((o) => o.type === "create_pair"))!;
+    const lastMove = Math.max(...lane.map((o, i) => (o.type === "move" ? i : -1)));
+    expect(lastMove).toBeLessThan(lane.findIndex((o) => o.type === "create_pair"));
+  });
+
+  it("staging a rename emits a single rename op", () => {
+    const before = mediaRoom();
+    const renamed = renameSpeaker(before, "E1", "Kitchen Speaker");
+    const ops = opsFor(before, renamed);
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "rename" });
+    expect(ops[0].service.data).toMatchObject({ speaker: "E1", name: "Kitchen Speaker" });
   });
 
   it("separate a pair AND move a half to another room emits BOTH ops (the bug)", () => {
