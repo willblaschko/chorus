@@ -43,7 +43,13 @@ export class ChorusEditor extends LitElement {
 
   private _room(): Room | undefined {
     const rooms = this._rooms;
-    return rooms.find((r) => r.key === this._selected) ?? rooms[0];
+    if (this._selected) {
+      const found = rooms.find((r) => r.key === this._selected);
+      if (found) return found;
+    }
+    // Desktop shows the first room by default (two-pane); mobile starts on the
+    // list, so "‹ All rooms" (which clears _selected) actually returns to it.
+    return this.narrow ? undefined : rooms[0];
   }
 
   public override render(): TemplateResult {
@@ -68,7 +74,7 @@ export class ChorusEditor extends LitElement {
   private _roomButton(r: Room, sel?: Room): TemplateResult {
     const on = sel?.key === r.key;
     return html`
-      <button class="room ${on ? "sel" : ""}" @click=${() => (this._selected = r.key)}>
+      <button type="button" class="room ${on ? "sel" : ""}" @click=${() => (this._selected = r.key)}>
         <span class="rmeta">
           <b>${r.name}</b>
           <span>${this._roomSummary(r)}</span>
@@ -90,7 +96,7 @@ export class ChorusEditor extends LitElement {
   private _detail(r: Room): TemplateResult {
     return html`
       ${this.narrow
-        ? html`<button class="back" @click=${() => (this._selected = undefined)}>‹ All rooms</button>`
+        ? html`<button type="button" class="back" @click=${() => (this._selected = undefined)}>‹ All rooms</button>`
         : nothing}
       <div class="head">
         <h1>${r.name}</h1>
