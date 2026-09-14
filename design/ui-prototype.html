@@ -146,6 +146,7 @@
   .chime svg{width:19px;height:19px}.chime:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
   .rows .empty-note{padding:16px;color:var(--text-3);font-size:13.5px}
   .drop-hint{border:1.5px dashed var(--hair-2);border-radius:14px;padding:10px;text-align:center;font-size:12px;color:var(--text-3);margin-top:12px}
+  .group.dropping{outline:2px solid var(--accent);outline-offset:3px}
 
   .readout{margin-top:22px}.readout .rl{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:7px}
   .readout code{display:block;font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--text-2);word-break:break-all;
@@ -246,6 +247,26 @@
   .cb-row{display:flex;align-items:center;gap:9px;padding:9px 2px;border-top:.5px solid var(--hair);font-size:12.5px}
   .cb-row b{font-weight:600;min-width:118px;flex:none}
   .cb-from{color:var(--text-3)}.cb-arw{color:var(--text-3);flex:none}.cb-to{color:var(--accent);font-weight:500}
+  .paircards{display:flex;flex-direction:column;gap:12px}
+  .paircard{display:flex;align-items:center;gap:16px;background:var(--card);box-shadow:var(--shadow);border-radius:16px;padding:13px 14px}
+  .pc-orbs{display:flex;align-items:center;gap:9px;flex:none}
+  .pc-div{color:var(--text-3);font-weight:700}
+  .pc-slot{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:58px}
+  .orb.mini{width:44px;height:44px}
+  .orb.mini svg{width:22px;height:22px}
+  .pc-side{font-size:9.5px;font-weight:600;letter-spacing:.04em;color:var(--text-3);text-transform:uppercase}
+  .pc-slot.empty .pc-drop{width:44px;height:44px;border-radius:12px;border:1.5px dashed var(--hair-2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-3)}
+  .pc-slot.over .pc-drop{border-color:var(--accent);border-style:solid;background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
+  .pc-meta{flex:1;min-width:0}
+  .pc-meta b{display:block;font-size:15px;font-weight:600}
+  .pc-meta span{font-size:12.5px;color:var(--text-3)}
+  .pc-subchip{display:flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--c-sub) 15%,transparent);color:var(--c-sub);border-radius:999px;padding:5px 12px 5px 8px;font-size:12px;font-weight:600;flex:none}
+  .pc-sub-ic svg{width:15px;height:15px;display:block}
+  .newpair{display:flex;flex-direction:column;align-items:center;gap:3px;border:1.5px dashed var(--hair-2);border-radius:16px;padding:15px;text-align:center;margin-bottom:4px}
+  .newpair .np-ic{font-size:19px;color:var(--accent);line-height:1}
+  .newpair .np-t{font-size:14px;font-weight:600}
+  .newpair small{font-size:11.5px;color:var(--text-3)}
+  .newpair.over{border-color:var(--accent);border-style:solid;background:color-mix(in srgb,var(--accent) 8%,transparent)}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -265,13 +286,13 @@
       slots:{LF:{id:"sym-bk1",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},RF:{id:"sym-bk2",name:"Bookshelf",model:"Symfonisk Bookshelf",height:false},
         LR:{id:"sym-pf1",name:"Picture frame",model:"Symfonisk Picture frame",height:false},RR:{id:"sym-pf2",name:"Picture frame",model:"Symfonisk Picture frame",height:false},SW:{id:"submini",name:"Sub Mini",model:"Sonos Sub Mini"}},
       tray:[{id:"era1",name:"Media Room 2",model:"Era 300"},{id:"era2",name:"Media Room 3",model:"Era 300"}]},
-    bedroom:{name:"Bedroom",type:"pair",L:{id:"lamp1",name:"Bedroom",model:"Symfonisk Lamp"},R:{id:"lamp2",name:"Bedroom",model:"Symfonisk Lamp"},tray:[],sub:null},
-    guest:{name:"Guest Bedroom",type:"pair",L:{id:"gl1",name:"Guest",model:"Symfonisk Lamp"},R:{id:"gl2",name:"Guest",model:"Symfonisk Lamp"},tray:[],sub:null},
-    pantry:{name:"Pantry",type:"solo",tray:[{id:"p1",name:"Pantry",model:"Symfonisk Bookshelf"}]},
-    office:{name:"Office",type:"solo",tray:[{id:"of1",name:"Office",model:"Symfonisk Frame"}]},
-    kitchen:{name:"Kitchen",type:"solo",tray:[{id:"k1",name:"Kitchen",model:"Symfonisk Bookshelf"}]},
-    dining:{name:"Dining Room",type:"solo",tray:[{id:"conn",name:"Dining Room",model:"Sonos Connect"}]},
-    patio:{name:"Patio",type:"solo",tray:[]}
+    bedroom:{name:"Bedroom",pairs:[{L:{id:"lamp1",name:"Bedroom",model:"Symfonisk Lamp"},R:{id:"lamp2",name:"Bedroom",model:"Symfonisk Lamp"},sub:null}],tray:[]},
+    guest:{name:"Guest Bedroom",pairs:[{L:{id:"gl1",name:"Guest",model:"Symfonisk Lamp"},R:{id:"gl2",name:"Guest",model:"Symfonisk Lamp"},sub:null}],tray:[]},
+    pantry:{name:"Pantry",pairs:[],tray:[{id:"p1",name:"Pantry",model:"Symfonisk Bookshelf"}]},
+    office:{name:"Office",pairs:[],tray:[{id:"of1",name:"Office",model:"Symfonisk Frame"}]},
+    kitchen:{name:"Kitchen",pairs:[],tray:[{id:"k1",name:"Kitchen",model:"Symfonisk Bookshelf"}]},
+    dining:{name:"Dining Room",pairs:[],tray:[{id:"conn",name:"Dining Room",model:"Sonos Connect"}]},
+    patio:{name:"Patio",pairs:[],tray:[]}
   };
   var CH=["LF","RF","LR","RR","SW"],CHNAME={LF:"Front L",RF:"Front R",LR:"Rear L",RR:"Rear R",SW:"Sub"};
   var TINT={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub",CC:"t-bar"};
@@ -325,9 +346,14 @@
     t.addEventListener("dragend",function(){t.classList.remove("dragging");drag=null});return t;}
   function cbtn(cls,inner,title,fn){var b=el("button","cbtn"+(cls?" "+cls:""));b.innerHTML=inner;b.title=title;b.addEventListener("mousedown",function(e){e.stopPropagation()});b.addEventListener("click",function(e){e.stopPropagation();fn()});return b;}
 
-  function roomTint(r){return r.type==="ht"?"t-bar":r.type==="pair"?"t-front":"t-neutral"}
-  function rGlyph(r){var m=r.type==="ht"?r.bar.model:(r.L?r.L.model:(r.tray[0]?r.tray[0].model:""));return iconFor(m)}
-  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";if(barIn(r))return "Soundbar · standalone";var n=(r.L?1:0)+(r.R?1:0)+(r.tray?r.tray.length:0);if(r.type==="solo"||n<=1)return n===1?"Single speaker":"No speakers";return (r.L&&r.R)?(r.sub?"Stereo pair · Sub":"Stereo pair"):n+" speakers, unpaired";}
+  function roomTint(r){return r.type==="ht"?"t-bar":(r.pairs&&r.pairs.some(function(p){return p.L&&p.R}))?"t-front":"t-neutral"}
+  function firstSpeaker(r){if(r.pairs)for(var i=0;i<r.pairs.length;i++){if(r.pairs[i].L)return r.pairs[i].L.model;if(r.pairs[i].R)return r.pairs[i].R.model}return (r.tray&&r.tray[0])?r.tray[0].model:""}
+  function rGlyph(r){return iconFor(r.type==="ht"?r.bar.model:firstSpeaker(r))}
+  function roomState(r){if(r.type==="ht")return "Home Theater · "+Object.keys(r.slots).length+".1";if(barIn(r))return "Soundbar · standalone";
+    var np=(r.pairs||[]).filter(function(p){return p.L&&p.R}).length;
+    var solo=(r.tray||[]).length+(r.pairs||[]).filter(function(p){return ((p.L?1:0)+(p.R?1:0))===1}).length;
+    var parts=[];if(np)parts.push(np===1?"Stereo pair":np+" stereo pairs");if(solo)parts.push(solo+(solo===1?" speaker":" speakers"));
+    return parts.length?parts.join(" + "):"No speakers";}
   function buildRooms(){var box=$("#rooms");box.innerHTML="";
     Object.keys(rooms).forEach(function(k){var r=rooms[k],b=el("button","room"+(k===current?" sel":""));b.setAttribute("aria-pressed",k===current);
       var tint=roomTint(r);
@@ -386,28 +412,28 @@
   function saveLayout(r,name){r.saved=r.saved||[];var nm=(name&&name.trim())||("Layout "+(r.saved.length+1));r.saved.push({name:nm,slots:JSON.parse(JSON.stringify(r.slots))});toast("Saved “"+nm+"”");render();}
   function restoreLayout(r,saved){var all=allSpeakers(r);r.slots=JSON.parse(JSON.stringify(saved.slots));var inS={};Object.keys(r.slots).forEach(function(k){if(r.slots[k])inS[r.slots[k].id]=1});r.tray=all.filter(function(s){return !inS[s.id]});toast("Restored “"+saved.name+"”");render();}
   function deleteLayout(r,saved){r.saved=(r.saved||[]).filter(function(x){return x!==saved});toast("Deleted “"+saved.name+"”");render();}
-  function normalizeRoom(r){if(r.type==="ht")return;
-    if(r.type==="pair"&&!(r.L&&r.R)){if(r.L){r.tray.push(r.L);r.L=null}if(r.R){r.tray.push(r.R);r.R=null}r.type="music";}
-    if(r.type!=="pair"){var n=(r.tray?r.tray.length:0)+(r.L?1:0)+(r.R?1:0);r.type=n>=2?"music":"solo";}}
+  function normalizeRoom(r){if(r.type==="ht")return;if(!r.tray)r.tray=[];
+    (r.pairs||[]).forEach(function(p){if(!p.L&&p.R){p.L=p.R;p.R=null}});
+    r.pairs=(r.pairs||[]).filter(function(p){if(!p.L&&!p.R){if(p.sub)looseSubs.push(p.sub);return false}return true});}
   // Remove a speaker from wherever it lives in a room. Taking a soundbar out of its
   // home theater dissolves the theater — surrounds can't exist without the bar — so the
   // satellites fall back to standalone in the room.
   function detach(src,sp){
-    if(src.type==="ht"&&src.bar&&src.bar.id===sp.id){Object.keys(src.slots).forEach(function(k){if(src.slots[k]){src.slots[k].height=false;src.tray.push(src.slots[k])}});src.slots={};src.bar=null;src.type="music";}
+    if(src.type==="ht"&&src.bar&&src.bar.id===sp.id){Object.keys(src.slots).forEach(function(k){if(src.slots[k]){src.slots[k].height=false;src.tray.push(src.slots[k])}});src.slots={};src.bar=null;delete src.type;src.pairs=src.pairs||[];}
+    (src.pairs||[]).forEach(function(p){if((p.L&&p.L.id===sp.id)||(p.R&&p.R.id===sp.id)){ // taking one speaker separates its pair
+      [p.L,p.R].forEach(function(mm){if(mm&&mm.id!==sp.id)src.tray.push(mm)});if(p.sub)looseSubs.push(p.sub);p.L=null;p.R=null;p.sub=null;}});
     if(src.tray)src.tray=src.tray.filter(function(x){return x.id!==sp.id});
     if(src.slots)Object.keys(src.slots).forEach(function(k){if(src.slots[k]&&src.slots[k].id===sp.id)src.slots[k]=null});
-    if(src.L&&src.L.id===sp.id)src.L=null;if(src.R&&src.R.id===sp.id)src.R=null;
-    if(src.sub&&src.sub.id===sp.id)src.sub=null;
     normalizeRoom(src);}
   function moveSpeaker(d,targetKey){if(!d||d.roomKey===targetKey)return;
     var src=rooms[d.roomKey],tgt=rooms[targetKey],sp=d.sp;
     detach(src,sp);sp.height=false;if(!tgt.tray)tgt.tray=[];tgt.tray.push(sp);
     normalizeRoom(tgt);drag=null;toast(sp.name+" → "+tgt.name);render();}
-  function allSubs(target){var out=[];
+  function allSubs(exclude){var out=[];
     looseSubs.forEach(function(s){out.push({sub:s,loc:"Available",take:function(){looseSubs=looseSubs.filter(function(x){return x!==s})}})});
-    Object.keys(rooms).forEach(function(k){var rm=rooms[k];if(rm===target)return;
+    Object.keys(rooms).forEach(function(k){var rm=rooms[k];
       if(rm.type==="ht"&&rm.slots&&rm.slots.SW){var s=rm.slots.SW;out.push({sub:s,loc:"in "+rm.name,take:function(){rm.slots.SW=null}})}
-      if(rm.sub){var s2=rm.sub;out.push({sub:s2,loc:"in "+rm.name,take:function(){rm.sub=null}})}});
+      (rm.pairs||[]).forEach(function(pp){if(pp.sub&&pp!==exclude){var s2=pp.sub;out.push({sub:s2,loc:"in "+rm.name,take:function(){pp.sub=null}})}})});
     return out;}
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
@@ -427,12 +453,13 @@
     var s=el("div","psub");s.appendChild(pos(r,"SW"));stage.appendChild(s);
     m.appendChild(stage);
 
-    var sec2=el("div","sec");sec2.innerHTML='<h2>Available speakers</h2><span class="sc">drag onto a position, or a room to move it</span>';m.appendChild(sec2);
-    var grp=el("div","group");var rowsEl=el("div","rows");
-    if(!r.tray.length)rowsEl.appendChild(el("div","empty-note","Every speaker is in use."));
+    var sec2=el("div","sec");sec2.innerHTML='<h2>Available speakers</h2><span class="sc">drag onto a position — or drop one here to remove it</span>';m.appendChild(sec2);
+    var grp=el("div","group droppable");var rowsEl=el("div","rows");
+    if(!r.tray.length)rowsEl.appendChild(el("div","empty-note","Every speaker is in use — drop one here to remove it from the theater."));
     r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);
-    var hint=el("div","drop-hint","drop a speaker here to remove it from the home theater");m.appendChild(hint);
-    [grp,hint].forEach(function(z){z.addEventListener("dragover",function(e){if(drag){e.preventDefault();z.style.borderColor="var(--accent)"}});z.addEventListener("dragleave",function(){z.style.borderColor=""});z.addEventListener("drop",function(e){e.preventDefault();z.style.borderColor="";unbondToShelf(r)})});
+    grp.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current){e.preventDefault();grp.classList.add("dropping")}});
+    grp.addEventListener("dragleave",function(){grp.classList.remove("dropping")});
+    grp.addEventListener("drop",function(e){e.preventDefault();grp.classList.remove("dropping");unbondToShelf(r)});
 
     var w=el("div","warn");w.innerHTML='<b>Heads up:</b> custom layouts like this are ones the Sonos app won’t build itself, so some of its tuning (like Trueplay) may not fully apply. Everything else works normally.';m.appendChild(w);
   }
@@ -473,7 +500,7 @@
     r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms();}
   function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);renderHT(r);buildRooms()}
   function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
-  function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};r.type="music";render();}
+  function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};delete r.type;r.pairs=r.pairs||[];render();}
 
   function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";renderHT(r);buildRooms();}
   function renderBarSetup(r){var m=$("#main");m.innerHTML="";var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
@@ -487,56 +514,62 @@
     if(others.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">available to add as surrounds</span>';m.appendChild(sec2);
       var grp=el("div","group"),rowsEl=el("div","rows");others.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
   }
-  function commitPair(r){r.type="pair";renderPair(r);buildRooms();}
-  function renderPair(r){var m=$("#main");m.innerHTML="";var paired=r.L&&r.R;
-    var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);
-    var mn=roomMenu(r);if(mn)head.appendChild(mn);m.appendChild(head);
-    var sec=el("div","sec");sec.innerHTML='<h2>Stereo pair</h2><span class="sc">'+(paired?"":"drop a speaker on each side")+'</span>';m.appendChild(sec);
-    var wells=el("div","wells");wells.appendChild(well(r,"L"));var sw=el("button","swap","⇄");sw.title="Swap sides";sw.onclick=function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)};wells.appendChild(sw);wells.appendChild(well(r,"R"));m.appendChild(wells);
-    if(paired){
-      if(r.sub){var subw=el("div","pairsub"),st=el("div","subchip");st.innerHTML='<div class="badge t-sub" style="width:36px;height:36px;border-radius:10px">'+ICON.sub+'</div><div class="sc-meta"><b></b><span></span></div>';st.querySelector("b").textContent=r.sub.name;st.querySelector(".sc-meta span").textContent=sm(r.sub.model);
-        st.onclick=function(){actionSheet(r.sub.name,sm(r.sub.model),[{label:"Identify",icon:WAVE,fn:function(){identify(r.sub.name,st)}},{label:"Remove sub",danger:true,icon:RMI,fn:function(){looseSubs.push(r.sub);r.sub=null;renderPair(r);buildRooms()}}])};subw.appendChild(st);m.appendChild(subw);}
-      else{var opts=allSubs(r);if(opts.length){var subw2=el("div","pairsub"),add=el("button","addsub");add.textContent="＋ Add a Sub";
-        add.onclick=function(){actionSheet("Add a Sub","Choose a Sub to bond to this pair",opts.map(function(o){return {label:o.sub.name+" · "+sm(o.sub.model),sub:o.loc,icon:ICON.sub,fn:function(){o.take();r.sub=Object.assign({},o.sub);toast(o.loc==="Available"?("Added "+o.sub.name):(o.sub.name+" moved from "+o.loc.slice(3)));renderPair(r);buildRooms()}}}))};subw2.appendChild(add);m.appendChild(subw2);}}
-    }
-    if(r.tray.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">chime to identify</span>';m.appendChild(sec2);
-      var grp=el("div","group");var rowsEl=el("div","rows");r.tray.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
+  function renderRoom(r){var m=$("#main");m.innerHTML="";var pairs=(r.pairs||[]),solos=(r.tray||[]);
+    var head=el("div","head"),left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip"></span></div>';$("h1",left).textContent=r.name;$(".chip",left).textContent=roomState(r);head.appendChild(left);m.appendChild(head);
+    if(pairs.length){var sec=el("div","sec");sec.innerHTML='<h2>'+(pairs.length>1?"Stereo pairs":"Stereo pair")+'</h2><span class="sc">tap a speaker to identify</span>';m.appendChild(sec);
+      var pg=el("div","paircards");pairs.forEach(function(p){pg.appendChild(pairCard(r,p))});m.appendChild(pg);}
+    var pairableSolos=solos.filter(function(s){return speakerKind(s.model).pair});
+    if(pairableSolos.length){var nz=el("div","newpair");nz.innerHTML='<span class="np-ic">＋</span><span class="np-t">New stereo pair</span><small>drag a speaker here, then drop its partner on the empty side</small>';
+      nz.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();nz.classList.add("over")}});
+      nz.addEventListener("dragleave",function(){nz.classList.remove("over")});
+      nz.addEventListener("drop",function(e){e.preventDefault();nz.classList.remove("over");startPair(r)});m.appendChild(nz);}
+    if(solos.length){var sec2=el("div","sec");sec2.innerHTML='<h2>'+(pairs.length?"Other speakers":(solos.length>1?"Speakers":"Speaker"))+'</h2><span class="sc">drag onto “New stereo pair”, or a room to move</span>';m.appendChild(sec2);
+      var grp=el("div","group"),rowsEl=el("div","rows");solos.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
+    if(!pairs.length&&!solos.length){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">No speakers here yet</div><div class="wm" style="max-width:34ch;text-align:center">Drop a speaker onto “'+r.name+'” in the sidebar to move one in.</div>';m.appendChild(e);}
   }
-  function well(r,side){var w=el("div","well");var sp=r[side];w.appendChild(el("div","side",side));
-    if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
-      var ctl=el("div","ctl pin");ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(sp.name,t)}));ctl.appendChild(cbtn("x","✕","Remove",function(){r.tray.push(sp);r[side]=null;renderPair(r)}));w.appendChild(ctl);
-    }else w.appendChild(el("div","empty-note","Empty"));
-    w.addEventListener("dragover",function(e){if(drag&&speakerKind(drag.sp.model).pair){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
-    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;if(!speakerKind(s2.model).pair)return;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;if(r.L&&r.R&&r.type!=="pair"){commitPair(r)}else{renderPair(r)}});return w;}
-  function unpair(r){if(r.sub){looseSubs.push(r.sub);r.sub=null}r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms();}
-
-  function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
-    var head=el("div","head");var left=el("div","head-l");
-    left.innerHTML='<h1></h1><div class="chips"><span class="chip">'+(sp?"Single speaker":"Empty room")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
-    var sec=el("div","sec");sec.innerHTML='<h2>'+(sp?"Speaker":"No speakers yet")+'</h2><span class="sc">'+(sp?"add another to pair":"an HA room with no Sonos")+'</span>';m.appendChild(sec);
-    if(!sp){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">This room has no speakers</div><div class="wm" style="max-width:32ch;text-align:center">Move one in by dropping it onto “'+r.name+'” in the sidebar.</div>';m.appendChild(e);return;}
-    var s=el("div","solo");var t=orb(sp,"t-neutral");s.appendChild(t);s.appendChild(el("div","wn",sp.name));s.appendChild(el("div","wm",sm(sp.model)+" · standalone"));
-    var b=el("button","btn soft","Chime to identify");b.onclick=function(){identify(sp.name,t)};s.appendChild(b);m.appendChild(s);}
+  function startPair(r){if(!drag)return;var sp=drag.sp;if(!speakerKind(sp.model).pair){drag=null;return;}
+    detach(rooms[drag.roomKey],sp);sp.height=false;if(!r.pairs)r.pairs=[];r.pairs.push({L:sp,R:null,sub:null});drag=null;render();}
+  function pairCard(r,p){var complete=p.L&&p.R,card=el("div","paircard");
+    var orbs=el("div","pc-orbs");orbs.appendChild(pcSlot(r,p,"L"));orbs.appendChild(el("div","pc-div","·"));orbs.appendChild(pcSlot(r,p,"R"));card.appendChild(orbs);
+    var meta=el("div","pc-meta");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=complete?"Stereo pair":"Pairing…";$("span",meta).textContent=complete?sm(p.L.model):"drop a partner on the empty side";card.appendChild(meta);
+    if(p.sub){var sc=el("div","pc-subchip");sc.innerHTML='<span class="pc-sub-ic">'+ICON.sub+'</span><span class="pc-sub-n"></span>';sc.querySelector(".pc-sub-n").textContent=p.sub.name;card.appendChild(sc);}
+    card.appendChild(pairMenu(r,p));return card;}
+  function pcSlot(r,p,side){var sp=p[side],s=el("div","pc-slot"+(sp?"":" empty"));
+    if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");t.classList.add("mini");s.appendChild(t);s.appendChild(el("div","pc-side",side));s.style.cursor="pointer";s.onclick=function(){identify(sp.name,t)};}
+    else{s.appendChild(el("div","pc-drop",side));s.appendChild(el("div","pc-side","drop partner"));
+      s.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();s.classList.add("over")}});
+      s.addEventListener("dragleave",function(){s.classList.remove("over")});
+      s.addEventListener("drop",function(e){e.preventDefault();s.classList.remove("over");if(!drag||drag.roomKey!==current)return;var b=drag.sp;if(!speakerKind(b.model).pair)return;detach(rooms[current],b);b.height=false;p[side]=b;drag=null;render();});}
+    return s;}
+  function pairMenu(r,p){var complete=p.L&&p.R,items=[];
+    if(complete){items.push(["Audio settings",0,function(){audioSheet(p,"pair","Stereo pair")}]);
+      items.push(["Swap left / right",0,function(){var t=p.L;p.L=p.R;p.R=t;render()}]);
+      if(p.sub)items.push(["Remove Sub",0,function(){looseSubs.push(p.sub);p.sub=null;render()}]);
+      else if(allSubs(p).length)items.push(["Add a Sub",0,function(){subPicker(r,p)}]);
+      items.push(["sep"]);items.push(["Separate pair",1,function(){separatePair(r,p)}]);}
+    else items.push(["Cancel pairing",1,function(){separatePair(r,p)}]);
+    return menuFrom(items);}
+  function separatePair(r,p){[p.L,p.R].forEach(function(mm){if(mm)r.tray.push(mm)});if(p.sub)looseSubs.push(p.sub);r.pairs=r.pairs.filter(function(x){return x!==p});render();}
+  function subPicker(r,p){var opts=allSubs(p);actionSheet("Add a Sub","Choose a Sub to bond to this pair",opts.map(function(o){return {label:o.sub.name+" · "+sm(o.sub.model),sub:o.loc,icon:ICON.sub,fn:function(){o.take();p.sub=Object.assign({},o.sub);render()}}}))}
 
   var DOTS='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>';
   function closeMenus(){var o=document.querySelectorAll(".menu.open");for(var i=0;i<o.length;i++)o[i].classList.remove("open")}
   document.addEventListener("click",closeMenus);
-  function roomMenu(r){var items=[];
-    if(r.type==="ht"){items.push(["Audio settings",0,function(){audioSheet(r)}]);items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
-      if(r.saved&&r.saved.length){items.push(["header","Saved layouts"]);r.saved.forEach(function(s){items.push(["layout",s])});}
-      items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);}
-    else if(r.type==="pair"){items.push(["Audio settings",0,function(){audioSheet(r)}]);items.push(["Swap left / right",0,function(){var t=r.L;r.L=r.R;r.R=t;renderPair(r)}]);
-      items.push(["sep"]);items.push(["Unpair",1,function(){unpair(r)}]);}
-    else return null;
-    var wrap=el("div","menu-wrap");var btn=el("button","hmenu-btn");btn.innerHTML=DOTS;btn.title="Room options";btn.setAttribute("aria-label","Room options");
+  function roomMenu(r){if(r.type!=="ht")return null;var items=[];
+    items.push(["Audio settings",0,function(){audioSheet(r,"ht",r.name)}]);
+    items.push(["Save current layout",0,function(){nameModal({title:"Save layout",message:"Give this speaker layout a name",placeholder:"e.g. Movie 5.1",confirmLabel:"Save",onConfirm:function(n){saveLayout(r,n)}})}]);
+    if(r.saved&&r.saved.length){items.push(["header","Saved layouts"]);r.saved.forEach(function(s){items.push(["layout",s])});}
+    items.push(["sep"]);items.push(["Separate all speakers",1,function(){dissolve(r)}]);
+    return menuFrom(items,r);}
+  function menuFrom(items,ctx){var wrap=el("div","menu-wrap");var btn=el("button","hmenu-btn");btn.innerHTML=DOTS;btn.title="Options";btn.setAttribute("aria-label","Options");
     var menu=el("div","menu");
     items.forEach(function(it){
       if(it[0]==="sep"){menu.appendChild(el("div","sep"));return;}
       if(it[0]==="header"){menu.appendChild(el("div","mlabel",it[1]));return;}
       if(it[0]==="layout"){var s=it[1],row=el("button","mlayout"),nm=el("span",null,s.name),dl=el("span","mdel","✕");
         row.appendChild(nm);row.appendChild(dl);row.title="Restore “"+s.name+"”";
-        row.onclick=function(e){e.stopPropagation();closeMenus();restoreLayout(r,s)};
-        dl.title="Delete";dl.onclick=function(e){e.stopPropagation();deleteLayout(r,s)};menu.appendChild(row);return;}
+        row.onclick=function(e){e.stopPropagation();closeMenus();restoreLayout(ctx,s)};
+        dl.title="Delete";dl.onclick=function(e){e.stopPropagation();deleteLayout(ctx,s)};menu.appendChild(row);return;}
       var b=el("button",it[1]?"danger":"");b.textContent=it[0];b.onclick=function(e){e.stopPropagation();closeMenus();it[2]()};menu.appendChild(b)});
     btn.onclick=function(e){e.stopPropagation();var was=menu.classList.contains("open");closeMenus();if(!was)menu.classList.add("open")};
     wrap.appendChild(btn);wrap.appendChild(menu);return wrap;}
@@ -549,11 +582,11 @@
     var c=el("button","cancel");c.textContent="Cancel";c.onclick=close;sheet.appendChild(c);
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
-  function audioSheet(r){
-    r.audio=r.audio||{bass:0,treble:0,loudness:false,sub:6,surround:6,height:4,night:false,dialog:false,trueplay:true,balance:0};
-    var a=r.audio,back=el("div","modal-back"),sheet=el("div","modal aset");
+  function audioSheet(obj,kind,title){
+    obj.audio=obj.audio||{bass:0,treble:0,loudness:false,sub:6,surround:6,height:4,night:false,dialog:false,trueplay:true,balance:0};
+    var a=obj.audio,back=el("div","modal-back"),sheet=el("div","modal aset");
     function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
-    var h=el("div","aset-h");h.innerHTML='<b>Audio</b><div></div>';h.querySelector("div").textContent=r.name;sheet.appendChild(h);
+    var h=el("div","aset-h");h.innerHTML='<b>Audio</b><div></div>';h.querySelector("div").textContent=title;sheet.appendChild(h);
     function lbl(t){return el("div","aset-lbl",t)}
     function sliderRow(label,key,min,max,fmt){var row=el("div","aset-row");row.appendChild(el("div","rl",label));
       var rc=el("div","rc"),val=el("span","rv"),inp=el("input","sl");inp.type="range";inp.min=min;inp.max=max;inp.step=1;inp.value=a[key];
@@ -565,8 +598,8 @@
     var dB=function(v){return (v>0?"+":"")+v+" dB"},lvl=function(v){return ""+v},bal=function(v){return v===0?"Center":(v<0?"L "+(-v):"R "+v)};
     function group(rows){var g=el("div","aset-group");rows.forEach(function(x){g.appendChild(x)});return g}
     sheet.appendChild(lbl("Tone"));sheet.appendChild(group([sliderRow("Bass","bass",-10,10,dB),sliderRow("Treble","treble",-10,10,dB),toggleRow("Loudness","loudness")]));
-    if(r.type==="ht"){sheet.appendChild(lbl("Home theater"));sheet.appendChild(group([sliderRow("Sub level","sub",0,10,lvl),sliderRow("Surround level","surround",0,10,lvl),sliderRow("Height level","height",0,10,lvl),toggleRow("Night sound","night"),toggleRow("Speech clarity","dialog")]));}
-    if(r.type==="pair"){sheet.appendChild(lbl("Stereo pair"));sheet.appendChild(group([sliderRow("Balance","balance",-5,5,bal)]));}
+    if(kind==="ht"){sheet.appendChild(lbl("Home theater"));sheet.appendChild(group([sliderRow("Sub level","sub",0,10,lvl),sliderRow("Surround level","surround",0,10,lvl),sliderRow("Height level","height",0,10,lvl),toggleRow("Night sound","night"),toggleRow("Speech clarity","dialog")]));}
+    if(kind==="pair"){sheet.appendChild(lbl("Stereo pair"));sheet.appendChild(group([sliderRow("Balance","balance",-5,5,bal)]));}
     sheet.appendChild(lbl("Tuning"));sheet.appendChild(group([toggleRow("Trueplay","trueplay")]));
     var done=el("button","btn fill");done.textContent="Done";done.style.cssText="width:100%;margin-top:18px";done.onclick=close;sheet.appendChild(done);
     back.addEventListener("click",function(e){if(e.target===back)close()});
@@ -582,8 +615,7 @@
     Object.keys(state.rooms).forEach(function(k){var r=state.rooms[k];
       function put(sp,role){if(sp)map[sp.id]={room:r.name,role:role,height:!!sp.height,name:sp.name}}
       if(r.type==="ht"){put(r.bar,"Center");CH.forEach(function(ch){put(r.slots[ch],ch==="SW"?"Sub":CHNAME[ch])});(r.tray||[]).forEach(function(s){put(s,"available")});}
-      else if(r.L&&r.R){put(r.L,"Left");put(r.R,"Right");put(r.sub,"Sub");(r.tray||[]).forEach(function(s){put(s,"in room")});}
-      else {[r.L,r.R].concat(r.tray||[]).forEach(function(s){if(s)put(s,"standalone")});}});
+      else {(r.pairs||[]).forEach(function(p){if(p.L&&p.R){put(p.L,"Left");put(p.R,"Right");put(p.sub,"Sub")}else{var mm=p.L||p.R;if(mm)put(mm,"standalone")}});(r.tray||[]).forEach(function(s){put(s,"standalone")});}});
     (state.subs||[]).forEach(function(s){map[s.id]={room:"available",role:"idle",height:false,name:s.name}});
     return map;}
   function labelFor(e){if(e.role==="idle")return "Available";if(e.role==="standalone")return e.room+" · standalone";return e.room+" · "+e.role+(e.height?" + height":"");}
@@ -611,7 +643,7 @@
     bar.appendChild(list);
     info.onclick=function(){bar.classList.toggle("open")};
     bar.classList.add("on");if(wasOpen)bar.classList.add("open");}
-  function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):barIn(r)?renderBarSetup(r):r.type==="solo"?renderSolo(r):renderPair(r)}
+  function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):barIn(r)?renderBarSetup(r):renderRoom(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
   function curTheme(){return document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light")}
