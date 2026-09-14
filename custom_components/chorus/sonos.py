@@ -147,8 +147,25 @@ class SonosBackend:
             wait_ip=sat_ip or soundbar_ip,
         )
 
-    def remove_ht_satellite(self, soundbar_ip: str, sat_uid: str) -> str:
-        return self._dp(soundbar_ip, "RemoveHTSatellite", f"<SatRoomUUID>{sat_uid}</SatRoomUUID>")
+    def remove_ht_satellite(
+        self, soundbar_ip: str, sat_uid: str, soundbar_uid: str | None = None
+    ) -> str:
+        """Remove a satellite; if `soundbar_uid` is given, wait for the device to
+        actually drop it before returning (so callers don't report 'done' while the
+        soundbar is still cycling)."""
+        result = self._dp(
+            soundbar_ip, "RemoveHTSatellite", f"<SatRoomUUID>{sat_uid}</SatRoomUUID>"
+        )
+        if soundbar_uid:
+            deadline = time.monotonic() + self.settle_timeout
+            while time.monotonic() < deadline:
+                try:
+                    if sat_uid not in self.ht_sat_map(soundbar_ip, soundbar_uid):
+                        break
+                except Exception:  # noqa: BLE001 - transient during transition
+                    pass
+                time.sleep(1.0)
+        return result
 
     # -- move / rename (SetZoneAttributes) --------------------------------
     def set_zone_name(self, ip: str, name: str) -> str:
@@ -230,7 +247,7 @@ class SonosBackend:
         # Remove satellites that shouldn't be there, or are on the wrong channel.
         for uid, base in current.items():
             if desired.get(uid) != base:
-                self.remove_ht_satellite(soundbar_ip, uid)
+                self.remove_ht_satellite(soundbar_ip, uid, soundbar_uid)
         # Add satellites that are missing, or need re-adding on the right channel.
         for uid, base in desired.items():
             if current.get(uid) != base:

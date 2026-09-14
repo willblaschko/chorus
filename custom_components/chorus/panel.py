@@ -40,6 +40,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
     if not ui.get("ws"):
         websocket_api.async_register_command(hass, ws_bond_graph)
+        websocket_api.async_register_command(hass, ws_refresh)
         ui["ws"] = True
 
     frontend.async_register_built_in_panel(
@@ -71,18 +72,16 @@ def async_unregister_panel(hass: HomeAssistant) -> None:
         ui["panel"] = False
 
 
-@websocket_api.websocket_command({"type": "chorus/bond_graph"})
-@callback
-def ws_bond_graph(hass: HomeAssistant, connection, msg) -> None:
-    """Return the live bonded units plus the flat (visible) player inventory."""
-    coordinator = _first_coordinator(hass)
+def _graph_payload(hass: HomeAssistant, coordinator) -> dict:
+    """Build the {units, players, areas} payload from the coordinator's current state.
+
+    Annotates shallow copies with each speaker's HA Area — never mutates the
+    coordinator's live dicts.
+    """
     if coordinator is None:
-        connection.send_result(msg["id"], {"units": [], "players": [], "areas": []})
-        return
+        return {"units": [], "players": [], "areas": []}
     units = coordinator.bond_graph
     players = list(coordinator.players.values())
-    # Resolve every speaker's HA Area once, then annotate shallow copies (never
-    # mutate the coordinator's live dicts from this read-only handler).
     uids = {p["uid"] for p in players}
     uids.update(m["uid"] for u in units for m in u["members"])
     area_of = speaker_area_map(hass, list(uids))
@@ -91,10 +90,28 @@ def ws_bond_graph(hass: HomeAssistant, connection, msg) -> None:
         {**u, "members": [{**m, "area": area_of.get(m["uid"])} for m in u["members"]]}
         for u in units
     ]
-    connection.send_result(
-        msg["id"],
-        {"units": units_out, "players": players_out, "areas": all_area_names(hass)},
-    )
+    return {"units": units_out, "players": players_out, "areas": all_area_names(hass)}
+
+
+@websocket_api.websocket_command({"type": "chorus/bond_graph"})
+@callback
+def ws_bond_graph(hass: HomeAssistant, connection, msg) -> None:
+    """Return the live bonded units + areas from the coordinator's current cache."""
+    connection.send_result(msg["id"], _graph_payload(hass, _first_coordinator(hass)))
+
+
+@websocket_api.websocket_command({"type": "chorus/refresh"})
+@websocket_api.async_response
+async def ws_refresh(hass: HomeAssistant, connection, msg) -> None:
+    """Force a fresh Sonos re-discovery, then return the settled graph.
+
+    Used after Apply: the plain bond_graph read returns the cached graph, which may
+    still be mid-cycle right after a bonding change — this re-scans first.
+    """
+    coordinator = _first_coordinator(hass)
+    if coordinator is not None:
+        await coordinator.async_request_refresh()
+    connection.send_result(msg["id"], _graph_payload(hass, coordinator))
 
 
 def _first_coordinator(hass: HomeAssistant):

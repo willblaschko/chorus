@@ -49,12 +49,14 @@ export class ChorusPanel extends LitElement {
     void this._load();
   }
 
-  private async _load(): Promise<void> {
+  private async _load(fresh = false): Promise<void> {
     this._loading = true;
     this._error = undefined;
     try {
+      // `chorus/refresh` forces a fresh Sonos re-discovery (used after Apply so the
+      // reloaded graph reflects the settled device, not the mid-cycle cache).
       this._graph = await this.hass.connection.sendMessagePromise<BondGraph>({
-        type: "chorus/bond_graph",
+        type: fresh ? "chorus/refresh" : "chorus/bond_graph",
       });
     } catch (err) {
       this._error =
@@ -120,7 +122,11 @@ export class ChorusPanel extends LitElement {
       .hass=${this.hass}
       .graph=${this._graph}
       .narrow=${this.narrow}
-      @chorus-refresh=${() => this._load()}
+      @chorus-graph=${(e: Event) => {
+        this._graph = (e as CustomEvent).detail as BondGraph;
+        this._loading = false;
+      }}
+      @chorus-refresh=${() => this._load(true)}
     ></chorus-editor>`;
   }
 

@@ -140,13 +140,13 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             uid = backend.resolve_channel_to_uid(current, bar["uid"], channel)
             if not uid:
                 raise HomeAssistantError(f"{bar['name']} has no {channel} satellite")
-            await run(backend.remove_ht_satellite, bar["ip"], uid)
+            await run(backend.remove_ht_satellite, bar["ip"], uid, bar["uid"])
         elif sat_name:  # a still-standalone speaker referenced by name
             sat = resolve(sat_name)
-            await run(backend.remove_ht_satellite, bar["ip"], sat["uid"])
+            await run(backend.remove_ht_satellite, bar["ip"], sat["uid"], bar["uid"])
         else:  # dissolve: remove every satellite currently on the bar (by UID)
             for uid in backend.satellites_to_remove(current, bar["uid"]):
-                await run(backend.remove_ht_satellite, bar["ip"], uid)
+                await run(backend.remove_ht_satellite, bar["ip"], uid, bar["uid"])
         await coordinator.async_request_refresh()
 
     # --- move (rename the zone == move to another room) -------------------

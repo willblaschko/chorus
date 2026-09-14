@@ -116,12 +116,50 @@ export class ChorusEditor extends LitElement {
     await applyPlan(this.hass, plan, (rows) => {
       this._rows = [...rows];
     });
+    // The service calls have returned, but Sonos keeps re-syncing for a beat after.
+    // Wait for the live topology to actually converge to what we asked for before
+    // reporting done — mirror what the Sonos app does.
+    const intended = this._bondSignature(roomsToLayout(this._rooms));
+    const fresh = await this._awaitConvergence(intended);
     const failed = this._rows.filter((r) => r.status === "error").length;
     this._applying = false;
     this._dirty = false;
-    // Ask the panel to reload the live graph; willUpdate then resets the working model.
-    this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
+    if (fresh) {
+      // Push the settled graph straight to the panel (no extra round-trip).
+      this.dispatchEvent(
+        new CustomEvent("chorus-graph", { detail: fresh, bubbles: true, composed: true })
+      );
+    } else {
+      this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
+    }
     this._toast(failed ? `Applied with ${failed} error${failed === 1 ? "" : "s"}` : "Applied");
+  }
+
+  // A stable fingerprint of the bonding topology (each speaker's role + anchor),
+  // ignoring names/rooms — so convergence tracks the actual bonds, not transient labels.
+  private _bondSignature(map: ReturnType<typeof roomsToLayout>): string {
+    return Object.keys(map)
+      .sort()
+      .map((u) => `${u}:${map[u].role}:${map[u].anchorUid}`)
+      .join(";");
+  }
+
+  // Re-discover (forcing a fresh Sonos scan) until the live bonding matches `intended`
+  // or we exhaust the budget; returns the last graph we saw.
+  private async _awaitConvergence(intended: string): Promise<BondGraph | undefined> {
+    let last: BondGraph | undefined;
+    for (let i = 0; i < 5; i++) {
+      let fresh: BondGraph;
+      try {
+        fresh = await this.hass.connection.sendMessagePromise<BondGraph>({ type: "chorus/refresh" });
+      } catch {
+        return last;
+      }
+      last = fresh;
+      if (this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended) return fresh;
+      await new Promise((r) => window.setTimeout(r, 1500));
+    }
+    return last;
   }
 
   public override render(): TemplateResult {
