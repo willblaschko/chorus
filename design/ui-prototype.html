@@ -295,7 +295,9 @@
   .plan-btns{display:flex;gap:10px;margin-top:16px}
   .plan-btns .btn{flex:1}
   .row{cursor:grab}.row:active{cursor:grabbing}
-  .rowchev{margin-left:auto;color:var(--text-3);font-size:20px;line-height:1;flex:none;padding-left:8px}
+  .rowdots{margin-left:auto;flex:none;background:none;border:0;color:var(--text-3);cursor:pointer;padding:7px;border-radius:9px;display:flex;align-items:center}
+  .rowdots svg{width:20px;height:20px}
+  .rowdots:hover{background:var(--tile);color:var(--text-2)}
   .row.dragging,.postile.dragging{opacity:.45}
   .postile[draggable="true"]:active{cursor:grabbing}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -524,7 +526,8 @@
     row.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id);e.dataTransfer.setDragImage(rt.firstChild,22,22)}catch(_){}row.classList.add("dragging")});
     row.addEventListener("dragend",function(){row.classList.remove("dragging");drag=null});
     row.addEventListener("click",function(){speakerSheet(sp)});
-    row.appendChild(rt);row.appendChild(meta);row.appendChild(el("div","rowchev","›"));return row;}
+    var opt=el("button","rowdots");opt.innerHTML=DOTS;opt.setAttribute("aria-label","Options");opt.draggable=false;opt.addEventListener("dragstart",function(e){e.preventDefault();e.stopPropagation()});opt.addEventListener("click",function(e){e.stopPropagation();speakerSheet(sp)});
+    row.appendChild(rt);row.appendChild(meta);row.appendChild(opt);return row;}
   function pos(r,ch){var wrap=el("div","posw");paint();return wrap;
     function paint(){wrap.innerHTML="";var cur=ch==="CC"?r.bar:r.slots[ch];
       var t=el("div","postile"+(cur?"":" empty"));
