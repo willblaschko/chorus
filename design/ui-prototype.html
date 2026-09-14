@@ -106,7 +106,7 @@
   .psub{display:flex;justify-content:center;margin-top:12px}
   .lp{display:flex;flex-direction:column;align-items:center;gap:5px;margin:14px 0;pointer-events:none}
   .lp .couch{color:var(--text-3);margin-bottom:3px}
-  .lp .couch svg{width:42px;height:42px;display:block}
+  .lp .couch svg{width:46px;height:auto;display:block}
   .lp small{font-size:10.5px;color:var(--text-3)}
 
   .posw{position:relative;display:flex}
@@ -498,7 +498,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  var COUCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0Z"/><path d="M5 18v2"/><path d="M19 18v2"/></svg>';
+  var COUCH='<svg viewBox="0 0 48 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="7" height="29" rx="3.5"/><rect x="37" y="6" width="7" height="29" rx="3.5"/><rect x="11" y="23" width="26" height="12" rx="4"/><rect x="13" y="8" width="11" height="15" rx="3"/><rect x="24" y="8" width="11" height="15" rx="3"/></svg>';
   function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
