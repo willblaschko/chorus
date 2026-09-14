@@ -2,6 +2,20 @@
 
 *A Sonos speaker manager for Home Assistant.*
 
+> **TL;DR** — Chorus is a **Home Assistant integration** that **configures Sonos
+> bonding over your local network** (no cloud, no Sonos account): create and
+> dissolve stereo pairs and home-theater surrounds — including dedicated front
+> surrounds and mixed-model satellites the official Sonos app won't build.
+>
+> **Install:** HACS → ⋮ → *Custom repositories* → add this repo with category
+> **Integration** → **Download** → **restart Home Assistant** → **Settings →
+> Devices & Services → Add Integration → Chorus**.
+>
+> **Maturity:** today Chorus ships the bonding operations as Home Assistant
+> **services** (**Developer Tools → Actions**), validated on real hardware. A
+> **sidebar panel** is in progress — a live status/overview view now, with a
+> drag-and-drop editor being built.
+
 Chorus is a Home Assistant integration for **configuring Sonos bonding** — stereo
 pairs and home-theater surrounds, including **dedicated front surrounds and
 mixed-model satellites the official Sonos app refuses to create**. It talks to
