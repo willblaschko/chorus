@@ -885,7 +885,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       @click=${t=>{t.stopPropagation(),e(t)}}
     >
       ⋯
-    </button>`}_discard(){this._working=structuredClone(Pe(this.graph)),this._dirty=!1,this._picker=void 0,this._toast("Changes discarded")}async _apply(){const e=this._plan();if(function(e){return 0===e.ops.length}(e)||this._applying)return;const t=[];for(const r of e.ops)"remove_ht"===r.type?t.push(r.touches[0]):"separate"===r.type&&t.push(...r.touches);this._releasedUids=t,this._settleTimedOut=!1,this._settleView={label:"Applying changes...",ratio:.05},this._applying=!0,this._rows=e.rows,await function(e,t,r){const o=e=>e.map(e=>({summary:e.op.summary,status:e.status}));return st(e,t.lanes,{onUpdate:e=>r(o(e))}).then(e=>o(e))}(this.hass,e,e=>{this._rows=[...e]});const r=De(this._rooms),o=at(r),s=Math.round(1.5*function(e){const t=t=>-1!==e.indexOf(t),r=t=>e.filter(e=>e===t).length;return 9e3+(t("remove_ht")||t("separate")||t("remove_pair_sub")?55e3:0)+3e3*(r("add_ht")+r("create_pair")+r("add_pair_sub"))+4e3*r("move")}(e.ops.map(e=>e.type))),i=await this._awaitConvergence(o,r,s),a=this._rows.filter(e=>"error"===e.status).length;this._applying=!1,this._dirty=!1,i?this.dispatchEvent(new CustomEvent("chorus-graph",{detail:i,bubbles:!0,composed:!0})):this.dispatchEvent(new CustomEvent("chorus-refresh",{bubbles:!0,composed:!0}));const n=a?`Applied with ${a} error${1===a?"":"s"}`:this._settleTimedOut?"Applied -- speakers still reconnecting":"Applied";this._toast(n)}async _awaitConvergence(e,t,r){let o,s="\0";const i=Date.now();for(;Date.now()-i<r;){let r;try{r=await this.hass.connection.sendMessagePromise({type:"chorus/refresh"})}catch{return o}o=r;const i=De(Pe(r)),a=at(i);if(this._settleView=dt(t,i,this._releasedUids),ct(e,a,r,s))return r;s=nt(r),await new Promise(e=>window.setTimeout(e,1500))}return this._settleTimedOut=!0,o}_name(e){return e.name&&!/^RINCON_/i.test(e.name)?e.name:Ue(e.model)||"Speaker"}render(){const e=this._rooms.filter(e=>e.key!==Re);if(!e.length)return I`<div class="empty">No Sonos speakers discovered yet.</div>
+    </button>`}_discard(){this._working=structuredClone(Pe(this.graph)),this._dirty=!1,this._picker=void 0,this._toast("Changes discarded")}async _apply(){const e=this._plan();if(function(e){return 0===e.ops.length}(e)||this._applying)return;const t=[];for(const r of e.ops)"remove_ht"===r.type?t.push(r.touches[0]):"separate"===r.type&&t.push(...r.touches);this._releasedUids=t,this._settleTimedOut=!1,this._settleView={label:"Applying changes...",ratio:.05},this._applying=!0,this._rows=e.rows,await function(e,t,r){const o=e=>e.map(e=>({summary:e.op.summary,status:e.status}));return st(e,t.lanes,{onUpdate:e=>r(o(e))}).then(e=>o(e))}(this.hass,e,e=>{this._rows=[...e]});const r=De(this._rooms),o=at(r),s=Math.round(1.5*function(e){const t=t=>-1!==e.indexOf(t),r=t=>e.filter(e=>e===t).length;return 9e3+(t("remove_ht")||t("separate")||t("remove_pair_sub")?55e3:0)+3e3*(r("add_ht")+r("create_pair")+r("add_pair_sub"))+4e3*r("move")}(e.ops.map(e=>e.type))),i=await this._awaitConvergence(o,r,s),a=this._rows.filter(e=>"error"===e.status).length;this._applying=!1,this._dirty=!1,i?this.dispatchEvent(new CustomEvent("chorus-graph",{detail:i,bubbles:!0,composed:!0})):this.dispatchEvent(new CustomEvent("chorus-refresh",{bubbles:!0,composed:!0}));const n=a?`Applied with ${a} error${1===a?"":"s"}`:this._settleTimedOut?"Applied -- speakers still reconnecting":"Applied";this._toast(n)}async _awaitConvergence(e,t,r){let o,s="\0";const i=Date.now();for(;Date.now()-i<r;){let r;try{r=await this.hass.connection.sendMessagePromise({type:"chorus/refresh"})}catch{return o}o=r;const i=De(Pe(r)),a=at(i);if(this._settleView=dt(t,i,this._releasedUids),ct(e,a,r,s))return r;s=nt(r),await new Promise(e=>window.setTimeout(e,1500))}return this._settleTimedOut=!0,o}_name(e){return e.name&&!/^RINCON_/i.test(e.name)?e.name:Ue(e.model)||"Speaker"}render(){const e=this._rooms.filter(e=>e.key!==Re);if(!e.length)return I`<div class="empty-state">No Sonos speakers discovered yet.</div>
         <chorus-toast></chorus-toast>`;const t=this._room(),r=this._plan(),o=this._applying?this._rows:r.rows;return I`
       <div class="grid ${this._applying?"locked":""}" data-detail=${t?"on":"off"}>
         <div class="col-list">
@@ -1051,7 +1051,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
         ${t?I`<span class="badge orb t-front">${Le(t.model)}</span>`:I`<span class="badge empty-badge">${e}</span>`}
         <span class="pc-side">${e}</span>
       </div>
-    `}_traySection(e){if(!e.tray.length)return e.sets.length?q:I`<div class="empty">No speakers in this room.</div>`;const t=e.sets.length?"Available speakers":"Speakers",r=e.tray.filter(e=>we(e.model)).length>=2;return I`
+    `}_traySection(e){if(!e.tray.length)return e.sets.length?q:I`<div class="empty-state">No speakers in this room.</div>`;const t=e.sets.length?"Available speakers":"Speakers",r=e.tray.filter(e=>we(e.model)).length>=2;return I`
       <div class="sec">${t}</div>
       <div class="rows">${e.tray.map(t=>this._speakerRow(t,e.key))}</div>
       ${r?I`<button type="button" class="newpair" @click=${()=>this._pairPick={roomKey:e.key}}>
@@ -1612,7 +1612,9 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .empty {
+    /* The full-width "no speakers" message. Renamed off ".empty" so it can't bleed
+       into the empty-channel tiles (which carry a "postile empty" modifier). */
+    .empty-state {
       padding: 40px 8px;
       text-align: center;
       color: var(--secondary-text-color);

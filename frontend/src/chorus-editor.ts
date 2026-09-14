@@ -544,7 +544,7 @@ export class ChorusEditor extends LitElement {
   public override render(): TemplateResult {
     const rooms = this._rooms.filter((r) => r.key !== AVAILABLE_SUBS_KEY);
     if (!rooms.length) {
-      return html`<div class="empty">No Sonos speakers discovered yet.</div>
+      return html`<div class="empty-state">No Sonos speakers discovered yet.</div>
         <chorus-toast></chorus-toast>`;
     }
     const room = this._room();
@@ -856,7 +856,7 @@ export class ChorusEditor extends LitElement {
   // ---- lone speakers / available pool --------------------------------
   private _traySection(r: Room): TemplateResult | typeof nothing {
     if (!r.tray.length) {
-      return r.sets.length ? nothing : html`<div class="empty">No speakers in this room.</div>`;
+      return r.sets.length ? nothing : html`<div class="empty-state">No speakers in this room.</div>`;
     }
     const heading = r.sets.length ? "Available speakers" : "Speakers";
     const pairable = r.tray.filter((s) => canPair(s.model)).length >= 2;
@@ -1475,7 +1475,9 @@ export class ChorusEditor extends LitElement {
       font-size: 12px;
       color: var(--secondary-text-color);
     }
-    .empty {
+    /* The full-width "no speakers" message. Renamed off ".empty" so it can't bleed
+       into the empty-channel tiles (which carry a "postile empty" modifier). */
+    .empty-state {
       padding: 40px 8px;
       text-align: center;
       color: var(--secondary-text-color);
