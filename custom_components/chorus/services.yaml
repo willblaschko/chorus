@@ -6,14 +6,14 @@ create_stereo_pair:
       name: Left speaker
       description: Sonos room/speaker name for the left channel.
       required: true
-      example: Bedroom
+      example: Living Room
       selector:
         text:
     right:
       name: Right speaker
       description: Sonos room/speaker name for the right channel.
       required: true
-      example: Bedroom 2
+      example: Living Room (right)
       selector:
         text:
 
@@ -40,7 +40,7 @@ set_home_theater:
       name: Soundbar
       description: The Arc/Beam/Ray to build the home theater around.
       required: true
-      example: Media Room
+      example: Living Room
       selector:
         text:
     lf:
