@@ -106,7 +106,7 @@
   .psub{display:flex;justify-content:center;margin-top:12px}
   .lp{display:flex;flex-direction:column;align-items:center;gap:5px;margin:14px 0;pointer-events:none}
   .lp .couch{color:var(--text-3);margin-bottom:3px}
-  .lp .couch svg{width:50px;height:auto;display:block}
+  .lp .couch svg{width:92px;height:auto;display:block}
   .lp small{font-size:10.5px;color:var(--text-3)}
 
   .posw{position:relative;display:flex}
@@ -498,7 +498,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  var COUCH='<svg viewBox="0 0 56 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="52" height="22" rx="7"/><rect x="8" y="5" width="12.6" height="12.6" rx="2.8"/><rect x="21.7" y="5" width="12.6" height="12.6" rx="2.8"/><rect x="35.4" y="5" width="12.6" height="12.6" rx="2.8"/></svg>';
+  var COUCH='<svg viewBox="0 0 56 25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="52" height="21" rx="6.5"/><rect x="8" y="4" width="12.6" height="12.6" rx="2.6"/><rect x="21.7" y="4" width="12.6" height="12.6" rx="2.6"/><rect x="35.4" y="4" width="12.6" height="12.6" rx="2.6"/></svg>';
   function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
