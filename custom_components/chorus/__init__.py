@@ -134,12 +134,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         # never by a friendly name.
         current = await hass.async_add_executor_job(backend.snapshot_ht, bar["ip"], bar["uid"])
         if channel:
-            uid = next(
-                (t.split(":", 1)[0] for t in current.split(";")
-                 if ":" in t and t.split(":", 1)[0] != bar["uid"]
-                 and t.split(":", 1)[1].split(",")[0] == channel),
-                None,
-            )
+            uid = backend.resolve_channel_to_uid(current, bar["uid"], channel)
             if not uid:
                 raise HomeAssistantError(f"{bar['name']} has no {channel} satellite")
             await run(backend.remove_ht_satellite, bar["ip"], uid)
@@ -147,13 +142,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             sat = resolve(sat_name)
             await run(backend.remove_ht_satellite, bar["ip"], sat["uid"])
         else:  # dissolve: remove every satellite currently on the bar (by UID)
-            for token in current.split(";"):
-                token = token.strip()
-                if ":" not in token:
-                    continue
-                uid, chan = token.split(":", 1)
-                if uid == bar["uid"] or chan.split(",")[0] == "CC":
-                    continue
+            for uid in backend.satellites_to_remove(current, bar["uid"]):
                 await run(backend.remove_ht_satellite, bar["ip"], uid)
         await coordinator.async_request_refresh()
 

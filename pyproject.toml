@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Chorus's pure logic lives in custom_components/chorus. Putting it on the
+# import path lets tests do `import const, sonos` WITHOUT importing Home
+# Assistant (only __init__.py/coordinator.py pull in homeassistant.*).
+testpaths = ["tests"]
+addopts = "-ra"

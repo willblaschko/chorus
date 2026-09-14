@@ -181,6 +181,37 @@ class SonosBackend:
             out[uid] = base
         return out
 
+    # -- remove/dissolve selection (pure decision, no I/O) ----------------
+    @staticmethod
+    def resolve_channel_to_uid(current_map, soundbar_uid, channel) -> str | None:
+        """Return the satellite UID currently bonded on `channel`, or None.
+
+        `channel` is a base channel (LF/RF/LR/RR/SW); the auto height suffix
+        (LF,LTF) is ignored — matching is on the base channel. The soundbar's own
+        UID and the CC/center are never returned.
+        """
+        channel = (channel or "").upper()
+        if not channel:
+            return None
+        for uid, base in SonosBackend._parse_ht_map(current_map, soundbar_uid).items():
+            if base == channel:
+                return uid
+        return None
+
+    @staticmethod
+    def satellites_to_remove(current_map, soundbar_uid, channel=None) -> list:
+        """Decide which satellite UID(s) to remove from the soundbar's HT map.
+
+        With a `channel`, the single satellite on that channel (or [] if none is
+        bonded there). Without a channel, every satellite currently bonded to the
+        soundbar (a full dissolve). The soundbar's own UID and the CC/center are
+        never included.
+        """
+        if channel:
+            uid = SonosBackend.resolve_channel_to_uid(current_map, soundbar_uid, channel)
+            return [uid] if uid else []
+        return list(SonosBackend._parse_ht_map(current_map, soundbar_uid))
+
     def restore_ht(self, soundbar_ip, soundbar_uid, snapshot, sat_ips=None) -> None:
         """Reconcile the live layout to a snapshot: remove extras, add what's missing.
 
