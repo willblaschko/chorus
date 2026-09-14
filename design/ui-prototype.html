@@ -227,6 +227,25 @@
   .subchip{display:flex;align-items:center;gap:11px;background:var(--card);box-shadow:var(--shadow);border-radius:14px;padding:9px 15px 9px 10px;cursor:pointer}
   .subchip .badge svg{width:20px;height:20px}
   .subchip .sc-meta b{display:block;font-size:13.5px;font-weight:600}.subchip .sc-meta span{font-family:var(--mono);font-size:10px;color:var(--text-3)}
+  .changebar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(160%);width:min(680px,calc(100vw - 40px));background:var(--card);border-radius:18px;box-shadow:0 18px 50px -12px rgba(0,0,0,.4),0 0 0 .5px var(--hair);z-index:60;overflow:hidden;transition:transform .36s cubic-bezier(.32,1.04,.4,1),opacity .2s}
+  .changebar.on{transform:translateX(-50%) translateY(0)}
+  .changebar.busy{opacity:.55;pointer-events:none}
+  .cb-head{display:flex;align-items:center;gap:12px;padding:11px 11px 11px 18px}
+  .cb-info{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;font:inherit;color:var(--text);cursor:pointer;text-align:left;padding:4px 0}
+  .cb-info b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+  .cb-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+  .cb-tog{font-size:12.5px;color:var(--text-3)}
+  .changebar.open .cb-tog{color:var(--accent)}
+  .cb-acts{display:flex;gap:6px;flex:none}
+  .cb-disc{font:inherit;font-size:13.5px;font-weight:500;color:var(--text-2);background:none;border:0;padding:9px 13px;border-radius:11px;cursor:pointer}
+  .cb-disc:hover{background:var(--tile)}
+  .cb-apply{font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:var(--accent);border:0;padding:9px 20px;border-radius:11px;cursor:pointer}
+  .cb-apply:hover{filter:brightness(1.06)}
+  .cb-list{max-height:0;overflow-y:auto;transition:max-height .32s ease;padding:0 18px}
+  .changebar.open .cb-list{max-height:230px;padding-bottom:12px}
+  .cb-row{display:flex;align-items:center;gap:9px;padding:9px 2px;border-top:.5px solid var(--hair);font-size:12.5px}
+  .cb-row b{font-weight:600;min-width:118px;flex:none}
+  .cb-from{color:var(--text-3)}.cb-arw{color:var(--text-3);flex:none}.cb-to{color:var(--accent);font-weight:500}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -271,8 +290,29 @@
     connect:svg('<rect x="3.5" y="8" width="17" height="8" rx="2.5"/><circle cx="17" cy="12" r="1.1" fill="currentColor" stroke="none"/>'),
     driver:svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4"/>')
   };
-  function iconFor(m){m=(m||"").toLowerCase();return /arc|beam|ray/.test(m)?ICON.soundbar:/sub/.test(m)?ICON.sub:/era/.test(m)?ICON.era:/lamp/.test(m)?ICON.lamp:/frame|picture/.test(m)?ICON.frame:/bookshelf/.test(m)?ICON.book:/connect|port|amp/.test(m)?ICON.connect:ICON.driver}
-  function isBar(m){return /arc|beam|ray/.test((m||"").toLowerCase())}
+  // Capability registry — one row per device family, matched top-down on the model string.
+  // Icon + bonding rules derive from these tags, so adding a future device is a one-line
+  // change here. Unknown models fall through to FALLBACK (a generic home speaker: can
+  // surround/pair, no height) so new hardware degrades gracefully instead of breaking.
+  //   primary = can be a home-theater center (soundbar)   sub = is a subwoofer
+  //   surround = can be a surround/satellite               pair = can be stereo-paired
+  //   height = has up-firing Atmos drivers (height channel)
+  var KINDS=[
+    {re:/arc/,                       icon:"soundbar", primary:1},
+    {re:/beam|ray|playbar|playbase/, icon:"soundbar", primary:1},
+    {re:/sub/,                       icon:"sub",      sub:1},
+    {re:/era 300/,                   icon:"era",      surround:1, pair:1, height:1},
+    {re:/era/,                       icon:"era",      surround:1, pair:1},
+    {re:/lamp/,                      icon:"lamp",     surround:1, pair:1},
+    {re:/frame|picture/,             icon:"frame",    surround:1, pair:1},
+    {re:/bookshelf/,                 icon:"book",     surround:1, pair:1},
+    {re:/connect|port|amp/,          icon:"connect"},
+    {re:/move|roam/,                 icon:"driver"}
+  ];
+  var FALLBACK={icon:"driver", surround:1, pair:1};
+  function speakerKind(m){m=(m||"").toLowerCase();for(var i=0;i<KINDS.length;i++)if(KINDS[i].re.test(m))return KINDS[i];return FALLBACK;}
+  function iconFor(m){return ICON[speakerKind(m).icon]||ICON.driver}
+  function isBar(m){return !!speakerKind(m).primary}
   function barIn(r){if(!r.tray)return null;for(var i=0;i<r.tray.length;i++)if(isBar(r.tray[i].model))return r.tray[i];return null}
   var WAVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.3L11.5 18V6L7.3 9.5H4z" fill="currentColor" stroke="none"/><path d="M15 9.3a4 4 0 0 1 0 5.4"/><path d="M17.7 6.5a8 8 0 0 1 0 11"/></svg>';
 
@@ -304,12 +344,11 @@
     nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");var d=drag;if(!d)return;
       nameModal({title:"New room",message:"Name this room for "+d.sp.name,placeholder:"Room name",confirmLabel:"Create",onConfirm:function(name){createRoomWith(d,name)}});});
     box.appendChild(nr);
+    renderChangeBar();
   }
   var newRoomN=0;
   function createRoomWith(d,name){if(!d)return;var sp=d.sp,src=rooms[d.roomKey];
-    if(src.tray)src.tray=src.tray.filter(function(x){return x.id!==sp.id});
-    if(src.slots)Object.keys(src.slots).forEach(function(k){if(src.slots[k]&&src.slots[k].id===sp.id)src.slots[k]=null});
-    if(src.L&&src.L.id===sp.id)src.L=null;if(src.R&&src.R.id===sp.id)src.R=null;normalizeRoom(src);
+    detach(src,sp);
     newRoomN++;var key="new"+newRoomN;sp.height=false;
     rooms[key]={name:(name&&name.trim())||"New Room",type:"solo",tray:[sp]};
     drag=null;current=key;toast("Created “"+rooms[key].name+"” with "+sp.name);render();}
@@ -350,14 +389,20 @@
   function normalizeRoom(r){if(r.type==="ht")return;
     if(r.type==="pair"&&!(r.L&&r.R)){if(r.L){r.tray.push(r.L);r.L=null}if(r.R){r.tray.push(r.R);r.R=null}r.type="music";}
     if(r.type!=="pair"){var n=(r.tray?r.tray.length:0)+(r.L?1:0)+(r.R?1:0);r.type=n>=2?"music":"solo";}}
-  function moveSpeaker(d,targetKey){if(!d||d.roomKey===targetKey)return;
-    var src=rooms[d.roomKey],tgt=rooms[targetKey],sp=d.sp;
+  // Remove a speaker from wherever it lives in a room. Taking a soundbar out of its
+  // home theater dissolves the theater — surrounds can't exist without the bar — so the
+  // satellites fall back to standalone in the room.
+  function detach(src,sp){
+    if(src.type==="ht"&&src.bar&&src.bar.id===sp.id){Object.keys(src.slots).forEach(function(k){if(src.slots[k]){src.slots[k].height=false;src.tray.push(src.slots[k])}});src.slots={};src.bar=null;src.type="music";}
     if(src.tray)src.tray=src.tray.filter(function(x){return x.id!==sp.id});
     if(src.slots)Object.keys(src.slots).forEach(function(k){if(src.slots[k]&&src.slots[k].id===sp.id)src.slots[k]=null});
     if(src.L&&src.L.id===sp.id)src.L=null;if(src.R&&src.R.id===sp.id)src.R=null;
-    sp.height=false;if(!tgt.tray)tgt.tray=[];tgt.tray.push(sp);
-    normalizeRoom(src);normalizeRoom(tgt);drag=null;
-    toast(sp.name+" moved to "+tgt.name);render();}
+    if(src.sub&&src.sub.id===sp.id)src.sub=null;
+    normalizeRoom(src);}
+  function moveSpeaker(d,targetKey){if(!d||d.roomKey===targetKey)return;
+    var src=rooms[d.roomKey],tgt=rooms[targetKey],sp=d.sp;
+    detach(src,sp);sp.height=false;if(!tgt.tray)tgt.tray=[];tgt.tray.push(sp);
+    normalizeRoom(tgt);drag=null;toast(sp.name+" → "+tgt.name);render();}
   function allSubs(target){var out=[];
     looseSubs.forEach(function(s){out.push({sub:s,loc:"Available",take:function(){looseSubs=looseSubs.filter(function(x){return x!==s})}})});
     Object.keys(rooms).forEach(function(k){var rm=rooms[k];if(rm===target)return;
@@ -409,7 +454,7 @@
         t.addEventListener("click",function(){
           var nm=ch==="CC"?cur.name:((cur.name==="Bookshelf"||cur.name==="Picture frame")?CHNAME[ch]:cur.name);
           var items=[{label:"Identify",icon:WAVE,fn:function(){identify(nm,badge)}}];
-          if(ch!=="CC"&&ch!=="SW")items.push({label:cur.height?"Remove height channel":"Add height channel",icon:UPI,fn:function(){cur.height=!cur.height;paint()}});
+          if(ch!=="CC"&&ch!=="SW"&&speakerKind(cur.model).height)items.push({label:cur.height?"Remove height channel":"Add height channel",icon:UPI,fn:function(){cur.height=!cur.height;paint()}});
           if(ch!=="CC")items.push({label:"Remove from home theater",danger:true,icon:RMI,fn:function(){unbond(r,ch)}});
           actionSheet(ch==="CC"?cur.name:CHNAME[ch],sm(cur.model),items);
         });
@@ -418,20 +463,19 @@
         var m2=el("div","pmeta");m2.innerHTML='<b style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</b><span>Empty</span>';t.appendChild(m2);
       }
       wrap.appendChild(t);
-      if(ch!=="CC"){t.addEventListener("dragover",function(e){if(drag){e.preventDefault();t.classList.add("over")}});t.addEventListener("dragleave",function(){t.classList.remove("over")});t.addEventListener("drop",function(e){e.preventDefault();t.classList.remove("over");dropPos(r,ch,t,paint)});}
+      if(ch!=="CC"){t.addEventListener("dragover",function(e){if(drag&&posAccepts(ch,drag.sp)){e.preventDefault();t.classList.add("over")}});t.addEventListener("dragleave",function(){t.classList.remove("over")});t.addEventListener("drop",function(e){e.preventDefault();t.classList.remove("over");dropPos(r,ch,t,paint)});}
     }
   }
-  function dropPos(r,ch,tileEl,paint){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;
+  function posAccepts(ch,sp){var k=speakerKind(sp.model);return ch==="SW"?!!k.sub:!!k.surround;}
+  function dropPos(r,ch,tileEl,paint){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;if(!posAccepts(ch,sp))return;
     r.tray=r.tray.filter(function(x){return x.id!==sp.id});Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id)r.slots[k]=null});
     if(r.slots[ch]){r.slots[ch].height=false;r.tray.push(r.slots[ch])}
-    var st=el("div","st");st.innerHTML='<span class="spin"></span>applying';tileEl.parentNode.appendChild(st);
-    setTimeout(function(){st.innerHTML='<span class="spin"></span>settling'},600);
-    setTimeout(function(){r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms()},1300);}
+    r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms();}
   function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);renderHT(r);buildRooms()}
   function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
-  function dissolve(r){toast("Separating — every speaker returns to standalone");setTimeout(function(){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};r.type="music";render()},800)}
+  function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};r.type="music";render();}
 
-  function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";toast("Home theater ready — drag speakers onto the positions");renderHT(r);buildRooms();}
+  function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";renderHT(r);buildRooms();}
   function renderBarSetup(r){var m=$("#main");m.innerHTML="";var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
     var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip">Soundbar</span><span class="chip">Standalone</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Home theater</h2><span class="sc">not set up yet</span>';m.appendChild(sec);
@@ -443,7 +487,7 @@
     if(others.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">available to add as surrounds</span>';m.appendChild(sec2);
       var grp=el("div","group"),rowsEl=el("div","rows");others.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
   }
-  function commitPair(r){toast("Creating stereo pair…");renderPair(r);setTimeout(function(){r.type="pair";renderPair(r);buildRooms()},900)}
+  function commitPair(r){r.type="pair";renderPair(r);buildRooms();}
   function renderPair(r){var m=$("#main");m.innerHTML="";var paired=r.L&&r.R;
     var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip '+(paired?"accent":"")+'">'+(paired?"Stereo pair":"Not paired")+'</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);
     var mn=roomMenu(r);if(mn)head.appendChild(mn);m.appendChild(head);
@@ -462,9 +506,9 @@
     if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");w.appendChild(t);w.appendChild(el("div","wn",sp.name));w.appendChild(el("div","wm",sm(sp.model)));
       var ctl=el("div","ctl pin");ctl.appendChild(cbtn("",WAVE,"Identify",function(){identify(sp.name,t)}));ctl.appendChild(cbtn("x","✕","Remove",function(){r.tray.push(sp);r[side]=null;renderPair(r)}));w.appendChild(ctl);
     }else w.appendChild(el("div","empty-note","Empty"));
-    w.addEventListener("dragover",function(e){if(drag){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
-    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;if(r.L&&r.R&&r.type!=="pair"){commitPair(r)}else{renderPair(r)}});return w;}
-  function unpair(r){toast("Separating…");setTimeout(function(){if(r.sub){looseSubs.push(r.sub);r.sub=null}r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms()},800)}
+    w.addEventListener("dragover",function(e){if(drag&&speakerKind(drag.sp.model).pair){e.preventDefault();w.classList.add("over")}});w.addEventListener("dragleave",function(){w.classList.remove("over")});
+    w.addEventListener("drop",function(e){e.preventDefault();w.classList.remove("over");if(!drag||drag.roomKey!==current)return;var s2=drag.sp;if(!speakerKind(s2.model).pair)return;r.tray=r.tray.filter(function(x){return x.id!==s2.id});if(r.L&&r.L.id===s2.id)r.L=null;if(r.R&&r.R.id===s2.id)r.R=null;if(r[side])r.tray.push(r[side]);r[side]=s2;if(r.L&&r.R&&r.type!=="pair"){commitPair(r)}else{renderPair(r)}});return w;}
+  function unpair(r){if(r.sub){looseSubs.push(r.sub);r.sub=null}r.tray.push(r.L,r.R);r.L=null;r.R=null;r.type="music";renderPair(r);buildRooms();}
 
   function renderSolo(r){var m=$("#main");m.innerHTML="";var sp=r.tray[0];
     var head=el("div","head");var left=el("div","head-l");
@@ -527,6 +571,46 @@
     var done=el("button","btn fill");done.textContent="Done";done.style.cssText="width:100%;margin-top:18px";done.onclick=close;sheet.appendChild(done);
     back.addEventListener("click",function(e){if(e.target===back)close()});
     back.appendChild(sheet);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")});}
+  // ── Staged changes ────────────────────────────────────────────────────────────
+  // Every edit mutates the working model instantly; nothing touches the speakers until
+  // Apply. The change log is the live diff between the working model and `applied` (the
+  // last state committed to the devices) — so it's always in sync and Discard just
+  // restores the baseline. This is the transaction boundary the real integration needs.
+  function clone(x){return JSON.parse(JSON.stringify(x))}
+  var applied=null;
+  function assignMap(state){var map={};
+    Object.keys(state.rooms).forEach(function(k){var r=state.rooms[k];
+      function put(sp,role){if(sp)map[sp.id]={room:r.name,role:role,height:!!sp.height,name:sp.name}}
+      if(r.type==="ht"){put(r.bar,"Center");CH.forEach(function(ch){put(r.slots[ch],ch==="SW"?"Sub":CHNAME[ch])});(r.tray||[]).forEach(function(s){put(s,"available")});}
+      else if(r.L&&r.R){put(r.L,"Left");put(r.R,"Right");put(r.sub,"Sub");(r.tray||[]).forEach(function(s){put(s,"in room")});}
+      else {[r.L,r.R].concat(r.tray||[]).forEach(function(s){if(s)put(s,"standalone")});}});
+    (state.subs||[]).forEach(function(s){map[s.id]={room:"available",role:"idle",height:false,name:s.name}});
+    return map;}
+  function labelFor(e){if(e.role==="idle")return "Available";if(e.role==="standalone")return e.room+" · standalone";return e.room+" · "+e.role+(e.height?" + height":"");}
+  function computeChanges(){if(!applied)return [];var A=assignMap(applied),B=assignMap({rooms:rooms,subs:looseSubs}),out=[];
+    Object.keys(B).forEach(function(id){var b=B[id],a=A[id];
+      if(!a){out.push({name:b.name,from:"New",to:labelFor(b)});return;}
+      if(a.room!==b.room||a.role!==b.role||a.height!==b.height)out.push({name:b.name,from:labelFor(a),to:labelFor(b)});});
+    return out;}
+  function applyChanges(){var n=computeChanges().length;if(!n)return;var bar=$("#changebar");if(bar)bar.classList.add("busy");
+    toast("Applying "+n+" change"+(n>1?"s":"")+" to your Sonos…");
+    setTimeout(function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};toast("Applied — your speakers are set");render();},1200);}
+  function discardChanges(){if(!applied)return;rooms=clone(applied.rooms);looseSubs=clone(applied.subs);if(!rooms[current])current=Object.keys(rooms)[0];toast("Changes discarded");render();}
+  function renderChangeBar(){var bar=$("#changebar");if(!bar){bar=el("div","changebar");bar.id="changebar";document.body.appendChild(bar);}
+    var ch=computeChanges(),wasOpen=bar.classList.contains("open");
+    if(!ch.length){bar.classList.remove("on","open","busy");bar.innerHTML="";return;}
+    bar.innerHTML="";
+    var head=el("div","cb-head"),info=el("button","cb-info"),acts=el("div","cb-acts");
+    info.innerHTML='<span class="cb-dot"></span><b>'+ch.length+' pending change'+(ch.length>1?'s':'')+'</b><span class="cb-tog">Details</span>';
+    var disc=el("button","cb-disc","Discard"),app=el("button","cb-apply","Apply");
+    disc.onclick=discardChanges;app.onclick=applyChanges;acts.appendChild(disc);acts.appendChild(app);
+    head.appendChild(info);head.appendChild(acts);bar.appendChild(head);
+    var list=el("div","cb-list");
+    ch.forEach(function(c){var row=el("div","cb-row");row.innerHTML='<b></b><span class="cb-from"></span><span class="cb-arw">→</span><span class="cb-to"></span>';
+      $("b",row).textContent=c.name;$(".cb-from",row).textContent=c.from;$(".cb-to",row).textContent=c.to;list.appendChild(row);});
+    bar.appendChild(list);
+    info.onclick=function(){bar.classList.toggle("open")};
+    bar.classList.add("on");if(wasOpen)bar.classList.add("open");}
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):barIn(r)?renderBarSetup(r):r.type==="solo"?renderSolo(r):renderPair(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
@@ -535,6 +619,7 @@
   $("#themeBtn").onclick=function(){document.documentElement.setAttribute("data-theme",curTheme()==="dark"?"light":"dark");setThemeBtn()};
   setThemeBtn();
   $("#helpBtn").onclick=overviewModal;
+  applied={rooms:clone(rooms),subs:clone(looseSubs)};
   render();
   overviewModal();
 })();
