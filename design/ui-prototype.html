@@ -98,10 +98,10 @@
 
   /* ===== STAGE on a grouped card ===== */
   .stage{position:relative;padding:8px 0 10px}
-  .tv{width:min(300px,60%);height:clamp(46px,8.5vw,62px);margin:2px auto 22px;border-radius:11px;position:relative;
-    background:linear-gradient(158deg,#31313a 0%,#17171c 60%,#0e0e12 100%);
-    box-shadow:0 12px 28px -14px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px var(--hair-2)}
-  .tv::before{content:"";position:absolute;inset:6px;border-radius:7px;background:radial-gradient(130% 100% at 28% 14%,rgba(125,175,255,.24),rgba(90,120,220,.05) 46%,transparent 70%)}
+  .tv{width:min(288px,58%);height:clamp(38px,7vw,50px);margin:2px auto 20px;border-radius:10px;position:relative;
+    background:linear-gradient(160deg,#3d3d48,#22222a);
+    box-shadow:0 8px 20px -15px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px var(--hair-2)}
+  .tv::before{content:"";position:absolute;inset:6px;border-radius:6px;background:radial-gradient(130% 100% at 28% 16%,rgba(130,175,255,.15),transparent 66%)}
   .prow{display:flex;justify-content:center;gap:clamp(60px,16vw,200px)}.prow.fronts{margin-top:14px}.prow.rear{margin-top:6px}
   .psub{display:flex;justify-content:center;margin-top:12px}
   .lp{display:flex;flex-direction:column;align-items:center;gap:5px;margin:14px 0;pointer-events:none}
@@ -498,7 +498,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  var COUCH='<svg viewBox="0 0 56 42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="52" height="34" rx="9"/><rect x="11.4" y="8" width="10.4" height="16" rx="3.5"/><rect x="22.8" y="8" width="10.4" height="16" rx="3.5"/><rect x="34.2" y="8" width="10.4" height="16" rx="3.5"/></svg>';
+  var COUCH='<svg viewBox="0 0 56 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="52" height="34" rx="9"/><rect x="8.5" y="7" width="12.6" height="13" rx="2.8"/><rect x="21.7" y="7" width="12.6" height="13" rx="2.8"/><rect x="34.9" y="7" width="12.6" height="13" rx="2.8"/></svg>';
   function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
