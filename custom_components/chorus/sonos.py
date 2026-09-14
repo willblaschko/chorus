@@ -237,3 +237,114 @@ class SonosBackend:
                 self.add_ht_satellite(
                     soundbar_ip, soundbar_uid, uid, base, sat_ip=sat_ips.get(uid)
                 )
+
+    # -- live bond graph (the state the panel binds to) -------------------
+    @staticmethod
+    def _attrs(fragment: str) -> dict:
+        """All key="value" attributes of an XML element's opening tag."""
+        return dict(re.findall(r'(\w+)="([^"]*)"', fragment))
+
+    @staticmethod
+    def _ip_from_location(location: str) -> str | None:
+        """Pull the LAN IP out of a Sonos Location URL (http://IP:1400/...)."""
+        match = re.search(r"https?://([0-9.]+):1400", location or "")
+        return match.group(1) if match else None
+
+    @staticmethod
+    def parse_bond_graph(zgs: str) -> list:
+        """Parse a (doubly-unescaped) ZoneGroupState into a list of bonded units.
+
+        Each unit is exactly one of: a standalone speaker, a stereo pair, or a home
+        theater. Shape:
+
+            {"primary_uid", "name", "kind", "members": [
+                {"uid", "channel", "ip", "name", "invisible", "is_primary"}, ...]}
+
+        `kind` is "standalone" | "stereo_pair" | "home_theater". `channel` is CC for a
+        soundbar, LF/RF for fronts or a pair's left/right, LR/RR for rears, SW for a
+        sub, or None for a standalone. IPs come from each element's Location, so even
+        invisible bonded members (which soco.discover never returns) resolve.
+
+        The two bonding shapes differ in the wire format, both handled here:
+          - home theater: one visible primary carries HTSatChanMapSet and NESTS its
+            satellites as <Satellite> children.
+          - stereo pair: TWO sibling <ZoneGroupMember>s share one ChannelMapSet; the
+            visible one is the primary/left, the Invisible="1" one is the right.
+        """
+        attrs = SonosBackend._attrs
+        ip_of = SonosBackend._ip_from_location
+
+        # Index every top-level member (attrs + inner XML) for partner lookups.
+        members = {}
+        for m in re.finditer(
+            r"<ZoneGroupMember\b([^>]*?)(?:/>|>(.*?)</ZoneGroupMember>)", zgs, re.S
+        ):
+            at = attrs(m.group(1))
+            uid = at.get("UUID")
+            if uid:
+                members[uid] = (at, m.group(2) or "")
+
+        units = []
+        claimed = set()  # uids already represented (pair partners, HT satellites)
+        for uid, (at, inner) in members.items():
+            if uid in claimed:
+                continue
+            hts = at.get("HTSatChanMapSet")
+            cms = at.get("ChannelMapSet")
+
+            if hts:  # ---- home theater ----
+                channels = SonosBackend._parse_ht_map(hts, uid)  # {sat_uid: base}
+                nested = {}
+                for s in re.finditer(r"<Satellite\b([^>]*?)/?>", inner):
+                    sa = attrs(s.group(1))
+                    if sa.get("UUID"):
+                        nested[sa["UUID"]] = sa
+                mem = [{
+                    "uid": uid, "channel": "CC", "ip": ip_of(at.get("Location", "")),
+                    "name": at.get("ZoneName"), "invisible": False, "is_primary": True,
+                }]
+                for suid, base in channels.items():
+                    sa = nested.get(suid, {})
+                    mem.append({
+                        "uid": suid, "channel": base, "ip": ip_of(sa.get("Location", "")),
+                        "name": sa.get("ZoneName"),
+                        "invisible": sa.get("Invisible", "0") == "1", "is_primary": False,
+                    })
+                    claimed.add(suid)
+                units.append({
+                    "primary_uid": uid, "name": at.get("ZoneName"),
+                    "kind": "home_theater", "members": mem,
+                })
+                claimed.add(uid)
+
+            elif cms:  # ---- stereo pair ----
+                if at.get("Invisible", "0") == "1":
+                    continue  # the visible half emits the unit
+                # soundbar_uid="" so both halves survive (_parse_ht_map still drops CC)
+                pair = SonosBackend._parse_ht_map(cms, "")
+                mem = []
+                for puid, base in pair.items():
+                    p_at = members.get(puid, ({}, ""))[0]
+                    mem.append({
+                        "uid": puid, "channel": base, "ip": ip_of(p_at.get("Location", "")),
+                        "name": p_at.get("ZoneName"),
+                        "invisible": p_at.get("Invisible", "0") == "1",
+                        "is_primary": puid == uid,
+                    })
+                    claimed.add(puid)
+                units.append({
+                    "primary_uid": uid, "name": at.get("ZoneName"),
+                    "kind": "stereo_pair", "members": mem,
+                })
+
+            else:  # ---- standalone ----
+                if at.get("Invisible", "0") == "1":
+                    continue
+                units.append({
+                    "primary_uid": uid, "name": at.get("ZoneName"), "kind": "standalone",
+                    "members": [{
+                        "uid": uid, "channel": None, "ip": ip_of(at.get("Location", "")),
+                        "name": at.get("ZoneName"), "invisible": False, "is_primary": True,
+                    }],
+                })
+        return units
