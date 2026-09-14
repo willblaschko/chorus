@@ -3,6 +3,7 @@ import {
   roomsToLayout,
   assignToChannel,
   clearChannel,
+  assignSubToChannel,
   createPair,
   separatePair,
   swapPair,
@@ -13,7 +14,7 @@ import {
   setupHT,
 } from "./layout.js";
 import { computeOps } from "./apply.js";
-import type { Room, EditorSpeaker } from "./model.js";
+import { AVAILABLE_SUBS_KEY, type Room, type EditorSpeaker } from "./model.js";
 
 const spk = (uid: string, name: string, model = "Sonos One"): EditorSpeaker => ({
   uid,
@@ -224,5 +225,69 @@ describe("location change -> service op (via computeOps)", () => {
   it("no edit -> no ops", () => {
     const before = mediaRoom();
     expect(opsFor(before, mediaRoom())).toEqual([]);
+  });
+});
+
+describe("available subs — assign/clear across rooms", () => {
+  const sub = (uid: string, name = "Sub Mini") => spk(uid, name, "Sonos Sub Mini");
+  const htRoom = (key: string, sw: EditorSpeaker | null): Room => ({
+    key,
+    name: key,
+    area: key,
+    ht: { bar: spk(`${key}-BAR`, key, "Sonos Arc"), slots: { LF: null, RF: null, LR: null, RR: null, SW: sw } },
+    pairs: [],
+    tray: [],
+  });
+  const pool = (...subs: EditorSpeaker[]): Room => ({
+    key: AVAILABLE_SUBS_KEY,
+    name: "Available subs",
+    area: null,
+    ht: null,
+    pairs: [],
+    tray: subs,
+  });
+
+  it("assigns a pooled sub into a room's SW slot and empties (prunes) the pool", () => {
+    const before = [htRoom("Media Room", null), pool(sub("SUB"))];
+    const after = assignSubToChannel(before, "Media Room", "SUB");
+    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW?.uid).toBe("SUB");
+    expect(after.some((r) => r.key === AVAILABLE_SUBS_KEY)).toBe(false);
+  });
+
+  it("assigning a pooled sub emits exactly one add_ht with the sw field", () => {
+    const before = [htRoom("Media Room", null), pool(sub("SUB"))];
+    const ops = computeOps(roomsToLayout(before), roomsToLayout(assignSubToChannel(before, "Media Room", "SUB")));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "add_ht" });
+    expect(ops[0].service.data).toMatchObject({ soundbar: "Media Room-BAR", sw: "SUB" });
+  });
+
+  it("clearing a SW sends the sub to the available pool, NOT the room tray", () => {
+    const before = [htRoom("Media Room", sub("SUB"))];
+    const after = clearChannel(before, "Media Room", "SW");
+    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW).toBeNull();
+    expect(after.find((r) => r.key === "Media Room")!.tray.some((s) => s.uid === "SUB")).toBe(false);
+    expect(after.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["SUB"]);
+  });
+
+  it("clearing a SW then re-reading emits one remove_ht", () => {
+    const before = [htRoom("Media Room", sub("SUB"))];
+    const ops = computeOps(roomsToLayout(before), roomsToLayout(clearChannel(before, "Media Room", "SW")));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "remove_ht" });
+  });
+
+  it("moves a sub from one room's SW to another's (cross-room)", () => {
+    const before = [htRoom("A", sub("SUB")), htRoom("B", null)];
+    const after = assignSubToChannel(before, "B", "SUB");
+    expect(after.find((r) => r.key === "A")!.ht!.slots.SW).toBeNull();
+    expect(after.find((r) => r.key === "B")!.ht!.slots.SW?.uid).toBe("SUB");
+  });
+
+  it("displaces an existing sub back to the pool when a new one is assigned", () => {
+    const before = [htRoom("Media Room", sub("OLD")), pool(sub("NEW"))];
+    const after = assignSubToChannel(before, "Media Room", "NEW");
+    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW?.uid).toBe("NEW");
+    expect(after.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["OLD"]);
   });
 });

@@ -136,14 +136,34 @@ function pairOf(u: BondUnit): EditorPair {
 const byName = (a: { name: string }, b: { name: string }) =>
   a.name.localeCompare(b.name, undefined, { numeric: true });
 
+/** Sentinel room key for the global pool of unbonded subs (see buildRooms). */
+export const AVAILABLE_SUBS_KEY = "__available_subs__";
+
 /**
  * Group the live bond graph into rooms by HA Area. Units whose primary speaker has
  * no area fall back to their own zone name as the room key, so nothing is dropped.
+ *
+ * Subs are special: a sub has no standalone playback role, so an unbonded sub is
+ * homeless -- it can only live in a home theater's SW slot (or, later, a pair). We
+ * collect every unbonded sub into one global "Available subs" pseudo-room (keyed
+ * AVAILABLE_SUBS_KEY) so the editor can offer it as droppable onto ANY home theater,
+ * across rooms. A sub is NEVER rendered as a soundbar: right after it's unbonded it
+ * can briefly appear as a degenerate "home theater of one", which we detect and
+ * route to the pool instead.
  */
 export function buildRooms(graph: BondGraph | undefined): Room[] {
   const units = graph?.units ?? [];
   const byKey = new Map<string, Room>();
   const order: string[] = [];
+  const availableSubs: EditorSpeaker[] = [];
+
+  // A loose (unbonded) speaker: a sub is homeless (global pool); anything else
+  // lands in its own room's tray.
+  const routeLoose = (room: Room, sp: EditorSpeaker): void => {
+    if (isSub(sp.model)) availableSubs.push(sp);
+    else room.tray.push(sp);
+  };
+
   for (const u of units) {
     const area = unitArea(u);
     const key = area ?? u.name;
@@ -154,15 +174,40 @@ export function buildRooms(graph: BondGraph | undefined): Room[] {
       order.push(key);
     }
     if (u.kind === "home_theater") {
-      // An area with two soundbars is unusual; keep the first, ignore extras.
-      if (!room.ht) room.ht = htLayout(u);
+      const bar = u.members.find((m) => m.channel === "CC") ?? u.members[0];
+      // A real home theater is a soundbar plus >=1 satellite. A single-member
+      // "home theater", or one whose center is a sub, is a just-unbonded sub
+      // masquerading -- never a soundbar; treat its members as loose speakers.
+      if (isSub(bar?.model) || u.members.length <= 1) {
+        for (const m of u.members) routeLoose(room, speakerOf(m));
+      } else if (!room.ht) {
+        // An area with two soundbars is unusual; keep the first, ignore extras.
+        room.ht = htLayout(u);
+      }
     } else if (u.kind === "stereo_pair") {
       room.pairs.push(pairOf(u));
     } else {
-      for (const m of u.members) room.tray.push(speakerOf(m));
+      for (const m of u.members) routeLoose(room, speakerOf(m));
     }
   }
-  const rooms = order.map((k) => byKey.get(k)!);
+
+  // Drop rooms left empty because their only speaker was a sub routed to the pool
+  // (e.g. a lone unbonded sub whose zone name became a phantom room).
+  const rooms = order
+    .map((k) => byKey.get(k)!)
+    .filter((r) => r.ht || r.pairs.length > 0 || r.tray.length > 0);
   for (const r of rooms) r.tray.sort(byName);
-  return rooms.sort(byName);
+  rooms.sort(byName);
+  if (availableSubs.length) {
+    availableSubs.sort(byName);
+    rooms.push({
+      key: AVAILABLE_SUBS_KEY,
+      name: "Available subs",
+      area: null,
+      ht: null,
+      pairs: [],
+      tray: availableSubs,
+    });
+  }
+  return rooms;
 }

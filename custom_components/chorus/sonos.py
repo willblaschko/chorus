@@ -370,14 +370,20 @@ class SonosBackend:
                     "kind": "stereo_pair", "members": mem,
                 })
 
-            else:  # ---- standalone ----
-                if at.get("Invisible", "0") == "1":
+            else:  # ---- standalone (visible), OR an unbonded, still-invisible sub ----
+                # A regular speaker unbonds to a VISIBLE standalone. A sub has no
+                # standalone playback role, so it stays Invisible="1" even when
+                # unbonded -- surface it anyway (flagged invisible) so the UI can
+                # offer to re-home it; the frontend decides by model that it's a sub.
+                # Skip true infrastructure (a Boost/Bridge) and any ghost with no IP.
+                if at.get("IsZoneBridge", "0") == "1" or not at.get("Location"):
                     continue
+                invisible = at.get("Invisible", "0") == "1"
                 units.append({
                     "primary_uid": uid, "name": at.get("ZoneName"), "kind": "standalone",
                     "members": [{
                         "uid": uid, "channel": None, "ip": ip_of(at.get("Location", "")),
-                        "name": at.get("ZoneName"), "invisible": False, "is_primary": True,
+                        "name": at.get("ZoneName"), "invisible": invisible, "is_primary": True,
                     }],
                 })
         return units

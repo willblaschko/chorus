@@ -8,8 +8,20 @@ import {
   hasHeight,
   positionAccepts,
   buildRooms,
+  AVAILABLE_SUBS_KEY,
 } from "./model.js";
 import type { BondGraph } from "./types.js";
+
+const subMember = (uid: string, channel: string | null, invisible: boolean) => ({
+  uid,
+  channel,
+  ip: "10.0.1.1",
+  name: "Sub Mini",
+  model: "Sonos Sub Mini",
+  area: null,
+  invisible,
+  is_primary: true,
+});
 
 describe("capability registry", () => {
   it("classifies soundbars as primaries", () => {
@@ -149,5 +161,71 @@ describe("buildRooms — group by HA Area", () => {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(buildRooms(undefined)).toEqual([]);
     expect(buildRooms({ units: [], players: [] })).toEqual([]);
+  });
+
+  it("keeps a bonded sub in its home theater (not the available pool)", () => {
+    // The Media Room HT's SW is bonded -> it must stay in the HT, and there must be
+    // NO available-subs pool for a fully-bonded system.
+    const rooms = buildRooms(GRAPH);
+    expect(room("Media Room").ht!.slots.SW?.uid).toBe("S_SW");
+    expect(rooms.some((r) => r.key === AVAILABLE_SUBS_KEY)).toBe(false);
+  });
+});
+
+describe("buildRooms — unbonded subs go to the global available pool", () => {
+  it("routes an unbonded (invisible) standalone sub to the AVAILABLE_SUBS pool, not a room tray", () => {
+    const graph: BondGraph = {
+      units: [
+        {
+          primary_uid: "USUB",
+          name: "Sub Mini",
+          kind: "standalone",
+          members: [subMember("USUB", null, true)],
+        },
+      ],
+      players: [],
+    };
+    const rooms = buildRooms(graph);
+    const pool = rooms.find((r) => r.key === AVAILABLE_SUBS_KEY);
+    expect(pool).toBeTruthy();
+    expect(pool!.tray.map((s) => s.uid)).toEqual(["USUB"]);
+    // and it did NOT create a normal "Sub Mini" room
+    expect(rooms.some((r) => r.key !== AVAILABLE_SUBS_KEY && r.name === "Sub Mini")).toBe(false);
+  });
+
+  it("never renders a sub as a soundbar (degenerate home-theater-of-one -> pool)", () => {
+    // Right after unbonding, Sonos can briefly present the lone sub as its own HT.
+    const graph: BondGraph = {
+      units: [
+        {
+          primary_uid: "DSUB",
+          name: "Sub Mini",
+          kind: "home_theater",
+          members: [subMember("DSUB", "CC", false)],
+        },
+      ],
+      players: [],
+    };
+    const rooms = buildRooms(graph);
+    // no room has an HT (the sub is not a bar)
+    expect(rooms.every((r) => r.ht === null)).toBe(true);
+    expect(rooms.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["DSUB"]);
+  });
+
+  it("a non-sub standalone still goes to its room tray, not the sub pool", () => {
+    const graph: BondGraph = {
+      units: [
+        {
+          primary_uid: "SP",
+          name: "Office",
+          kind: "standalone",
+          members: [{ uid: "SP", channel: null, ip: "10.0.2.2", name: "Office", model: "Sonos Era 100", area: "Office", invisible: false, is_primary: true }],
+        },
+      ],
+      players: [],
+    };
+    const rooms = buildRooms(graph);
+    expect(rooms.some((r) => r.key === AVAILABLE_SUBS_KEY)).toBe(false);
+    expect(rooms.find((r) => r.name === "Office")!.tray.map((s) => s.uid)).toEqual(["SP"]);
   });
 });

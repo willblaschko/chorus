@@ -6,7 +6,7 @@
 // channel, clear a channel, create/separate a stereo pair. Cross-room moves are a
 // later slice. These map 1:1 to the validated chorus.* services via computeOps.
 
-import { CHANNELS, type Channel, type Room, type EditorSpeaker } from "./model.js";
+import { CHANNELS, AVAILABLE_SUBS_KEY, type Channel, type Room, type EditorSpeaker } from "./model.js";
 import type { LayoutMap, Placement } from "./apply.js";
 
 /** Convert the room model to the flat LayoutMap the scheduler diffs. */
@@ -75,7 +75,31 @@ export function assignToChannel(
   return next;
 }
 
-/** Remove whatever is on an HT channel back into the room's tray. */
+const byName = (a: EditorSpeaker, b: EditorSpeaker) =>
+  a.name.localeCompare(b.name, undefined, { numeric: true });
+
+/** Find (or create) the global "Available subs" pseudo-room in a rooms array. */
+function poolOf(rooms: Room[]): Room {
+  let pool = rooms.find((r) => r.key === AVAILABLE_SUBS_KEY);
+  if (!pool) {
+    pool = { key: AVAILABLE_SUBS_KEY, name: "Available subs", area: null, ht: null, pairs: [], tray: [] };
+    rooms.push(pool);
+  }
+  return pool;
+}
+
+/** Drop the available-subs pseudo-room if it has emptied out. */
+function prunePool(rooms: Room[]): Room[] {
+  const i = rooms.findIndex((r) => r.key === AVAILABLE_SUBS_KEY);
+  if (i >= 0 && rooms[i].tray.length === 0) rooms.splice(i, 1);
+  return rooms;
+}
+
+/**
+ * Remove whatever is on an HT channel. A surround/front goes back to its room's
+ * tray; a SUB goes to the global available-subs pool (a sub is homeless once
+ * unbonded -- it can only live in another HT/pair).
+ */
 export function clearChannel(rooms: Room[], roomKey: string, ch: Channel): Room[] {
   const next = cloneRooms(rooms);
   const room = findRoom(next, roomKey);
@@ -83,9 +107,55 @@ export function clearChannel(rooms: Room[], roomKey: string, ch: Channel): Room[
   const sp = room.ht.slots[ch];
   if (!sp) return next;
   room.ht.slots[ch] = null;
-  room.tray.push(sp);
-  room.tray.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (ch === "SW") {
+    const pool = poolOf(next);
+    pool.tray.push(sp);
+    pool.tray.sort(byName);
+  } else {
+    room.tray.push(sp);
+    room.tray.sort(byName);
+  }
   return next;
+}
+
+/**
+ * Assign an available sub to a target room's home-theater SW slot. The sub may
+ * currently live in the available pool OR in another home theater's SW slot (this
+ * is how a sub moves between rooms). Any sub already on the target's SW is displaced
+ * back to the available pool. No-op if the target has no HT or the sub isn't found.
+ */
+export function assignSubToChannel(rooms: Room[], targetRoomKey: string, subUid: string): Room[] {
+  const next = cloneRooms(rooms);
+  const target = findRoom(next, targetRoomKey);
+  if (!target || !target.ht) return next;
+
+  // Detach the sub from wherever it currently lives.
+  let sub: EditorSpeaker | undefined;
+  const pool = next.find((r) => r.key === AVAILABLE_SUBS_KEY);
+  if (pool) {
+    const i = pool.tray.findIndex((s) => s.uid === subUid);
+    if (i >= 0) sub = pool.tray.splice(i, 1)[0];
+  }
+  if (!sub) {
+    for (const r of next) {
+      if (r.ht && r.ht.slots.SW?.uid === subUid) {
+        sub = r.ht.slots.SW;
+        r.ht.slots.SW = null;
+        break;
+      }
+    }
+  }
+  if (!sub) return next;
+
+  // Displace an existing sub on the target back to the pool, then seat the new one.
+  const existing = target.ht.slots.SW;
+  if (existing) {
+    const p = poolOf(next);
+    p.tray.push(existing);
+    p.tray.sort(byName);
+  }
+  target.ht.slots.SW = sub;
+  return prunePool(next);
 }
 
 /** Create a stereo pair from two speakers currently in the room's tray. */

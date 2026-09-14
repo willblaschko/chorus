@@ -9,6 +9,7 @@ import {
   isBar,
   CHANNELS,
   CHANNEL_NAME,
+  AVAILABLE_SUBS_KEY,
   type Channel,
   type Room,
   type HTLayout,
@@ -21,6 +22,7 @@ import {
   roomsToLayout,
   assignToChannel,
   clearChannel,
+  assignSubToChannel,
   createPair,
   separatePair,
   swapPair,
@@ -121,12 +123,17 @@ export class ChorusEditor extends LitElement {
   }
 
   private _room(): Room | undefined {
-    const rooms = this._rooms;
+    const rooms = this._rooms.filter((r) => r.key !== AVAILABLE_SUBS_KEY);
     if (this._selected) {
       const found = rooms.find((r) => r.key === this._selected);
       if (found) return found;
     }
     return this.narrow ? undefined : rooms[0];
+  }
+
+  /** The global pool of unbonded subs (droppable onto any home theater's SW). */
+  private _availableSubs(): EditorSpeaker[] {
+    return this._rooms.find((r) => r.key === AVAILABLE_SUBS_KEY)?.tray ?? [];
   }
 
   // ---- staged plan + apply -------------------------------------------
@@ -150,16 +157,35 @@ export class ChorusEditor extends LitElement {
     this._toast(`${this._name(sp)} → ${CHANNEL_NAME[ch]}`);
   }
 
+  private _assignSub(roomKey: string, subUid: string): void {
+    // Read the sub's name before the mutation moves it out of the pool.
+    const sub = this._availableSubs().find((s) => s.uid === subUid);
+    this._working = assignSubToChannel(this._rooms, roomKey, subUid);
+    this._dirty = true;
+    this._picker = undefined;
+    this._toast(sub ? `${this._name(sub)} → ${CHANNEL_NAME.SW}` : "Sub added");
+  }
+
   // ---- drag & drop (desktop; tap-to-assign remains for touch) ---------
   private _canDrop(r: Room, ch: Channel): boolean {
-    return !!this._drag && this._drag.roomKey === r.key && positionAccepts(ch, this._drag.model);
+    if (!this._drag) return false;
+    // An available sub (from the global pool) can drop onto ANY home theater's SW.
+    if (this._drag.roomKey === AVAILABLE_SUBS_KEY) {
+      return ch === "SW" && !!r.ht && positionAccepts("SW", this._drag.model);
+    }
+    return this._drag.roomKey === r.key && positionAccepts(ch, this._drag.model);
   }
 
   private _dropOnChannel(r: Room, ch: Channel): void {
     if (!this._canDrop(r, ch)) return;
-    const sp = r.tray.find((s) => s.uid === this._drag!.uid);
+    const drag = this._drag!;
     this._drag = undefined;
-    if (sp) this._assign(r.key, ch, sp);
+    if (drag.roomKey === AVAILABLE_SUBS_KEY) {
+      this._assignSub(r.key, drag.uid);
+    } else {
+      const sp = r.tray.find((s) => s.uid === drag.uid);
+      if (sp) this._assign(r.key, ch, sp);
+    }
   }
 
   private _onDragOver(e: DragEvent, r: Room, ch: Channel): void {
@@ -362,7 +388,7 @@ export class ChorusEditor extends LitElement {
     const uid = this._movePick;
     const current = this._rooms.find((r) => r.tray.some((s) => s.uid === uid));
     const names = new Set<string>();
-    for (const r of this._rooms) names.add(r.name);
+    for (const r of this._rooms) if (r.key !== AVAILABLE_SUBS_KEY) names.add(r.name);
     for (const a of this.graph?.areas ?? []) names.add(a);
     if (current) names.delete(current.name);
     const targets = [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -551,7 +577,7 @@ export class ChorusEditor extends LitElement {
   }
 
   public override render(): TemplateResult {
-    const rooms = this._rooms;
+    const rooms = this._rooms.filter((r) => r.key !== AVAILABLE_SUBS_KEY);
     if (!rooms.length) {
       return html`<div class="empty">No Sonos speakers discovered yet.</div>
         <chorus-toast></chorus-toast>`;
@@ -658,6 +684,7 @@ export class ChorusEditor extends LitElement {
         <span class="grow"></span>
         ${r.ht ? this._dots(() => this._openRoomMenu(r)) : nothing}
       </div>
+      ${this._availableSubsStrip(r)}
       ${r.ht ? this._htStage(r, r.ht) : this._setupCta(r)}
       ${r.pairs.length
         ? html`<div class="paircards">${r.pairs.map((p, i) => this._pairCard(r, p, i))}</div>`
@@ -684,6 +711,38 @@ export class ChorusEditor extends LitElement {
     `;
   }
 
+  // A strip of unbonded subs, shown on any home-theater room: drag one onto the
+  // Sub slot (or tap it) to re-home it here, even if it came from another room.
+  private _availableSubsStrip(r: Room): TemplateResult | typeof nothing {
+    const subs = this._availableSubs();
+    if (!subs.length || !r.ht) return nothing;
+    return html`
+      <div class="subbin">
+        <span class="subbin-label">Available sub${subs.length === 1 ? "" : "s"}</span>
+        <div class="subbin-chips">
+          ${subs.map(
+            (s) => html`
+              <div
+                class="subchip"
+                draggable="true"
+                title="Drag onto the Sub slot, or tap to add"
+                @dragstart=${(e: DragEvent) => {
+                  e.dataTransfer?.setData("text/plain", s.uid);
+                  this._drag = { uid: s.uid, roomKey: AVAILABLE_SUBS_KEY, model: s.model };
+                }}
+                @dragend=${() => (this._drag = undefined)}
+                @click=${() => this._assignSub(r.key, s.uid)}
+              >
+                <span class="subchip-ic">${iconFor(s.model)}</span>
+                <b>${this._name(s)}</b>
+              </div>
+            `
+          )}
+        </div>
+      </div>
+    `;
+  }
+
   private _htStage(r: Room, ht: HTLayout): TemplateResult {
     return html`
       <div class="stage">
@@ -702,7 +761,12 @@ export class ChorusEditor extends LitElement {
 
   private _pos(r: Room, ht: HTLayout, ch: Channel): TemplateResult {
     const sp = ht.slots[ch];
-    const eligible = r.tray.some((s) => positionAccepts(ch, s.model));
+    // Subs come from the global available pool (cross-room), everything else from
+    // this room's tray.
+    const eligible =
+      ch === "SW"
+        ? this._availableSubs().length > 0
+        : r.tray.some((s) => positionAccepts(ch, s.model));
     if (!sp) {
       const add = () => {
         if (eligible) this._picker = { roomKey: r.key, ch };
@@ -713,7 +777,11 @@ export class ChorusEditor extends LitElement {
           class="postile empty ${eligible ? "actionable" : ""}"
           role=${eligible ? "button" : nothing}
           tabindex=${eligible ? "0" : nothing}
-          title=${eligible ? `Add ${CHANNEL_NAME[ch]}` : "No eligible speaker in this room"}
+          title=${eligible
+            ? `Add ${CHANNEL_NAME[ch]}`
+            : ch === "SW"
+              ? "No available sub"
+              : "No eligible speaker in this room"}
           @click=${add}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -831,7 +899,14 @@ export class ChorusEditor extends LitElement {
     if (!this._picker) return nothing;
     const { roomKey, ch } = this._picker;
     const room = this._rooms.find((r) => r.key === roomKey);
-    const candidates = (room?.tray ?? []).filter((s) => positionAccepts(ch, s.model));
+    // Subs are drawn from the global available pool (any room); other channels from
+    // this room's tray.
+    const isSw = ch === "SW";
+    const candidates = isSw
+      ? this._availableSubs()
+      : (room?.tray ?? []).filter((s) => positionAccepts(ch, s.model));
+    const pick = (s: EditorSpeaker) =>
+      isSw ? this._assignSub(roomKey, s.uid) : this._assign(roomKey, ch, s);
     return html`
       <div class="backdrop" @click=${() => (this._picker = undefined)}>
         <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
@@ -839,13 +914,13 @@ export class ChorusEditor extends LitElement {
           ${candidates.length
             ? candidates.map(
                 (s) => html`
-                  <button type="button" class="sheet-item" @click=${() => this._assign(roomKey, ch, s)}>
+                  <button type="button" class="sheet-item" @click=${() => pick(s)}>
                     <span class="rt">${iconFor(s.model)}</span>
-                    <span class="rx"><b>${s.name}</b><span>${shortModel(s.model)}</span></span>
+                    <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
                   </button>
                 `
               )
-            : html`<div class="sheet-empty">No eligible speaker in this room.</div>`}
+            : html`<div class="sheet-empty">${isSw ? "No available sub." : "No eligible speaker in this room."}</div>`}
           <button type="button" class="sheet-cancel" @click=${() => (this._picker = undefined)}>Cancel</button>
         </div>
       </div>
@@ -1085,6 +1160,60 @@ export class ChorusEditor extends LitElement {
     .lp small {
       font-size: 11px;
       color: var(--secondary-text-color);
+    }
+    .subbin {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px 12px;
+      margin: 2px 0 14px;
+      padding: 10px 12px;
+      border: 1.5px dashed var(--divider-color);
+      border-radius: 14px;
+    }
+    .subbin-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--secondary-text-color);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .subbin-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .subchip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px 6px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color, var(--ha-card-background));
+      cursor: grab;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary-text-color);
+    }
+    .subchip:active {
+      cursor: grabbing;
+    }
+    .subchip:hover {
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+    .subchip-ic {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      color: var(--secondary-text-color);
+      flex: none;
+    }
+    .subchip-ic svg {
+      width: 20px;
+      height: 20px;
     }
     .postile {
       box-sizing: border-box;
