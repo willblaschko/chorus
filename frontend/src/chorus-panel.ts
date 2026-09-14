@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { BondGraph, BondUnit, BondMember, HomeAssistant } from "./types.js";
+import "./chorus-editor.js";
 
 type View = "editor" | "overview";
 
@@ -109,18 +110,16 @@ export class ChorusPanel extends LitElement {
   }
 
   private _editor(): TemplateResult {
-    // Placeholder — the drag/drop + tap-to-assign editor (primary view) is built next
-    // on top of this same bond graph + the chorus.* services.
-    return html`
-      <div class="msg">
-        <b>Editor coming next.</b>
-        <span
-          >The drag-and-drop room editor will live here. For now, open
-          <button class="link" @click=${() => (this._view = "overview")}>Overview</button>
-          to see your live speaker layout.</span
-        >
-      </div>
-    `;
+    if (this._loading && !this._graph) {
+      return html`<div class="msg">Reading your speakers…</div>`;
+    }
+    if (this._error) {
+      return html`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;
+    }
+    return html`<chorus-editor
+      .graph=${this._graph}
+      .narrow=${this.narrow}
+    ></chorus-editor>`;
   }
 
   private _overview(): TemplateResult {
