@@ -162,17 +162,47 @@ class SonosBackend:
     def snapshot_ht(self, soundbar_ip: str, soundbar_uid: str) -> str:
         return self.ht_sat_map(soundbar_ip, soundbar_uid)
 
-    def restore_ht(self, soundbar_ip, soundbar_uid, snapshot, sat_ips=None) -> None:
-        """Re-apply a snapshotted HTSatChanMapSet, one satellite at a time."""
-        sat_ips = sat_ips or {}
-        for token in snapshot.split(";"):
+    @staticmethod
+    def _parse_ht_map(ht_map: str, soundbar_uid: str) -> dict:
+        """Parse an HTSatChanMapSet into {sat_uid: base_channel}, sans soundbar/CC.
+
+        The auto height suffix (LF,LTF / RR,RTR) is dropped — we key on the base
+        channel (LF/RF/LR/RR/SW) that AddHTSatellite takes.
+        """
+        out = {}
+        for token in (ht_map or "").split(";"):
             token = token.strip()
             if not token or ":" not in token:
                 continue
             uid, chan = token.split(":", 1)
-            base = chan.split(",")[0]  # drop the auto height suffix (LTF/RTR/...)
+            base = chan.split(",")[0]
             if uid == soundbar_uid or base == "CC":
                 continue
-            self.add_ht_satellite(
-                soundbar_ip, soundbar_uid, uid, base, sat_ip=sat_ips.get(uid)
-            )
+            out[uid] = base
+        return out
+
+    def restore_ht(self, soundbar_ip, soundbar_uid, snapshot, sat_ips=None) -> None:
+        """Reconcile the live layout to a snapshot: remove extras, add what's missing.
+
+        Not a blind replay — re-adding an already-bonded satellite storms 800 and
+        can abort before the truly-missing ones are restored. Instead we read the
+        CURRENT map and diff it against the snapshot, so restore is idempotent from
+        any state (full, partial, or fully dissolved). A satellite that needs adding
+        is by definition not currently bonded, hence standalone/visible, hence its IP
+        is discoverable for the settle-poll.
+        """
+        sat_ips = sat_ips or {}
+        desired = self._parse_ht_map(snapshot, soundbar_uid)
+        current = self._parse_ht_map(
+            self.snapshot_ht(soundbar_ip, soundbar_uid), soundbar_uid
+        )
+        # Remove satellites that shouldn't be there, or are on the wrong channel.
+        for uid, base in current.items():
+            if desired.get(uid) != base:
+                self.remove_ht_satellite(soundbar_ip, uid)
+        # Add satellites that are missing, or need re-adding on the right channel.
+        for uid, base in desired.items():
+            if current.get(uid) != base:
+                self.add_ht_satellite(
+                    soundbar_ip, soundbar_uid, uid, base, sat_ip=sat_ips.get(uid)
+                )
