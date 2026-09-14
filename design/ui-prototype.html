@@ -496,7 +496,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  var COUCH='<svg viewBox="0 0 66 46" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="60" height="40" rx="7"/><path d="M12 7v32"/><path d="M54 7v32"/><rect x="14" y="7" width="12.3" height="19" rx="2.6"/><rect x="26.85" y="7" width="12.3" height="19" rx="2.6"/><rect x="39.7" y="7" width="12.3" height="19" rx="2.6"/><rect x="14" y="28" width="12.3" height="11" rx="2.6"/><rect x="26.85" y="28" width="12.3" height="11" rx="2.6"/><rect x="39.7" y="28" width="12.3" height="11" rx="2.6"/><rect x="11.5" y="4" width="10.5" height="10.5" rx="2.4" transform="rotate(27 16.75 9.25)"/><rect x="44" y="4" width="10.5" height="10.5" rx="2.4" transform="rotate(-27 49.25 9.25)"/></svg>';
+  var COUCH='<svg viewBox="0 0 72 46" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="11" height="36" rx="5"/><rect x="58" y="6" width="11" height="36" rx="5"/><rect x="14" y="28" width="44" height="13" rx="5"/><rect x="15" y="8" width="13.3" height="21" rx="3.5"/><rect x="29.35" y="8" width="13.3" height="21" rx="3.5"/><rect x="43.7" y="8" width="13.3" height="21" rx="3.5"/></svg>';
   function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
