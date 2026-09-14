@@ -127,14 +127,26 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
 
     async def remove_home_theater(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
+        channel = (call.data.get("channel") or "").upper()
         sat_name = call.data.get("satellite")
-        if sat_name:
+        # Read the live map first — bonded satellites are invisible and share the
+        # soundbar's zone name, so they can only be addressed by channel or UID,
+        # never by a friendly name.
+        current = await hass.async_add_executor_job(backend.snapshot_ht, bar["ip"], bar["uid"])
+        if channel:
+            uid = next(
+                (t.split(":", 1)[0] for t in current.split(";")
+                 if ":" in t and t.split(":", 1)[0] != bar["uid"]
+                 and t.split(":", 1)[1].split(",")[0] == channel),
+                None,
+            )
+            if not uid:
+                raise HomeAssistantError(f"{bar['name']} has no {channel} satellite")
+            await run(backend.remove_ht_satellite, bar["ip"], uid)
+        elif sat_name:  # a still-standalone speaker referenced by name
             sat = resolve(sat_name)
             await run(backend.remove_ht_satellite, bar["ip"], sat["uid"])
-        else:  # dissolve: remove every satellite currently on the bar
-            current = await hass.async_add_executor_job(
-                backend.snapshot_ht, bar["ip"], bar["uid"]
-            )
+        else:  # dissolve: remove every satellite currently on the bar (by UID)
             for token in current.split(";"):
                 token = token.strip()
                 if ":" not in token:
@@ -187,7 +199,11 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     )
     hass.services.async_register(
         DOMAIN, SERVICE_REMOVE_HOME_THEATER, remove_home_theater,
-        schema=vol.Schema({vol.Required("soundbar"): name, vol.Optional("satellite"): name}),
+        schema=vol.Schema({
+            vol.Required("soundbar"): name,
+            vol.Optional("channel"): name,
+            vol.Optional("satellite"): name,
+        }),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE, move,

@@ -66,16 +66,23 @@ set_home_theater:
 
 remove_home_theater:
   name: Remove home theater
-  description: Remove one satellite, or (with no satellite given) dissolve the whole home theater back to standalone speakers.
+  description: Remove one satellite by channel (bonded satellites are invisible, so address them by channel), or dissolve the whole home theater when nothing is specified.
   fields:
     soundbar:
       name: Soundbar
       required: true
       selector:
         text:
+    channel:
+      name: Channel (optional)
+      description: Which satellite to remove — LF, RF, LR, RR or SW. Leave blank to dissolve the entire home theater.
+      example: SW
+      selector:
+        select:
+          options: [LF, RF, LR, RR, SW]
     satellite:
-      name: Satellite (optional)
-      description: A single speaker to remove. Leave blank to dissolve the entire home theater.
+      name: Satellite name (optional)
+      description: A still-standalone speaker to remove, by name. For already-bonded satellites use Channel instead.
       selector:
         text:
 
