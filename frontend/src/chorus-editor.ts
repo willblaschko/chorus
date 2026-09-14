@@ -530,7 +530,10 @@ export class ChorusEditor extends LitElement {
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
       ${this._applying
-        ? html`<div class="settling">Finishing up… this can take up to a minute.</div>`
+        ? html`<div class="settling">
+            <div class="settling-txt">Finishing up — your speakers are reconnecting…</div>
+            <div class="settling-track"><div class="settling-fill"></div></div>
+          </div>`
         : nothing}
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
@@ -1440,15 +1443,49 @@ export class ChorusEditor extends LitElement {
       left: 50%;
       bottom: 88px;
       transform: translateX(-50%);
+      width: min(300px, calc(100vw - 40px));
       background: var(--card-background-color, #fff);
       border: 1px solid var(--divider-color);
       color: var(--secondary-text-color);
+      padding: 12px 16px 14px;
+      border-radius: 14px;
+      box-shadow: var(--ha-card-box-shadow, 0 6px 20px -6px rgba(0, 0, 0, 0.3));
+      z-index: 40;
+    }
+    .settling-txt {
       font-size: 13px;
       font-weight: 500;
-      padding: 8px 16px;
-      border-radius: 999px;
-      box-shadow: var(--ha-card-box-shadow, 0 2px 10px rgba(0, 0, 0, 0.15));
-      z-index: 40;
+      margin-bottom: 9px;
+      text-align: center;
+    }
+    .settling-track {
+      height: 4px;
+      background: var(--divider-color);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .settling-fill {
+      height: 100%;
+      width: 0;
+      background: var(--primary-color);
+      border-radius: 2px;
+      /* Fill toward ~92% over the typical ~60s settle — reads as progress toward
+         done; when the change truly settles the banner unmounts (jumps to gone). */
+      animation: settle-fill 60s cubic-bezier(0.15, 0.7, 0.2, 1) forwards;
+    }
+    @keyframes settle-fill {
+      from {
+        width: 6%;
+      }
+      to {
+        width: 92%;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .settling-fill {
+        animation: none;
+        width: 45%;
+      }
     }
     @media (max-width: 800px) {
       .grid {
