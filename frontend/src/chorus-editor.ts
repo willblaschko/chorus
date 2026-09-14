@@ -156,10 +156,24 @@ export class ChorusEditor extends LitElement {
         return last;
       }
       last = fresh;
-      if (this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended) return fresh;
+      // Converged only when the topology matches AND every speaker has a resolved
+      // name — a freshly-bonded satellite's name lags the bond by a beat, and we
+      // must not show its raw UID ("RINCON…").
+      if (
+        this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended &&
+        this._namesResolved(fresh)
+      ) {
+        return fresh;
+      }
       await new Promise((r) => window.setTimeout(r, 1500));
     }
     return last;
+  }
+
+  private _namesResolved(graph: BondGraph): boolean {
+    return (graph.units ?? []).every((u) =>
+      u.members.every((m) => !!m.name && m.name !== m.uid)
+    );
   }
 
   public override render(): TemplateResult {
