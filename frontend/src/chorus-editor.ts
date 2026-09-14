@@ -15,11 +15,21 @@ import {
 } from "./model.js";
 import { iconFor, shortModel } from "./icons.js";
 import { TV_ART, COUCH_ART } from "./art.js";
-import { roomsToLayout, assignToChannel, clearChannel, createPair, separatePair } from "./layout.js";
+import {
+  roomsToLayout,
+  assignToChannel,
+  clearChannel,
+  createPair,
+  separatePair,
+  swapPair,
+  dissolveHT,
+} from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
+import "./chorus-menu.js";
 import type { ChangeRow } from "./chorus-changebar.js";
+import type { MenuItem } from "./chorus-menu.js";
 
 const CH_TINT: Record<Channel, string> = {
   LF: "t-front",
@@ -49,6 +59,7 @@ export class ChorusEditor extends LitElement {
   @state() private _picker?: { roomKey: string; ch: Channel };
   @state() private _pairPick?: { roomKey: string; first?: string };
   private _drag?: { uid: string; roomKey: string; model: string };
+  @state() private _menu?: { heading: string; items: MenuItem[]; onSelect: (id: string) => void };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -143,6 +154,74 @@ export class ChorusEditor extends LitElement {
     this._toast("Stereo pair created");
   }
 
+  // ---- ••• menus ------------------------------------------------------
+  private _onMenuSelect = (e: Event): void => {
+    const m = this._menu;
+    this._menu = undefined;
+    m?.onSelect((e as CustomEvent).detail as string);
+  };
+
+  private _openRoomMenu(r: Room): void {
+    const items: MenuItem[] = [];
+    if (r.ht) items.push({ id: "dissolve", label: "Separate home theater", danger: true });
+    if (!items.length) return;
+    this._menu = {
+      heading: r.name,
+      items,
+      onSelect: (id) => {
+        if (id === "dissolve") {
+          this._working = dissolveHT(this._rooms, r.key);
+          this._dirty = true;
+          this._toast("Home theater separated");
+        }
+      },
+    };
+  }
+
+  private _openPairMenu(r: Room, index: number): void {
+    this._menu = {
+      heading: "Stereo pair",
+      items: [
+        { id: "swap", label: "Swap L / R" },
+        { id: "separate", label: "Separate pair", danger: true },
+      ],
+      onSelect: (id) => {
+        if (id === "swap") {
+          this._working = swapPair(this._rooms, r.key, index);
+          this._dirty = true;
+          this._toast("Swapped L / R");
+        } else if (id === "separate") {
+          this._separate(r.key, index);
+        }
+      },
+    };
+  }
+
+  private _openSpeakerMenu(s: EditorSpeaker): void {
+    this._menu = {
+      heading: this._name(s),
+      items: [{ id: "identify", label: "Identify" }],
+      onSelect: (id) => {
+        if (id === "identify") this._toast(`Chiming on ${this._name(s)}`);
+      },
+    };
+  }
+
+  private _dots(onClick: (e: Event) => void): TemplateResult {
+    return html`<button
+      type="button"
+      class="dots"
+      title="Options"
+      aria-label="Options"
+      @click=${(e: Event) => {
+        e.stopPropagation();
+        onClick(e);
+      }}
+    >
+      ⋯
+    </button>`;
+  }
+
   private _discard(): void {
     this._working = structuredClone(buildRooms(this.graph));
     this._dirty = false;
@@ -232,6 +311,13 @@ export class ChorusEditor extends LitElement {
       </div>
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
+      <chorus-menu
+        .open=${!!this._menu}
+        .heading=${this._menu?.heading ?? ""}
+        .items=${this._menu?.items ?? []}
+        @select=${this._onMenuSelect}
+        @close=${() => (this._menu = undefined)}
+      ></chorus-menu>
       <chorus-changebar
         .rows=${rows}
         .busy=${this._applying}
@@ -290,6 +376,8 @@ export class ChorusEditor extends LitElement {
       <div class="head">
         <h1>${r.name}</h1>
         ${r.area ? nothing : html`<span class="kind">No HA area</span>`}
+        <span class="grow"></span>
+        ${r.ht ? this._dots(() => this._openRoomMenu(r)) : nothing}
       </div>
       ${r.ht ? this._htStage(r, r.ht) : nothing}
       ${r.pairs.length
@@ -378,9 +466,8 @@ export class ChorusEditor extends LitElement {
         ${p.sub
           ? html`<span class="pc-sub"><span class="pc-sub-ic">${iconFor(p.sub.model)}</span> Sub · ${p.sub.name}</span>`
           : nothing}
-        <button type="button" class="pc-sep" title="Separate pair" @click=${() => this._separate(r.key, index)}>
-          Separate
-        </button>
+        <span class="grow"></span>
+        ${this._dots(() => this._openPairMenu(r, index))}
       </div>
     `;
   }
@@ -431,6 +518,8 @@ export class ChorusEditor extends LitElement {
       >
         <span class="rt">${iconFor(s.model)}</span>
         <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
+        <span class="grow"></span>
+        ${this._dots(() => this._openSpeakerMenu(s))}
       </div>
     `;
   }
@@ -601,6 +690,24 @@ export class ChorusEditor extends LitElement {
       border-radius: 10px;
       padding: 1px 8px;
       font-weight: 600;
+    }
+    .grow {
+      flex: 1;
+    }
+    .dots {
+      flex: none;
+      border: none;
+      background: none;
+      color: var(--secondary-text-color);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 9px;
+      border-radius: 8px;
+    }
+    .dots:hover {
+      background: var(--secondary-background-color);
+      color: var(--primary-text-color);
     }
 
     .t-front {

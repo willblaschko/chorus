@@ -5,6 +5,8 @@ import {
   clearChannel,
   createPair,
   separatePair,
+  swapPair,
+  dissolveHT,
 } from "./layout.js";
 import { computeOps } from "./apply.js";
 import type { Room, EditorSpeaker } from "./model.js";
@@ -107,6 +109,20 @@ describe("clearChannel / createPair / separatePair", () => {
     const after = separatePair(paired, "Media Room", 0);
     expect(after[0].pairs).toHaveLength(0);
     expect(after[0].tray.map((s) => s.uid).sort()).toEqual(["E1", "E2"]);
+  });
+
+  it("swapPair flips L and R", () => {
+    const paired = createPair(mediaRoom(), "Media Room", "E1", "E2");
+    const after = swapPair(paired, "Media Room", 0);
+    expect(after[0].pairs[0].L?.uid).toBe("E2");
+    expect(after[0].pairs[0].R?.uid).toBe("E1");
+  });
+
+  it("dissolveHT clears every channel back to the tray, bar stays", () => {
+    const after = dissolveHT(mediaRoom(), "Media Room");
+    expect(after[0].ht?.bar.uid).toBe("BAR");
+    expect(after[0].ht?.slots.LR).toBeNull();
+    expect(after[0].tray.some((s) => s.uid === "LR")).toBe(true);
   });
 });
 

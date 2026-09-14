@@ -119,5 +119,25 @@ export function separatePair(rooms: Room[], roomKey: string, pairIndex: number):
   return next;
 }
 
+/** Swap a pair's left and right channels. */
+export function swapPair(rooms: Room[], roomKey: string, pairIndex: number): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room || pairIndex < 0 || pairIndex >= room.pairs.length) return next;
+  const p = room.pairs[pairIndex];
+  [p.L, p.R] = [p.R, p.L];
+  return next;
+}
+
+/** Separate a whole home theater — every satellite returns to the tray, the
+ * soundbar stays (as a standalone soundbar ready to rebuild). */
+export function dissolveHT(rooms: Room[], roomKey: string): Room[] {
+  const room = findRoom(rooms, roomKey);
+  if (!room?.ht) return cloneRooms(rooms);
+  let next = cloneRooms(rooms);
+  for (const ch of CHANNELS) next = clearChannel(next, roomKey, ch); // no-op if empty
+  return next;
+}
+
 // Re-export for consumers that build a Placement directly (tests, editor glue).
 export type { LayoutMap, Placement };
