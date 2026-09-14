@@ -286,6 +286,9 @@
   .plan-note{font-size:12px;color:var(--text-3);text-align:center;margin-top:8px}
   .plan-btns{display:flex;gap:10px;margin-top:16px}
   .plan-btns .btn{flex:1}
+  .row{cursor:grab}.row:active{cursor:grabbing}
+  .row.dragging,.postile.dragging{opacity:.45}
+  .postile[draggable="true"]:active{cursor:grabbing}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -492,21 +495,25 @@
 
     var w=el("div","warn");w.innerHTML='<b>Heads up:</b> custom layouts like this are ones the Sonos app won’t build itself, so some of its tuning (like Trueplay) may not fully apply. Everything else works normally.';m.appendChild(w);
   }
-  function speakerRow(r,sp){var row=el("div","row");var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";
+  function speakerRow(r,sp){var row=el("div","row");row.draggable=true;var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";rt.firstChild.draggable=false;
     var meta=el("div","rx");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=sp.name;$("span",meta).textContent=sm(sp.model);
     var id=el("button","chime");id.innerHTML=WAVE;id.title="Chime "+sp.name;id.setAttribute("aria-label","Chime "+sp.name);
     id.addEventListener("click",function(e){e.stopPropagation();identify(sp.name,rt.firstChild)});
+    id.draggable=false;id.addEventListener("dragstart",function(e){e.preventDefault();e.stopPropagation()});
+    row.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};row.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id)}catch(_){}} );
+    row.addEventListener("dragend",function(){row.classList.remove("dragging");drag=null});
     row.appendChild(rt);row.appendChild(meta);row.appendChild(id);return row;}
   function pos(r,ch){var wrap=el("div","posw");paint();return wrap;
     function paint(){wrap.innerHTML="";var cur=ch==="CC"?r.bar:r.slots[ch];
       var t=el("div","postile"+(cur?"":" empty"));
       if(cur){
-        var badge=el("div","badge orb "+TINT[ch]);badge.draggable=true;badge.innerHTML=iconFor(cur.model)+'<span class="rip"></span>';
-        badge.addEventListener("dragstart",function(e){drag={roomKey:current,sp:cur};badge.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",cur.id)}catch(_){}} );
-        badge.addEventListener("dragend",function(){badge.classList.remove("dragging");drag=null});
+        var badge=el("div","badge orb "+TINT[ch]);badge.innerHTML=iconFor(cur.model)+'<span class="rip"></span>';
+        t.draggable=true;
+        t.addEventListener("dragstart",function(e){drag={roomKey:current,sp:cur};t.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",cur.id)}catch(_){}} );
+        t.addEventListener("dragend",function(){t.classList.remove("dragging");drag=null});
         t.appendChild(badge);
         var meta=el("div","pmeta");meta.innerHTML='<b>'+(ch==="CC"?cur.name:CHNAME[ch])+'</b><span>'+(ch==="CC"?"Center":sm(cur.model))+'</span>';t.appendChild(meta);
-        t.style.cursor="pointer";
+        t.style.cursor="grab";
         t.addEventListener("click",function(){
           var nm=ch==="CC"?cur.name:((cur.name==="Bookshelf"||cur.name==="Picture frame")?CHNAME[ch]:cur.name);
           var items=[{label:"Identify",icon:WAVE,fn:function(){identify(nm,badge)}}];
