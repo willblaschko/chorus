@@ -156,6 +156,13 @@ export class ChorusHelp extends LitElement {
           aria-labelledby="chorus-help-title"
         >
           <header class="head">
+            <div class="dots" aria-hidden="true">
+              <i class="d-front"></i>
+              <i class="d-rear"></i>
+              <i class="d-sub"></i>
+              <i class="d-rear"></i>
+              <i class="d-front"></i>
+            </div>
             <h2 id="chorus-help-title">Chorus</h2>
             <p class="sub">Configure Sonos bonding — no cloud, all local.</p>
           </header>
@@ -183,13 +190,20 @@ export class ChorusHelp extends LitElement {
   static override styles = css`
     :host {
       display: contents;
+      /* Channel accents, shared by the flourish dots and the tip tiles.
+         Front = blue, Rear = teal, Sub = indigo. */
+      --c-front: var(--info-color, #2196f3);
+      --c-rear: #009688;
+      --c-sub: #3f51b5;
     }
 
     .backdrop {
       position: fixed;
       inset: 0;
       z-index: 1100;
-      background: rgba(0, 0, 0, 0.42);
+      background: rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -198,7 +212,8 @@ export class ChorusHelp extends LitElement {
     }
 
     .card {
-      width: 400px;
+      /* ~404px with 26px padding keeps the body copy to a comfortable measure. */
+      width: 404px;
       max-width: 100%;
       max-height: 86vh;
       overflow-y: auto;
@@ -207,8 +222,8 @@ export class ChorusHelp extends LitElement {
       color: var(--primary-text-color);
       border: 1px solid var(--divider-color);
       border-radius: 20px;
-      box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.55);
-      padding: 22px 20px 18px;
+      box-shadow: 0 30px 90px -24px rgba(0, 0, 0, 0.55);
+      padding: 26px;
       animation: rise 0.24s cubic-bezier(0.34, 1.4, 0.6, 1);
     }
 
@@ -216,16 +231,42 @@ export class ChorusHelp extends LitElement {
       text-align: center;
       margin-bottom: 18px;
     }
+
+    /* Decorative flourish: a centered row of five small colored marks,
+       symmetric front · rear · sub · rear · front. */
+    .dots {
+      display: flex;
+      gap: 7px;
+      justify-content: center;
+      margin: 0 0 16px;
+    }
+    .dots i {
+      display: block;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .d-front {
+      background: var(--c-front);
+    }
+    .d-rear {
+      background: var(--c-rear);
+    }
+    .d-sub {
+      background: var(--c-sub);
+    }
+
     .head h2 {
-      margin: 0;
+      margin: 0 0 5px;
       font-size: 22px;
-      font-weight: 600;
+      font-weight: 700;
       letter-spacing: -0.02em;
       color: var(--primary-text-color);
     }
     .head .sub {
-      margin: 6px 0 0;
-      font-size: 13px;
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.5;
       color: var(--secondary-text-color);
     }
 
@@ -235,19 +276,19 @@ export class ChorusHelp extends LitElement {
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
     }
 
     .tip {
       display: flex;
       align-items: flex-start;
       gap: 13px;
+      padding: 8px 0;
     }
 
     .tile {
       flex: 0 0 auto;
-      width: 38px;
-      height: 38px;
+      width: 40px;
+      height: 40px;
       border-radius: 11px;
       display: flex;
       align-items: center;
@@ -257,18 +298,18 @@ export class ChorusHelp extends LitElement {
       color: var(--tile-accent);
     }
     .tile svg {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
     }
     /* Front = blue, Rear = teal, Sub = indigo; neutral falls back to the theme. */
     .tile.front {
-      --tile-accent: var(--info-color, #2196f3);
+      --tile-accent: var(--c-front);
     }
     .tile.rear {
-      --tile-accent: #009688;
+      --tile-accent: var(--c-rear);
     }
     .tile.sub {
-      --tile-accent: #3f51b5;
+      --tile-accent: var(--c-sub);
     }
     .tile.neutral {
       --tile-accent: var(--primary-color);
@@ -277,18 +318,18 @@ export class ChorusHelp extends LitElement {
     .tt {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
       min-width: 0;
     }
     .tt b {
-      font-size: 14.5px;
+      font-size: 14px;
       font-weight: 600;
       line-height: 1.3;
       color: var(--primary-text-color);
     }
     .tt span {
-      font-size: 13px;
-      line-height: 1.4;
+      font-size: 12.5px;
+      line-height: 1.45;
       color: var(--secondary-text-color);
     }
 
@@ -301,13 +342,16 @@ export class ChorusHelp extends LitElement {
       font-size: 15px;
       font-weight: 600;
       padding: 12px;
-      border-radius: 12px;
+      border-radius: 980px;
       cursor: pointer;
-      margin-top: 20px;
-      transition: filter 0.12s ease;
+      margin-top: 18px;
+      transition: filter 0.12s ease, transform 0.12s ease;
     }
     .done:hover {
       filter: brightness(1.06);
+    }
+    .done:active {
+      transform: scale(0.98);
     }
     .done:focus-visible {
       outline: 2px solid var(--primary-color);
@@ -328,8 +372,10 @@ export class ChorusHelp extends LitElement {
 
     @media (prefers-reduced-motion: reduce) {
       .backdrop,
-      .card {
+      .card,
+      .done {
         animation: none;
+        transition: none;
       }
     }
   `;
