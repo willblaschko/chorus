@@ -250,16 +250,33 @@ export class ChorusEditor extends LitElement {
   }
 
   private _openPairMenu(r: Room, set: BondedSet): void {
+    const hasSub = !!set.slots.SW;
+    // With a sub bonded, swap/separate operate on the 2-member map — offer them only
+    // once the sub is removed (keeps the ChannelMapSet ops unambiguous).
+    const items: MenuItem[] = hasSub
+      ? [
+          { id: "audio", label: "Audio settings" },
+          { id: "removesub", label: "Remove sub" },
+        ]
+      : [
+          { id: "audio", label: "Audio settings" },
+          { id: "addsub", label: "Add a sub…" },
+          { id: "swap", label: "Swap L / R" },
+          { id: "separate", label: "Separate pair", danger: true },
+        ];
     this._menu = {
       heading: "Stereo pair",
-      items: [
-        { id: "audio", label: "Audio settings" },
-        { id: "swap", label: "Swap L / R" },
-        { id: "separate", label: "Separate pair", danger: true },
-      ],
+      items,
       onSelect: (id) => {
         if (id === "audio") {
           this._openAudio(set.primary.name);
+        } else if (id === "addsub") {
+          if (this._availableSubs().length) this._picker = { roomKey: r.key, setId: set.id, ch: "SW" };
+          else this._toast("No available sub");
+        } else if (id === "removesub") {
+          this._working = clearChannel(this._rooms, r.key, set.id, "SW");
+          this._dirty = true;
+          this._toast("Sub removed");
         } else if (id === "swap") {
           this._working = swapPair(this._rooms, r.key, set.id);
           this._dirty = true;
