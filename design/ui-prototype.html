@@ -267,23 +267,24 @@
   .newpair .np-t{font-size:14px;font-weight:600}
   .newpair small{font-size:11.5px;color:var(--text-3)}
   .newpair.over{border-color:var(--accent);border-style:solid;background:color-mix(in srgb,var(--accent) 8%,transparent)}
-  .modal.plan{width:min(700px,93vw);max-width:93vw;text-align:left}
+  .modal.plan{width:min(440px,93vw);max-width:93vw;text-align:left}
   .plan-h b{font-size:19px;font-weight:700;letter-spacing:-.02em}
   .plan-h span{display:block;font-size:13px;color:var(--text-2);margin-top:4px}
-  .plan-lanes{display:flex;gap:12px;margin:18px 0 8px;overflow-x:auto;padding-bottom:4px}
-  .plan-lane{flex:1 0 190px;min-width:190px;background:var(--tile);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
-  .plan-lane-h{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
-  .plan-op{display:flex;align-items:flex-start;gap:9px;background:var(--card);border-radius:11px;padding:10px 11px;box-shadow:var(--shadow);transition:opacity .25s}
-  .plan-op .po-dot{width:9px;height:9px;border-radius:50%;background:var(--hair-2);flex:none;margin-top:3px;transition:.25s}
-  .plan-op.active .po-dot{background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent);animation:pdpulse 1s infinite}
-  .plan-op.done .po-dot{background:#34c759;box-shadow:none}
-  .plan-op.done{opacity:.62}
-  @keyframes pdpulse{50%{opacity:.45}}
-  .po-tx b{display:block;font-size:13.5px;font-weight:600}
-  .po-tx>span{font-size:11.5px;color:var(--text-3)}
-  .plan-then{font-size:10px;color:var(--text-3);text-align:center;letter-spacing:.05em;text-transform:uppercase}
-  .plan-note{font-size:12px;color:var(--text-3);text-align:center;margin-top:6px}
-  .plan-btns{display:flex;gap:10px;margin-top:18px}
+  .plan-list{display:flex;flex-direction:column;gap:8px;margin:17px 0 4px}
+  .plan-row{display:flex;align-items:center;gap:12px;background:var(--tile);border-radius:12px;padding:11px 13px}
+  .pr-ic{width:36px;height:36px;border-radius:10px;background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--text-2);flex:none}
+  .pr-ic svg{width:19px;height:19px}
+  .pr-tx{flex:1;min-width:0}
+  .pr-tx b{display:block;font-size:14.5px;font-weight:600}
+  .pr-tx>span{font-size:12.5px;color:var(--text-3)}
+  .pr-state{width:21px;height:21px;border-radius:50%;border:1.6px solid var(--hair-2);flex:none;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+  .pr-state svg{width:13px;height:13px;display:none}
+  .plan-row.doing .pr-state{border-color:var(--hair-2);border-top-color:var(--accent);animation:spin .7s linear infinite}
+  .plan-row.done .pr-state{background:#34c759;border-color:#34c759}
+  .plan-row.done .pr-state svg{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .plan-note{font-size:12px;color:var(--text-3);text-align:center;margin-top:8px}
+  .plan-btns{display:flex;gap:10px;margin-top:16px}
   .plan-btns .btn{flex:1}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -665,16 +666,16 @@
       if(r.type==="ht"){var mem=[];if(r.bar)mem.push(r.bar.id);CH.forEach(function(ch){if(r.slots[ch])mem.push(r.slots[ch].id)});
         if(av&&av.type==="ht"){if(av.bar)mem.push(av.bar.id);CH.forEach(function(ch){if(av.slots&&av.slots[ch])mem.push(av.slots[ch].id)})}
         mem=uniq(mem);var cnt=Object.keys(r.slots).filter(function(c){return r.slots[c]}).length;
-        if(mem.some(changed))ops.push({kind:"ht",label:r.name+" home theater",detail:"configure "+cnt+".1",touch:mem,order:2});
+        if(mem.some(changed))ops.push({kind:"ht",title:r.name,note:(av&&av.type==="ht"?"Update home theater":"Set up home theater"),ic:"soundbar",touch:mem,order:2});
       }else{(r.pairs||[]).forEach(function(p){if(p.L&&p.R){var mem=[p.L.id,p.R.id];if(p.sub)mem.push(p.sub.id);
-          if(mem.some(changed))ops.push({kind:"pair",label:r.name+" pair",detail:sm(p.L.model)+(p.sub?" + Sub":""),touch:mem,order:2})}});
-        (r.tray||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",label:s.name,detail:"move to "+r.name,touch:[s.id],order:1})})}
+          if(mem.some(changed))ops.push({kind:"pair",title:r.name,note:"Create stereo pair"+(p.sub?" with Sub":""),ic:"pair",touch:mem,order:2})}});
+        (r.tray||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",title:s.name,note:"Move to "+r.name,ic:"move",touch:[s.id],order:1})})}
     });
     Object.keys(applied.rooms).forEach(function(k){var av=applied.rooms[k],wv=rooms[k];
       if(av.type==="ht"&&(!wv||wv.type!=="ht")){var mem=[];if(av.bar)mem.push(av.bar.id);CH.forEach(function(ch){if(av.slots&&av.slots[ch])mem.push(av.slots[ch].id)});mem=uniq(mem);
-        if(mem.some(changed))ops.push({kind:"separate",label:av.name+" theater",detail:"separate",touch:mem,order:0})}
+        if(mem.some(changed))ops.push({kind:"separate",title:av.name,note:"Separate home theater",ic:"soundbar",touch:mem,order:0})}
     });
-    (looseSubs||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",label:s.name,detail:"return to available",touch:[s.id],order:1})});
+    (looseSubs||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",title:s.name,note:"Return to available",ic:"move",touch:[s.id],order:1})});
     return ops;}
   function planLanes(ops){var parent=ops.map(function(_,i){return i});
     function find(x){while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x]}return x}
@@ -685,32 +686,35 @@
   function applyChanges(){var n=computeChanges().length;if(!n)return;var bar=$("#changebar");if(bar)bar.classList.add("busy");
     toast("Applying "+n+" change"+(n>1?"s":"")+" to your Sonos…");
     setTimeout(function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};toast("Applied — your speakers are set");render();},1200);}
+  var PAIR_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8.6" cy="12" r="4.3"/><circle cx="15.4" cy="12" r="4.3"/></svg>';
+  var CHECK_IC='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 10 17 19 7.5"/></svg>';
+  function opIcon(op){return op.ic==="move"?MOVE:op.ic==="pair"?PAIR_IC:op.ic==="soundbar"?ICON.soundbar:ICON.driver}
   function applyPlanModal(){var ops=computeOps();if(!ops.length){applyChanges();return;}
     var lanes=planLanes(ops),back=el("div","modal-back"),modal=el("div","modal plan");
     function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
-    var h=el("div","plan-h");h.innerHTML='<b>Apply plan</b><span></span>';
-    h.querySelector("span").textContent=ops.length+" operation"+(ops.length>1?"s":"")+" · "+lanes.length+" group"+(lanes.length>1?"s":"")+(lanes.length>1?" in parallel":"");
+    var h=el("div","plan-h");h.innerHTML='<b>Apply changes?</b><span></span>';
+    h.querySelector("span").textContent="Chorus will update your Sonos to match — "+ops.length+" change"+(ops.length>1?"s":"")+".";
     modal.appendChild(h);
-    var lanesEl=el("div","plan-lanes");
-    lanes.forEach(function(lane,li){var col=el("div","plan-lane");col.appendChild(el("div","plan-lane-h","Group "+(li+1)));
-      lane.forEach(function(op,oi){var chip=el("div","plan-op "+op.kind);chip.setAttribute("data-li",li);chip.setAttribute("data-oi",oi);
-        chip.innerHTML='<span class="po-dot"></span><span class="po-tx"><b></b><span></span></span>';
-        chip.querySelector("b").textContent=op.label;chip.querySelector(".po-tx span").textContent=op.detail||"";
-        col.appendChild(chip);if(oi<lane.length-1)col.appendChild(el("div","plan-then","then"))});
-      lanesEl.appendChild(col)});
-    modal.appendChild(lanesEl);
-    modal.appendChild(el("div","plan-note","Groups run at the same time; steps within a group run in order."));
+    var list=el("div","plan-list");
+    ops.forEach(function(op,i){var row=el("div","plan-row");row.setAttribute("data-i",i);
+      row.innerHTML='<span class="pr-ic"></span><span class="pr-tx"><b></b><span></span></span><span class="pr-state">'+CHECK_IC+'</span>';
+      row.querySelector(".pr-ic").innerHTML=opIcon(op);row.querySelector(".pr-tx b").textContent=op.title||"";row.querySelector(".pr-tx>span").textContent=op.note||"";
+      list.appendChild(row)});
+    modal.appendChild(list);
+    modal.appendChild(el("div","plan-note","Applied safely — you can change anything back anytime."));
     var btns=el("div","plan-btns"),cancel=el("button","btn soft","Cancel"),run=el("button","btn fill");
-    run.textContent="Apply "+ops.length+" operation"+(ops.length>1?"s":"");cancel.onclick=close;
-    run.onclick=function(){cancel.disabled=true;run.disabled=true;run.textContent="Applying…";runPlan(modal,lanes,function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};close();toast("Applied — your speakers are set");render()})};
+    run.textContent="Apply";cancel.onclick=close;
+    run.onclick=function(){cancel.disabled=true;run.disabled=true;run.textContent="Applying…";modal.classList.add("running");runPlan(modal,ops,lanes,function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};close();toast("Your Sonos is updated");render()})};
     btns.appendChild(cancel);btns.appendChild(run);modal.appendChild(btns);
     back.addEventListener("click",function(e){if(e.target===back&&!run.disabled)close()});
     back.appendChild(modal);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")})}
-  function runPlan(modal,lanes,done){modal.classList.add("running");var step=560,maxLen=0;
-    lanes.forEach(function(lane,li){maxLen=Math.max(maxLen,lane.length);
-      lane.forEach(function(op,oi){var chip=modal.querySelector('.plan-op[data-li="'+li+'"][data-oi="'+oi+'"]');
-        setTimeout(function(){if(chip)chip.classList.add("active")},oi*step+140);
-        setTimeout(function(){if(chip){chip.classList.remove("active");chip.classList.add("done")}},(oi+1)*step+140)})});
+  // Independent changes tick off together, dependent ones cascade — the parallelism is
+  // felt (it's quick) but never named.
+  function runPlan(modal,ops,lanes,done){var step=520,maxLen=0;
+    lanes.forEach(function(lane){maxLen=Math.max(maxLen,lane.length);
+      lane.forEach(function(op,oi){var idx=ops.indexOf(op),row=modal.querySelector('.plan-row[data-i="'+idx+'"]');
+        setTimeout(function(){if(row)row.classList.add("doing")},oi*step+140);
+        setTimeout(function(){if(row){row.classList.remove("doing");row.classList.add("done")}},(oi+1)*step+140)})});
     setTimeout(done,maxLen*step+520)}
   function discardChanges(){if(!applied)return;rooms=clone(applied.rooms);looseSubs=clone(applied.subs);if(!rooms[current])current=Object.keys(rooms)[0];toast("Changes discarded");render();}
   function renderChangeBar(){var bar=$("#changebar");if(!bar){bar=el("div","changebar");bar.id="changebar";document.body.appendChild(bar);}
