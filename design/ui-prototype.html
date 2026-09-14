@@ -31,7 +31,15 @@
   .tbtn:hover{color:var(--text)}.tbtn svg{width:15px;height:15px}
 
   .grid{display:grid;grid-template-columns:238px 1fr;gap:26px;align-items:start}
-  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  .mback{display:none;align-items:center;gap:4px;font:inherit;font-size:14px;font-weight:600;color:var(--accent);background:none;border:0;padding:4px 2px 2px;margin:-2px 0 12px;cursor:pointer}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}
+    .wrap[data-mv="rooms"] #main{display:none}
+    .wrap[data-mv="detail"] .rooms-col{display:none}
+    .mback{display:inline-flex}}
+  @media(max-width:460px){.wrap{padding:18px 16px 96px}
+    .postile{width:128px;min-height:52px;padding:8px 9px;gap:8px}
+    .prow{gap:clamp(18px,7vw,60px)}
+    .head h1{font-size:26px}}
   .eyebrow{font-size:12px;font-weight:600;color:var(--text-3);letter-spacing:.02em;margin:0 8px 8px}
 
   /* grouped surface */
@@ -295,7 +303,7 @@
 <div class="wrap">
   <div class="top"><span class="mark"><i></i></span><b>Chorus</b><span class="s">for Sonos</span><span class="sp"></span><button class="tbtn help" id="helpBtn" aria-label="Overview" title="Overview">?</button><button class="tbtn" id="themeBtn">Appearance</button></div>
   <div class="grid">
-    <div><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
+    <div class="rooms-col"><div class="eyebrow">Rooms</div><div class="group" id="rooms"></div></div>
     <div id="main"></div>
   </div>
 </div>
@@ -384,7 +392,7 @@
       var tint=roomTint(r);
       b.innerHTML='<span class="ric '+tint+'" style="border-radius:8px">'+rGlyph(r)+'</span><span class="rmeta"><b></b><span></span></span><span class="chev">›</span>';
       $(".ric",b).style.width="30px";$(".ric",b).style.height="30px";
-      $("b",b).textContent=r.name;$(".rmeta span",b).textContent=roomState(r);b.onclick=function(){current=k;render()};
+      $("b",b).textContent=r.name;$(".rmeta span",b).textContent=roomState(r);b.onclick=function(){current=k;mv("detail");render()};
       b.addEventListener("dragover",function(e){if(drag&&drag.roomKey!==k){e.preventDefault();b.classList.add("droproom")}});
       b.addEventListener("dragleave",function(){b.classList.remove("droproom")});
       b.addEventListener("drop",function(e){e.preventDefault();b.classList.remove("droproom");moveSpeaker(drag,k)});
@@ -410,6 +418,21 @@
     var items=unused.map(function(a){return {label:a,sub:"No Sonos yet",icon:AREA_IC,fn:function(){createRoomWith(d,a)}}});
     items.push({label:"Create a new space…",icon:PLUS_IC,fn:function(){nameModal({title:"New space",message:"Name a new area for "+d.sp.name,placeholder:"Area name",confirmLabel:"Create",onConfirm:function(name){if(nameTaken(name)){toast("“"+name.trim()+"” already exists");return;}createRoomWith(d,name);}})}});
     actionSheet("Move "+d.sp.name+" to…","Pick a Home Assistant space",items);}
+  // Tap-to-assign — a tap equivalent for every drag, so the whole app works on touch.
+  function movePicker(sp,fromKey){var items=[],used={};
+    Object.keys(rooms).forEach(function(k){used[rooms[k].name.toLowerCase()]=1;if(k!==fromKey)items.push({label:rooms[k].name,sub:roomState(rooms[k]),icon:AREA_IC,fn:function(){moveSpeaker({roomKey:fromKey,sp:sp},k)}})});
+    haAreas.filter(function(a){return !used[a.toLowerCase()]}).forEach(function(a){items.push({label:a,sub:"No Sonos yet",icon:AREA_IC,fn:function(){createRoomWith({roomKey:fromKey,sp:sp},a)}})});
+    items.push({label:"Create a new space…",icon:PLUS_IC,fn:function(){nameModal({title:"New space",message:"Name a new area for "+sp.name,placeholder:"Area name",confirmLabel:"Create",onConfirm:function(name){if(nameTaken(name)){toast("“"+name.trim()+"” already exists");return}createRoomWith({roomKey:fromKey,sp:sp},name)}})}});
+    actionSheet("Move "+sp.name+" to…","Pick a room or space",items);}
+  function speakerSheet(sp){actionSheet(sp.name,sm(sp.model),[{label:"Identify",icon:WAVE,fn:function(){identify(sp.name)}},{label:"Move to another room…",icon:MOVE,fn:function(){movePicker(sp,current)}}])}
+  function placeInSlot(r,ch,sp){r.tray=r.tray.filter(function(x){return x.id!==sp.id});Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id)r.slots[k]=null});if(r.slots[ch]){r.slots[ch].height=false;r.tray.push(r.slots[ch])}r.slots[ch]=Object.assign({},sp,{height:false});toast(sp.name+" → "+(ch==="SW"?"Sub":CHNAME[ch]));renderHT(r);buildRooms();}
+  function slotPicker(r,ch){var avail=(r.tray||[]).filter(function(s){return posAccepts(ch,s)});
+    if(!avail.length){toast(ch==="SW"?"No Sub available to add":"No available speaker fits here");return}
+    actionSheet("Add "+(ch==="SW"?"a Sub":CHNAME[ch]),"Choose a speaker",avail.map(function(s){return {label:s.name,sub:sm(s.model),icon:iconFor(s.model),fn:function(){placeInSlot(r,ch,s)}}}))}
+  function startPairTap(r){var avail=(r.tray||[]).filter(function(s){return speakerKind(s.model).pair});if(avail.length<2){toast("Need two speakers to pair");return}
+    actionSheet("New stereo pair","Choose the first speaker",avail.map(function(s){return {label:s.name,sub:sm(s.model),icon:iconFor(s.model),fn:function(){r.tray=r.tray.filter(function(x){return x.id!==s.id});if(!r.pairs)r.pairs=[];r.pairs.push({L:s,R:null,sub:null});toast("Pairing "+s.name+" — pick a partner");render()}}}))}
+  function pairPartnerPick(r,p,side){var avail=(r.tray||[]).filter(function(x){return speakerKind(x.model).pair});if(!avail.length){toast("No speaker available to pair");return}
+    actionSheet("Add partner","Choose a speaker",avail.map(function(sp){return {label:sp.name,sub:sm(sp.model),icon:iconFor(sp.model),fn:function(){r.tray=r.tray.filter(function(x){return x.id!==sp.id});p[side]=sp;toast("Stereo pair created");render()}}}))}
   function nameModal(opts){var back=el("div","modal-back"),modal=el("div","modal");
     modal.innerHTML='<h3></h3><p></p><input type="text" autocomplete="off"><div class="modal-btns"><button class="mbtn-cancel">Cancel</button><button class="mbtn-ok"></button></div>';
     $("h3",modal).textContent=opts.title;$("p",modal).textContent=opts.message||"";
@@ -470,7 +493,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  function renderHT(r){var m=$("#main");m.innerHTML="";
+  function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
     $("h1",left).textContent=r.name;head.appendChild(left);
@@ -502,6 +525,7 @@
     id.draggable=false;id.addEventListener("dragstart",function(e){e.preventDefault();e.stopPropagation()});
     row.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};row.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id)}catch(_){}} );
     row.addEventListener("dragend",function(){row.classList.remove("dragging");drag=null});
+    row.addEventListener("click",function(){speakerSheet(sp)});
     row.appendChild(rt);row.appendChild(meta);row.appendChild(id);return row;}
   function pos(r,ch){var wrap=el("div","posw");paint();return wrap;
     function paint(){wrap.innerHTML="";var cur=ch==="CC"?r.bar:r.slots[ch];
@@ -524,6 +548,7 @@
       }else{
         t.appendChild(el("div","badge empty-badge",ch));
         var m2=el("div","pmeta");m2.innerHTML='<b style="color:var(--text-3);font-weight:500">'+(CHNAME[ch]||"Soundbar")+'</b><span>Empty</span>';t.appendChild(m2);
+        if(ch!=="CC"){t.style.cursor="pointer";t.addEventListener("click",function(){slotPicker(r,ch)})}
       }
       wrap.appendChild(t);
       if(ch!=="CC"){t.addEventListener("dragover",function(e){if(drag&&posAccepts(ch,drag.sp)){e.preventDefault();t.classList.add("over")}});t.addEventListener("dragleave",function(){t.classList.remove("over")});t.addEventListener("drop",function(e){e.preventDefault();t.classList.remove("over");dropPos(r,ch,t,paint)});}
@@ -539,7 +564,7 @@
   function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};delete r.type;r.pairs=r.pairs||[];toast("Home theater separated");render();}
 
   function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";toast("Home theater created");renderHT(r);buildRooms();}
-  function renderBarSetup(r){var m=$("#main");m.innerHTML="";var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
+  function renderBarSetup(r){var m=shell();var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
     var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip">Soundbar</span><span class="chip">Standalone</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Home theater</h2><span class="sc">not set up yet</span>';m.appendChild(sec);
     var hero=el("div","solo");var t=orb(bar,"t-bar");hero.appendChild(t);hero.appendChild(el("div","wn",bar.name));hero.appendChild(el("div","wm",sm(bar.model)+" · standalone"));
@@ -550,7 +575,7 @@
     if(others.length){var sec2=el("div","sec");sec2.innerHTML='<h2>Speakers in this room</h2><span class="sc">available to add as surrounds</span>';m.appendChild(sec2);
       var grp=el("div","group"),rowsEl=el("div","rows");others.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
   }
-  function renderRoom(r){var m=$("#main");m.innerHTML="";var pairs=(r.pairs||[]),solos=(r.tray||[]);
+  function renderRoom(r){var m=shell();var pairs=(r.pairs||[]),solos=(r.tray||[]);
     var head=el("div","head"),left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip"></span></div>';$("h1",left).textContent=r.name;$(".chip",left).textContent=roomState(r);head.appendChild(left);m.appendChild(head);
     if(pairs.length){var sec=el("div","sec");sec.innerHTML='<h2>'+(pairs.length>1?"Stereo pairs":"Stereo pair")+'</h2><span class="sc">tap a speaker to identify</span>';m.appendChild(sec);
       var pg=el("div","paircards");pairs.forEach(function(p){pg.appendChild(pairCard(r,p))});m.appendChild(pg);}
@@ -559,7 +584,7 @@
     if(showZone){var nz=el("div","newpair");nz.innerHTML='<span class="np-ic">＋</span><span class="np-t">New stereo pair</span><small>drag a speaker here, then drop its partner on the empty side</small>';
       nz.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();nz.classList.add("over")}});
       nz.addEventListener("dragleave",function(){nz.classList.remove("over")});
-      nz.addEventListener("drop",function(e){e.preventDefault();nz.classList.remove("over");startPair(r)});m.appendChild(nz);}
+      nz.addEventListener("drop",function(e){e.preventDefault();nz.classList.remove("over");startPair(r)});nz.style.cursor="pointer";nz.addEventListener("click",function(){startPairTap(r)});m.appendChild(nz);}
     if(solos.length){var sec2=el("div","sec");sec2.innerHTML='<h2>'+(pairs.length?"Other speakers":(solos.length>1?"Speakers":"Speaker"))+'</h2><span class="sc">'+(showZone?"drag onto “New stereo pair”, or a room to move":"drag onto a room to move it")+'</span>';m.appendChild(sec2);
       var grp=el("div","group"),rowsEl=el("div","rows");solos.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
     if(!pairs.length&&!solos.length){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">No speakers here yet</div><div class="wm" style="max-width:34ch;text-align:center">Drop a speaker onto “'+r.name+'” in the sidebar to move one in.</div>';m.appendChild(e);}
@@ -573,7 +598,7 @@
     card.appendChild(pairMenu(r,p));return card;}
   function pcSlot(r,p,side){var sp=p[side],s=el("div","pc-slot"+(sp?"":" empty"));
     if(sp){var t=orb(sp,side==="L"?"t-front":"t-rear");t.classList.add("mini");s.appendChild(t);s.appendChild(el("div","pc-side",side));s.style.cursor="pointer";s.onclick=function(){identify(sp.name,t)};}
-    else{s.appendChild(el("div","pc-drop",side));s.appendChild(el("div","pc-side","drop partner"));
+    else{s.appendChild(el("div","pc-drop",side));s.appendChild(el("div","pc-side","add partner"));s.style.cursor="pointer";s.addEventListener("click",function(){pairPartnerPick(r,p,side)});
       s.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();s.classList.add("over")}});
       s.addEventListener("dragleave",function(){s.classList.remove("over")});
       s.addEventListener("drop",function(e){e.preventDefault();s.classList.remove("over");if(!drag||drag.roomKey!==current)return;var b=drag.sp;if(!speakerKind(b.model).pair)return;detach(rooms[current],b);b.height=false;p[side]=b;toast("Stereo pair created");drag=null;render();});}
@@ -739,6 +764,9 @@
     bar.appendChild(list);
     info.onclick=function(){bar.classList.toggle("open")};
     bar.classList.add("on");if(wasOpen)bar.classList.add("open");}
+  function mv(v){var w=$(".wrap");if(w)w.setAttribute("data-mv",v)}
+  function mbackBar(){var b=el("button","mback");b.innerHTML="‹ All rooms";b.onclick=function(){mv("rooms")};return b;}
+  function shell(){var m=$("#main");m.innerHTML="";m.appendChild(mbackBar());return m;}
   function render(){buildRooms();var r=rooms[current];r.type==="ht"?renderHT(r):barIn(r)?renderBarSetup(r):renderRoom(r)}
   var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="21.5" y2="12"/><line x1="5.3" y1="5.3" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="18.7" y2="18.7"/><line x1="5.3" y1="18.7" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="18.7" y2="5.3"/></svg>';
   var MOON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.9A8.5 8.5 0 1 1 11.1 3a6.7 6.7 0 0 0 9.9 9.9z"/></svg>';
@@ -748,6 +776,7 @@
   setThemeBtn();
   $("#helpBtn").onclick=overviewModal;
   applied={rooms:clone(rooms),subs:clone(looseSubs)};
+  mv("rooms");
   render();
   overviewModal();
 })();
