@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Chorus",
+        "description": "Chorus configures Sonos bonding over your local network — no account, no cloud. Select Submit to enable it, then use the Chorus services (Developer Tools → Actions) to create stereo pairs and home theaters."
+      }
+    },
+    "abort": {
+      "already_configured": "Chorus is already set up."
+    }
+  }
+}
