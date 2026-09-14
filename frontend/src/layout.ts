@@ -6,7 +6,7 @@
 // channel, clear a channel, create/separate a stereo pair. Cross-room moves are a
 // later slice. These map 1:1 to the validated chorus.* services via computeOps.
 
-import { CHANNELS, type Channel, type Room } from "./model.js";
+import { CHANNELS, type Channel, type Room, type EditorSpeaker } from "./model.js";
 import type { LayoutMap, Placement } from "./apply.js";
 
 /** Convert the room model to the flat LayoutMap the scheduler diffs. */
@@ -126,6 +126,32 @@ export function swapPair(rooms: Room[], roomKey: string, pairIndex: number): Roo
   if (!room || pairIndex < 0 || pairIndex >= room.pairs.length) return next;
   const p = room.pairs[pairIndex];
   [p.L, p.R] = [p.R, p.L];
+  return next;
+}
+
+/** Move a lone speaker to another room (by name); creates the target room if it
+ * doesn't exist yet. Only moves speakers from a tray (not bonded members). */
+export function moveSpeaker(rooms: Room[], speakerUid: string, targetRoom: string): Room[] {
+  const next = cloneRooms(rooms);
+  let moved: EditorSpeaker | undefined;
+  for (const r of next) {
+    const i = r.tray.findIndex((s) => s.uid === speakerUid);
+    if (i !== -1) {
+      moved = r.tray.splice(i, 1)[0];
+      break;
+    }
+  }
+  if (!moved) return next;
+  let target = next.find((r) => r.name === targetRoom);
+  if (!target) {
+    target = { key: targetRoom, name: targetRoom, area: targetRoom, ht: null, pairs: [], tray: [] };
+    next.push(target);
+  }
+  target.tray.push(moved);
+  const byName = (a: EditorSpeaker, b: EditorSpeaker) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true });
+  target.tray.sort(byName);
+  next.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   return next;
 }
 

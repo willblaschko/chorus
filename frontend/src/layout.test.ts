@@ -7,6 +7,7 @@ import {
   separatePair,
   swapPair,
   dissolveHT,
+  moveSpeaker,
 } from "./layout.js";
 import { computeOps } from "./apply.js";
 import type { Room, EditorSpeaker } from "./model.js";
@@ -123,6 +124,12 @@ describe("clearChannel / createPair / separatePair", () => {
     expect(after[0].ht?.bar.uid).toBe("BAR");
     expect(after[0].ht?.slots.LR).toBeNull();
     expect(after[0].tray.some((s) => s.uid === "LR")).toBe(true);
+  });
+
+  it("moveSpeaker relocates a tray speaker to another room, creating it", () => {
+    const after = moveSpeaker(mediaRoom(), "E1", "Kitchen");
+    expect(after.find((r) => r.name === "Media Room")!.tray.some((s) => s.uid === "E1")).toBe(false);
+    expect(after.find((r) => r.name === "Kitchen")!.tray.map((s) => s.uid)).toEqual(["E1"]);
   });
 });
 

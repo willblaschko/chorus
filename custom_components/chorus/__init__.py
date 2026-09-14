@@ -30,6 +30,7 @@ from .const import (
     is_soundbar,
     is_sub,
 )
+from .areas import set_speaker_area
 from .coordinator import ChorusCoordinator
 from .panel import async_register_panel, async_unregister_panel
 from .sonos import SonosBackend, SonosSoapError
@@ -177,7 +178,10 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     # --- move (rename the zone == move to another room) -------------------
     async def move(call: ServiceCall) -> None:
         speaker = resolve(call.data["speaker"])
-        await run(backend.set_zone_name, speaker["ip"], call.data["name"])
+        name = call.data["name"]
+        await run(backend.set_zone_name, speaker["ip"], name)
+        # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
+        set_speaker_area(hass, speaker["uid"], name)
         await coordinator.async_request_refresh()
 
     # --- snapshot / restore of a soundbar's HT layout ---------------------

@@ -45,8 +45,41 @@ export class ChorusPanel extends LitElement {
   @state() private _error?: string;
   @state() private _loading = true;
 
+  private _pollTimer?: number;
+  private _polling = false;
+
   public override firstUpdated(): void {
     void this._load();
+  }
+
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    // Live updates while the panel is open: force a fresh Sonos re-discovery every
+    // few seconds so speakers appear/disappear as the network changes. Only runs
+    // while connected, so it costs nothing when the panel is closed.
+    this._pollTimer = window.setInterval(() => void this._poll(), 12000);
+  }
+
+  public override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (this._pollTimer) {
+      window.clearInterval(this._pollTimer);
+      this._pollTimer = undefined;
+    }
+  }
+
+  private async _poll(): Promise<void> {
+    if (this._polling || !this.hass) return;
+    this._polling = true;
+    try {
+      this._graph = await this.hass.connection.sendMessagePromise<BondGraph>({
+        type: "chorus/refresh",
+      });
+    } catch {
+      /* transient — keep the last graph */
+    } finally {
+      this._polling = false;
+    }
   }
 
   private async _load(fresh = false): Promise<void> {
@@ -106,7 +139,7 @@ export class ChorusPanel extends LitElement {
         ${this._view === "overview" && units
           ? html`<span class="count">${units} unit${units === 1 ? "" : "s"}</span>`
           : nothing}
-        <button class="refresh" @click=${() => this._load()}>Refresh</button>
+        <button class="refresh" @click=${() => this._load(true)}>Refresh</button>
       </header>
     `;
   }

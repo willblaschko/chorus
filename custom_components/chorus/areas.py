@@ -84,3 +84,22 @@ def all_area_names(hass: HomeAssistant) -> list[str]:
     """All HA Area names, sorted (so the UI can offer empty areas as move targets)."""
     area_reg = area_registry.async_get(hass)
     return sorted(area.name for area in area_reg.async_list_areas())
+
+
+def set_speaker_area(hass: HomeAssistant, uid: str, area_name: str) -> None:
+    """Reassign a Sonos speaker's device to the HA Area named `area_name`, creating
+    the area if it doesn't exist. No-op if the speaker's device can't be found.
+    Registry ops are event-loop-safe (no executor)."""
+    dev_reg = device_registry.async_get(hass)
+    area_reg = area_registry.async_get(hass)
+    entries = _sonos_media_player_entries(hass)
+    entry = entries.get(uid) or next(
+        (e for k, e in entries.items() if uid and uid in k), None
+    )
+    device_id = getattr(entry, "device_id", None)
+    if not device_id:
+        return
+    area = area_reg.async_get_area_by_name(area_name)
+    if area is None:
+        area = area_reg.async_create(area_name)
+    dev_reg.async_update_device(device_id, area_id=area.id)

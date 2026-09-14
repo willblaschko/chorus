@@ -23,6 +23,7 @@ import {
   separatePair,
   swapPair,
   dissolveHT,
+  moveSpeaker,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import "./chorus-changebar.js";
@@ -86,6 +87,7 @@ export class ChorusEditor extends LitElement {
   private _drag?: { uid: string; roomKey: string; model: string };
   @state() private _menu?: { heading: string; items: MenuItem[]; onSelect: (id: string) => void };
   @state() private _audio?: { heading: string; controls: AudioControl[] };
+  @state() private _movePick?: string; // uid of the speaker being moved
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -234,11 +236,52 @@ export class ChorusEditor extends LitElement {
   private _openSpeakerMenu(s: EditorSpeaker): void {
     this._menu = {
       heading: this._name(s),
-      items: [{ id: "identify", label: "Identify" }],
+      items: [
+        { id: "identify", label: "Identify" },
+        { id: "move", label: "Move to another room…" },
+      ],
       onSelect: (id) => {
         if (id === "identify") this._toast(`Chiming on ${this._name(s)}`);
+        else if (id === "move") this._movePick = s.uid;
       },
     };
+  }
+
+  private _doMove(uid: string, target: string): void {
+    this._working = moveSpeaker(this._rooms, uid, target);
+    this._dirty = true;
+    this._movePick = undefined;
+    this._toast(`Moved to ${target}`);
+  }
+
+  private _moveOverlay(): TemplateResult | typeof nothing {
+    if (!this._movePick) return nothing;
+    const uid = this._movePick;
+    const current = this._rooms.find((r) => r.tray.some((s) => s.uid === uid));
+    const names = new Set<string>();
+    for (const r of this._rooms) names.add(r.name);
+    for (const a of this.graph?.areas ?? []) names.add(a);
+    if (current) names.delete(current.name);
+    const targets = [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return html`
+      <div class="backdrop" @click=${() => (this._movePick = undefined)}>
+        <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="sheet-h">Move to another room</div>
+          ${targets.length
+            ? targets.map(
+                (name) => html`
+                  <button type="button" class="sheet-item" @click=${() => this._doMove(uid, name)}>
+                    <span class="rx"><b>${name}</b></span>
+                  </button>
+                `
+              )
+            : html`<div class="sheet-empty">No other rooms available.</div>`}
+          <button type="button" class="sheet-cancel" @click=${() => (this._movePick = undefined)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   private _openAudio(name: string): void {
@@ -397,6 +440,7 @@ export class ChorusEditor extends LitElement {
       </div>
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
+      ${this._moveOverlay()}
       <chorus-menu
         .open=${!!this._menu}
         .heading=${this._menu?.heading ?? ""}
