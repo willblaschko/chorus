@@ -372,7 +372,7 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
         transform: none;
       }
     }
-  `,t([gt()],Gt.prototype,"_message",void 0),t([gt()],Gt.prototype,"_visible",void 0),Gt=t([dt("chorus-toast")],Gt);const Jt={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub"};let Yt=class extends pt{constructor(){super(...arguments),this.narrow=!1,this._dirty=!1,this._applying=!1,this._rows=[]}willUpdate(t){(t.has("graph")&&!this._dirty||void 0===this._working)&&(this._working=structuredClone(St(this.graph)))}get _rooms(){return this._working??St(this.graph)}_room(){const t=this._rooms;if(this._selected){const e=t.find(t=>t.key===this._selected);if(e)return e}return this.narrow?void 0:t[0]}_plan(){return Kt(Ut(St(this.graph)),Ut(this._rooms))}_toast(t){const e=this.shadowRoot?.querySelector("chorus-toast");e?.show(t)}_assign(t,e,r){this._working=function(t,e,r,o){const s=Ot(t),i=Nt(s,e);if(!i||!i.ht)return s;const a=i.tray.findIndex(t=>t.uid===o);if(-1===a)return s;const[n]=i.tray.splice(a,1),c=i.ht.slots[r];return c&&i.tray.push(c),i.ht.slots[r]=n,i.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),s}(this._rooms,t,e,r.uid),this._dirty=!0,this._picker=void 0,this._toast(`${r.name} → ${vt[e]}`)}_clear(t,e,r){this._working=function(t,e,r){const o=Ot(t),s=Nt(o,e);if(!s||!s.ht)return o;const i=s.ht.slots[r];return i?(s.ht.slots[r]=null,s.tray.push(i),s.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),o):o}(this._rooms,t,e),this._dirty=!0,this._toast(`${r.name} removed from ${vt[e]}`)}_separate(t,e){this._working=function(t,e,r){const o=Ot(t),s=Nt(o,e);if(!s||r<0||r>=s.pairs.length)return o;const[i]=s.pairs.splice(r,1);for(const t of[i.L,i.R,i.sub])t&&s.tray.push(t);return s.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),o}(this._rooms,t,e),this._dirty=!0,this._toast("Stereo pair separated")}_discard(){this._working=structuredClone(St(this.graph)),this._dirty=!1,this._picker=void 0,this._toast("Changes discarded")}async _apply(){const t=this._plan();if(function(t){return 0===t.ops.length}(t)||this._applying)return;this._applying=!0,this._rows=t.rows,await function(t,e,r){const o=t=>t.map(t=>({summary:t.op.summary,status:t.status}));return Vt(t,e.lanes,{onUpdate:t=>r(o(t))}).then(t=>o(t))}(this.hass,t,t=>{this._rows=[...t]});const e=this._bondSignature(Ut(this._rooms)),r=await this._awaitConvergence(e),o=this._rows.filter(t=>"error"===t.status).length;this._applying=!1,this._dirty=!1,r?this.dispatchEvent(new CustomEvent("chorus-graph",{detail:r,bubbles:!0,composed:!0})):this.dispatchEvent(new CustomEvent("chorus-refresh",{bubbles:!0,composed:!0})),this._toast(o?`Applied with ${o} error${1===o?"":"s"}`:"Applied")}_bondSignature(t){return Object.keys(t).sort().map(e=>`${e}:${t[e].role}:${t[e].anchorUid}`).join(";")}async _awaitConvergence(t){let e;for(let r=0;r<5;r++){let r;try{r=await this.hass.connection.sendMessagePromise({type:"chorus/refresh"})}catch{return e}if(e=r,this._bondSignature(Ut(St(r)))===t&&this._namesResolved(r))return r;await new Promise(t=>window.setTimeout(t,1500))}return e}_namesResolved(t){return(t.units??[]).every(t=>t.members.every(t=>!!t.name&&t.name!==t.uid))}render(){const t=this._rooms;if(!t.length)return I`<div class="empty">No Sonos speakers discovered yet.</div>
+  `,t([gt()],Gt.prototype,"_message",void 0),t([gt()],Gt.prototype,"_visible",void 0),Gt=t([dt("chorus-toast")],Gt);const Jt={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub"};let Yt=class extends pt{constructor(){super(...arguments),this.narrow=!1,this._dirty=!1,this._applying=!1,this._rows=[]}willUpdate(t){(t.has("graph")&&!this._dirty||void 0===this._working)&&(this._working=structuredClone(St(this.graph)))}get _rooms(){return this._working??St(this.graph)}_room(){const t=this._rooms;if(this._selected){const e=t.find(t=>t.key===this._selected);if(e)return e}return this.narrow?void 0:t[0]}_plan(){return Kt(Ut(St(this.graph)),Ut(this._rooms))}_toast(t){const e=this.shadowRoot?.querySelector("chorus-toast");e?.show(t)}_assign(t,e,r){this._working=function(t,e,r,o){const s=Ot(t),i=Nt(s,e);if(!i||!i.ht)return s;const a=i.tray.findIndex(t=>t.uid===o);if(-1===a)return s;const[n]=i.tray.splice(a,1),c=i.ht.slots[r];return c&&i.tray.push(c),i.ht.slots[r]=n,i.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),s}(this._rooms,t,e,r.uid),this._dirty=!0,this._picker=void 0,this._toast(`${r.name} → ${vt[e]}`)}_clear(t,e,r){this._working=function(t,e,r){const o=Ot(t),s=Nt(o,e);if(!s||!s.ht)return o;const i=s.ht.slots[r];return i?(s.ht.slots[r]=null,s.tray.push(i),s.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),o):o}(this._rooms,t,e),this._dirty=!0,this._toast(`${r.name} removed from ${vt[e]}`)}_separate(t,e){this._working=function(t,e,r){const o=Ot(t),s=Nt(o,e);if(!s||r<0||r>=s.pairs.length)return o;const[i]=s.pairs.splice(r,1);for(const t of[i.L,i.R,i.sub])t&&s.tray.push(t);return s.tray.sort((t,e)=>t.name.localeCompare(e.name,void 0,{numeric:!0})),o}(this._rooms,t,e),this._dirty=!0,this._toast("Stereo pair separated")}_discard(){this._working=structuredClone(St(this.graph)),this._dirty=!1,this._picker=void 0,this._toast("Changes discarded")}async _apply(){const t=this._plan();if(function(t){return 0===t.ops.length}(t)||this._applying)return;this._applying=!0,this._rows=t.rows,await function(t,e,r){const o=t=>t.map(t=>({summary:t.op.summary,status:t.status}));return Vt(t,e.lanes,{onUpdate:t=>r(o(t))}).then(t=>o(t))}(this.hass,t,t=>{this._rows=[...t]});const e=this._bondSignature(Ut(this._rooms)),r=await this._awaitConvergence(e),o=this._rows.filter(t=>"error"===t.status).length;this._applying=!1,this._dirty=!1,r?this.dispatchEvent(new CustomEvent("chorus-graph",{detail:r,bubbles:!0,composed:!0})):this.dispatchEvent(new CustomEvent("chorus-refresh",{bubbles:!0,composed:!0})),this._toast(o?`Applied with ${o} error${1===o?"":"s"}`:"Applied")}_bondSignature(t){return Object.keys(t).sort().map(e=>`${e}:${t[e].role}:${t[e].anchorUid}`).join(";")}async _awaitConvergence(t){let e;for(let r=0;r<5;r++){let r;try{r=await this.hass.connection.sendMessagePromise({type:"chorus/refresh"})}catch{return e}if(e=r,this._bondSignature(Ut(St(r)))===t)return r;await new Promise(t=>window.setTimeout(t,1500))}return e}_name(t){return t.name&&!/^RINCON_/i.test(t.name)?t.name:Ct(t.model)||"Speaker"}render(){const t=this._rooms;if(!t.length)return I`<div class="empty">No Sonos speakers discovered yet.</div>
         <chorus-toast></chorus-toast>`;const e=this._room(),r=this._plan(),o=this._applying?this._rows:r.rows;return I`
       <div class="grid" data-detail=${e?"on":"off"}>
         <div class="col-list">
@@ -414,7 +414,7 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
         <div class="tv">${Lt}</div>
         <div class="postile bar t-bar">
           <span class="badge t-bar">${Et(e.bar.model)}</span>
-          <span class="pmeta"><b>${e.bar.name}</b><span>${Ct(e.bar.model)||"Center"}</span></span>
+          <span class="pmeta"><b>${this._name(e.bar)}</b><span>${Ct(e.bar.model)||"Center"}</span></span>
         </div>
         <div class="prow fronts">${this._pos(t,e,"LF")}${this._pos(t,e,"RF")}</div>
         <div class="lp"><div class="couch">${Pt}</div><small>Listening position</small></div>
@@ -425,7 +425,7 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
       <div class="postile">
         <span class="badge ${Jt[r]}">${Et(o.model)}</span>
         <span class="pmeta">
-          <b>${o.name}</b>
+          <b>${this._name(o)}</b>
           <span>${vt[r]} · ${Ct(o.model)}</span>
         </span>
         <button type="button" class="x" title="Remove" @click=${()=>this._clear(t.key,r,o)}>×</button>
@@ -449,7 +449,7 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
           ${this._pcSlot("R",e.R)}
         </div>
         <div class="pc-meta">
-          <b>${e.L?.name??e.R?.name??"Stereo pair"}</b>
+          <b>${e.L?this._name(e.L):e.R?this._name(e.R):"Stereo pair"}</b>
           <span>${Ct(e.L?.model??e.R?.model)} · stereo pair</span>
         </div>
         ${e.sub?I`<span class="pc-sub"><span class="pc-sub-ic">${Et(e.sub.model)}</span> Sub · ${e.sub.name}</span>`:K}
@@ -468,7 +468,7 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
     `}_speakerRow(t){return I`
       <div class="row">
         <span class="rt">${Et(t.model)}</span>
-        <span class="rx"><b>${t.name}</b><span>${Ct(t.model)}</span></span>
+        <span class="rx"><b>${this._name(t)}</b><span>${Ct(t.model)}</span></span>
       </div>
     `}_pickerOverlay(){if(!this._picker)return K;const{roomKey:t,ch:e}=this._picker,r=this._rooms.find(e=>e.key===t),o=(r?.tray??[]).filter(t=>_t(e,t.model));return I`
       <div class="backdrop" @click=${()=>this._picker=void 0}>
@@ -672,7 +672,9 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
       color: var(--secondary-text-color);
     }
     .postile {
+      box-sizing: border-box;
       min-width: 158px;
+      min-height: 62px;
       border-radius: 15px;
       background: var(--card-background-color, var(--ha-card-background));
       box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.12));
@@ -684,6 +686,9 @@ function t(t,e,r,o){var s,i=arguments.length,a=i<3?e:null===o?o=Object.getOwnPro
       position: relative;
     }
     button.postile {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
       font: inherit;
       color: var(--primary-text-color);
       text-align: left;

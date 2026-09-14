@@ -156,24 +156,19 @@ export class ChorusEditor extends LitElement {
         return last;
       }
       last = fresh;
-      // Converged only when the topology matches AND every speaker has a resolved
-      // name — a freshly-bonded satellite's name lags the bond by a beat, and we
-      // must not show its raw UID ("RINCON…").
-      if (
-        this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended &&
-        this._namesResolved(fresh)
-      ) {
-        return fresh;
-      }
+      // Converge on the bonding topology (fast + reliable). A freshly-bonded
+      // satellite's *name* can lag the bond by longer than we want to spin — but we
+      // never surface a raw UID, so the display fills the model in until the name
+      // resolves on a later background refresh.
+      if (this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended) return fresh;
       await new Promise((r) => window.setTimeout(r, 1500));
     }
     return last;
   }
 
-  private _namesResolved(graph: BondGraph): boolean {
-    return (graph.units ?? []).every((u) =>
-      u.members.every((m) => !!m.name && m.name !== m.uid)
-    );
+  // Never show a raw "RINCON_…" UID: fall back to the model while a name resolves.
+  private _name(sp: EditorSpeaker): string {
+    return sp.name && !/^RINCON_/i.test(sp.name) ? sp.name : shortModel(sp.model) || "Speaker";
   }
 
   public override render(): TemplateResult {
@@ -267,7 +262,7 @@ export class ChorusEditor extends LitElement {
         <div class="tv">${TV_ART}</div>
         <div class="postile bar t-bar">
           <span class="badge t-bar">${iconFor(ht.bar.model)}</span>
-          <span class="pmeta"><b>${ht.bar.name}</b><span>${shortModel(ht.bar.model) || "Center"}</span></span>
+          <span class="pmeta"><b>${this._name(ht.bar)}</b><span>${shortModel(ht.bar.model) || "Center"}</span></span>
         </div>
         <div class="prow fronts">${this._pos(r, ht, "LF")}${this._pos(r, ht, "RF")}</div>
         <div class="lp"><div class="couch">${COUCH_ART}</div><small>Listening position</small></div>
@@ -298,7 +293,7 @@ export class ChorusEditor extends LitElement {
       <div class="postile">
         <span class="badge ${CH_TINT[ch]}">${iconFor(sp.model)}</span>
         <span class="pmeta">
-          <b>${sp.name}</b>
+          <b>${this._name(sp)}</b>
           <span>${CHANNEL_NAME[ch]} · ${shortModel(sp.model)}</span>
         </span>
         <button type="button" class="x" title="Remove" @click=${() => this._clear(r.key, ch, sp)}>×</button>
@@ -316,7 +311,7 @@ export class ChorusEditor extends LitElement {
           ${this._pcSlot("R", p.R)}
         </div>
         <div class="pc-meta">
-          <b>${p.L?.name ?? p.R?.name ?? "Stereo pair"}</b>
+          <b>${p.L ? this._name(p.L) : p.R ? this._name(p.R) : "Stereo pair"}</b>
           <span>${shortModel(p.L?.model ?? p.R?.model)} · stereo pair</span>
         </div>
         ${p.sub
@@ -356,7 +351,7 @@ export class ChorusEditor extends LitElement {
     return html`
       <div class="row">
         <span class="rt">${iconFor(s.model)}</span>
-        <span class="rx"><b>${s.name}</b><span>${shortModel(s.model)}</span></span>
+        <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
       </div>
     `;
   }
@@ -576,7 +571,9 @@ export class ChorusEditor extends LitElement {
       color: var(--secondary-text-color);
     }
     .postile {
+      box-sizing: border-box;
       min-width: 158px;
+      min-height: 62px;
       border-radius: 15px;
       background: var(--card-background-color, var(--ha-card-background));
       box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.12));
@@ -588,6 +585,9 @@ export class ChorusEditor extends LitElement {
       position: relative;
     }
     button.postile {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
       font: inherit;
       color: var(--primary-text-color);
       text-align: left;
