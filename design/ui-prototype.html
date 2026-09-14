@@ -98,8 +98,10 @@
 
   /* ===== STAGE on a grouped card ===== */
   .stage{position:relative;padding:8px 0 10px}
-  .tv{width:min(280px,54%);height:5px;border-radius:3px;background:var(--hair-2);margin:0 auto 5px;opacity:.8}
-  .tvl{text-align:center;font-size:10.5px;color:var(--text-3);letter-spacing:.08em;margin-bottom:16px}
+  .tv{width:min(300px,60%);height:clamp(46px,8.5vw,62px);margin:2px auto 22px;border-radius:11px;position:relative;
+    background:linear-gradient(158deg,#31313a 0%,#17171c 60%,#0e0e12 100%);
+    box-shadow:0 12px 28px -14px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px var(--hair-2)}
+  .tv::before{content:"";position:absolute;inset:6px;border-radius:7px;background:radial-gradient(130% 100% at 28% 14%,rgba(125,175,255,.24),rgba(90,120,220,.05) 46%,transparent 70%)}
   .prow{display:flex;justify-content:center;gap:clamp(60px,16vw,200px)}.prow.fronts{margin-top:14px}.prow.rear{margin-top:6px}
   .psub{display:flex;justify-content:center;margin-top:12px}
   .lp{display:flex;flex-direction:column;align-items:center;gap:5px;margin:14px 0;pointer-events:none}
@@ -503,7 +505,7 @@
     head.appendChild(roomMenu(r));m.appendChild(head);
 
     var sec=el("div","sec");sec.innerHTML='<h2>Home Theater</h2><span class="sc">tap a speaker for options</span>';m.appendChild(sec);
-    var stage=el("div","stage");stage.appendChild(el("div","tv"));stage.appendChild(el("div","tvl","T V"));
+    var stage=el("div","stage");stage.appendChild(el("div","tv"));
     var b1=el("div","prow");b1.appendChild(pos(r,"CC"));stage.appendChild(b1);
     var f=el("div","prow fronts");f.appendChild(pos(r,"LF"));f.appendChild(pos(r,"RF"));stage.appendChild(f);
     var lp=el("div","lp");lp.innerHTML='<div class="r"></div><small>You</small>';stage.appendChild(lp);
