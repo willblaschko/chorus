@@ -91,7 +91,9 @@ function speakerOf(m: {
 /** Build the editor's room list from the live bond graph. */
 export function buildRooms(graph: BondGraph | undefined): Room[] {
   const units = graph?.units ?? [];
-  return units.map((u) => unitToRoom(u));
+  return units
+    .map((u) => unitToRoom(u))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
 function unitToRoom(u: BondUnit): Room {
@@ -147,5 +149,5 @@ export function availableSpeakers(graph: BondGraph | undefined): EditorSpeaker[]
   for (const u of units) {
     if (u.kind === "standalone") for (const m of u.members) out.push(speakerOf(m));
   }
-  return out;
+  return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
