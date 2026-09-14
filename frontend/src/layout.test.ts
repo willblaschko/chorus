@@ -12,7 +12,7 @@ import {
   moveSpeaker,
   setupHT,
 } from "./layout.js";
-import { computeOps } from "./apply.js";
+import { computeOps, planLanes } from "./apply.js";
 import { AVAILABLE_SUBS_KEY, setKind, type Room, type EditorSpeaker } from "./model.js";
 
 const spk = (uid: string, name: string, model = "Sonos One"): EditorSpeaker => ({
@@ -205,6 +205,32 @@ describe("location change -> service op (via computeOps)", () => {
   it("no edit -> no ops", () => {
     const before = mediaRoom();
     expect(opsFor(before, mediaRoom())).toEqual([]);
+  });
+
+  it("separate a pair AND move a half to another room emits BOTH ops (the bug)", () => {
+    const before: Room[] = [
+      {
+        key: "Guest Bedroom",
+        name: "Guest Bedroom",
+        area: "Guest Bedroom",
+        sets: [{ id: "L", primary: spk("L", "Guest Bedroom"), slots: { RF: spk("R", "Guest Bedroom") } }],
+        tray: [],
+      },
+    ];
+    const separated = separatePair(before, "Guest Bedroom", "L"); // L + R fall to the tray
+    const moved = moveSpeaker(separated, "L", "Office"); // then move L to Office
+    const ops = opsFor(before, moved);
+    // Before the fix this only emitted the separate — the move was dropped because L
+    // started as pairL (not solo).
+    expect(ops.some((o) => o.type === "separate")).toBe(true);
+    const move = ops.find((o) => o.type === "move");
+    expect(move).toBeTruthy();
+    expect(move!.service.data).toMatchObject({ speaker: "L", name: "Office" });
+    // the move must run AFTER the separate within the (shared) lane
+    const lane = planLanes(ops).find((l) => l.some((o) => o.type === "move"))!;
+    expect(lane.findIndex((o) => o.type === "separate")).toBeLessThan(
+      lane.findIndex((o) => o.type === "move")
+    );
   });
 });
 

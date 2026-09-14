@@ -9,6 +9,10 @@
 // touches; a union-find over those touch-sets falls straight out as the apply
 // plan (ops sharing a device serialise, disjoint ops run in parallel).
 
+// The available-subs pool's room key — a synthetic "room" that must not count as a
+// real move target (model.ts only imports TYPES from here, so this stays one-way).
+import { AVAILABLE_SUBS_KEY } from "./model.js";
+
 // A speaker's placement in the layout.
 export type Role =
   | "CC"
@@ -77,11 +81,12 @@ const CHANNEL_FIELD: Record<string, string> = {
 const PHASE: Record<OpType, number> = {
   separate: 0,
   remove_pair_sub: 0,
-  move: 1,
-  create_pair: 2,
-  add_ht: 2,
-  remove_ht: 2,
-  add_pair_sub: 2,
+  remove_ht: 0,
+  create_pair: 1,
+  add_ht: 1,
+  add_pair_sub: 1,
+  // Moves run LAST: a speaker must be fully unbonded before we rename/re-home it.
+  move: 2,
 };
 
 function isHTSat(p: Placement | undefined): p is Placement {
@@ -174,11 +179,19 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
     }
   }
 
-  // ── Phase 1: move a standalone speaker to another room ───────────────────────
+  // ── move a speaker to another room ───────────────────────────────────────────
+  // A speaker that ends up standalone in a DIFFERENT room than it started needs a
+  // move (rename its zone + reassign its HA area). This fires even when it started
+  // bonded (e.g. separate a pair, then move a half to another room) — the only
+  // requirement is that it's `solo` in the target and its room changed. Ordered
+  // AFTER the unbonds (see PHASE) so the speaker is freed before it's renamed.
   for (const uid of allUids) {
     const a = applied[uid];
     const b = working[uid];
-    if (a && b && a.role === "solo" && b.role === "solo" && a.room !== b.room) {
+    // Exclude the synthetic available-subs pool — a sub unbonding TO the pool (or a
+    // sub coming FROM it) is not a room move; those are handled as pairSub add/remove.
+    const poolInvolved = a?.room === AVAILABLE_SUBS_KEY || b?.room === AVAILABLE_SUBS_KEY;
+    if (a && b && b.role === "solo" && a.room !== b.room && !poolInvolved) {
       ops.push({
         type: "move",
         touches: [uid],

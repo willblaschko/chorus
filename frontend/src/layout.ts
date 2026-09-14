@@ -50,8 +50,11 @@ export function roomsToLayout(rooms: Room[]): LayoutMap {
         if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
       }
     }
+    // Tag pool subs with the stable key (not the display name) so the diff can tell
+    // "unbonded to the pool" apart from a real room move.
+    const roomLabel = r.key === AVAILABLE_SUBS_KEY ? AVAILABLE_SUBS_KEY : r.name;
     for (const s of r.tray) {
-      map[s.uid] = { room: r.name, role: "solo", anchorUid: s.uid, name: s.name };
+      map[s.uid] = { room: roomLabel, role: "solo", anchorUid: s.uid, name: s.name };
     }
   }
   return map;

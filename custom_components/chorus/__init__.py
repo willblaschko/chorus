@@ -215,8 +215,17 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
 
     # --- move (rename the zone == move to another room) -------------------
     async def move(call: ServiceCall) -> None:
-        speaker = resolve(call.data["speaker"])
+        ident = call.data["speaker"]
         name = call.data["name"]
+        # A speaker moved right after being separated from a pair/HT may not be in
+        # soco.discover yet — resolve its IP by UID against a fresh topology.
+        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
+        if not speaker:
+            seed = next(iter(coordinator.players.values()), None)
+            if not seed:
+                raise HomeAssistantError("No Sonos speakers available to query")
+            ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
+            speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
         await run(backend.set_zone_name, speaker["ip"], name)
         # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
         set_speaker_area(hass, speaker["uid"], name)
