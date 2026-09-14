@@ -379,10 +379,8 @@ export class ChorusEditor extends LitElement {
 
     /* ---- stage ---- */
     .stage {
-      background: var(--card-background-color, var(--ha-card-background));
-      border: 1px solid var(--divider-color);
-      border-radius: 18px;
-      padding: 18px 16px 22px;
+      /* sits on the page background — only the tiles are cards */
+      padding: 8px 0 18px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -402,7 +400,8 @@ export class ChorusEditor extends LitElement {
       fill: currentColor;
     }
     .paper {
-      fill: var(--card-background-color, #fff);
+      /* the art's cut-outs blend with the page background the stage sits on */
+      fill: var(--primary-background-color, var(--card-background-color, #fff));
     }
     .prow {
       display: flex;
