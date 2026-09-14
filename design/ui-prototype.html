@@ -197,13 +197,13 @@
   .ov-tip .ti svg{width:22px;height:22px}
   .ov-tip .tt b{display:block;font-size:14px;font-weight:600;margin-bottom:1px}
   .ov-tip .tt span{font-size:12.5px;color:var(--text-2);line-height:1.45}
-  .sheet{background:var(--card);border-radius:20px;box-shadow:0 30px 90px -24px rgba(0,0,0,.55);width:300px;max-width:90vw;padding:8px}
-  .sheet .sh-h{text-align:center;padding:12px 10px 9px}
-  .sheet .sh-h b{font-size:15px;font-weight:600}.sheet .sh-h span{display:block;font-size:11.5px;font-family:var(--mono);color:var(--text-2);margin-top:1px}
+  .sheet{background:var(--card);border-radius:20px;box-shadow:0 30px 90px -24px rgba(0,0,0,.55);width:344px;max-width:92vw;padding:8px}
+  .sheet .sh-h{text-align:center;padding:13px 10px 10px}
+  .sheet .sh-h b{font-size:16px;font-weight:600;letter-spacing:-.01em}.sheet .sh-h span{display:block;font-size:12.5px;color:var(--text-2);margin-top:3px}
   .sheet button{display:flex;align-items:center;gap:12px;width:100%;border:none;background:none;font:inherit;font-size:15px;color:var(--text);padding:12px 14px;border-radius:12px;cursor:pointer;text-align:left}
   .sheet button:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
   .sheet button svg{width:19px;height:19px;color:var(--text-2);flex:none}
-  .sheet .ai-txt{display:flex;flex-direction:column;line-height:1.25}.sheet .ai-nm{font-size:15px}.sheet .ai-sub{font-size:11.5px;font-family:var(--mono);color:var(--text-3)}
+  .sheet .ai-txt{display:flex;flex-direction:column;gap:2px;line-height:1.3}.sheet .ai-nm{font-size:15px}.sheet .ai-sub{font-size:12.5px;color:var(--text-3)}
   .sheet button.danger{color:var(--danger)}.sheet button.danger svg{color:var(--danger)}
   .sheet button.cancel{justify-content:center;font-weight:600;background:var(--tile);margin-top:5px}
   .sw{position:relative;width:44px;height:26px;flex:none}
@@ -385,7 +385,7 @@
   function nameTaken(name){var n=(name||"").trim().toLowerCase();if(!n)return false;var t=false;Object.keys(rooms).forEach(function(k){if(rooms[k].name.toLowerCase()===n)t=true});haAreas.forEach(function(a){if(a.toLowerCase()===n)t=true});return t;}
   function pickSpace(d){var used={};Object.keys(rooms).forEach(function(k){used[rooms[k].name.toLowerCase()]=1});
     var unused=haAreas.filter(function(a){return !used[a.toLowerCase()]});
-    var items=unused.map(function(a){return {label:a,sub:"Home Assistant area · no Sonos yet",icon:AREA_IC,fn:function(){createRoomWith(d,a)}}});
+    var items=unused.map(function(a){return {label:a,sub:"No Sonos yet",icon:AREA_IC,fn:function(){createRoomWith(d,a)}}});
     items.push({label:"Create a new space…",icon:PLUS_IC,fn:function(){nameModal({title:"New space",message:"Name a new area for "+d.sp.name,placeholder:"Area name",confirmLabel:"Create",onConfirm:function(name){if(nameTaken(name)){toast("“"+name.trim()+"” already exists");return;}createRoomWith(d,name);}})}});
     actionSheet("Move "+d.sp.name+" to…","Pick a Home Assistant space",items);}
   function nameModal(opts){var back=el("div","modal-back"),modal=el("div","modal");
