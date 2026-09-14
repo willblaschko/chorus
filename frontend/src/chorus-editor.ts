@@ -3,23 +3,18 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { BondGraph } from "./types.js";
 import {
   buildRooms,
-  availableSpeakers,
   CHANNELS,
   CHANNEL_NAME,
   type Channel,
   type Room,
+  type HTLayout,
+  type EditorPair,
   type EditorSpeaker,
 } from "./model.js";
 import { iconFor, shortModel } from "./icons.js";
 import { TV_ART, COUCH_ART } from "./art.js";
 
-const KIND_LABEL: Record<string, string> = {
-  home_theater: "Home theater",
-  stereo_pair: "Stereo pair",
-  standalone: "Standalone",
-};
-
-// Channel -> tint class on the position tile.
+// Channel -> tint class on the position tile / badge.
 const CH_TINT: Record<Channel, string> = {
   LF: "t-front",
   RF: "t-front",
@@ -30,10 +25,11 @@ const CH_TINT: Record<Channel, string> = {
 
 /**
  * The primary editor view (read-only structure + full styling).
- * Master-detail: room list -> selected room detail. Home theaters render a spatial
- * stage (TV art, tinted front/rear/sub position tiles, listening-position couch);
- * pairs render pair cards; standalones render speaker rows. Drag/drop + tap-to-assign
- * + staged Apply land next, on top of this same layout.
+ * Master-detail: a room list (grouped by HA Area) -> the selected room's detail.
+ * A room may hold a home-theater stage (TV art + tinted Front/Rear/Sub tiles +
+ * listening-position couch), stereo-pair cards, and its lone speakers (the pool
+ * available to bond — scoped to this room's area). Drag/drop + tap-to-assign + a
+ * staged Apply land on top of this same layout next.
  */
 @customElement("chorus-editor")
 export class ChorusEditor extends LitElement {
@@ -52,8 +48,6 @@ export class ChorusEditor extends LitElement {
       const found = rooms.find((r) => r.key === this._selected);
       if (found) return found;
     }
-    // Desktop shows the first room by default (two-pane); mobile starts on the
-    // list, so "‹ All rooms" (which clears _selected) actually returns to it.
     return this.narrow ? undefined : rooms[0];
   }
 
@@ -76,13 +70,12 @@ export class ChorusEditor extends LitElement {
 
   // ---- room list ------------------------------------------------------
   private _roomGlyphModel(r: Room): string {
-    if (r.kind === "home_theater") return r.bar?.model ?? "";
-    return r.pairs?.[0]?.L?.model ?? r.tray?.[0]?.model ?? "";
+    return r.ht?.bar.model ?? r.pairs[0]?.L?.model ?? r.tray[0]?.model ?? "";
   }
 
   private _roomTint(r: Room): string {
-    if (r.kind === "home_theater") return "t-bar";
-    if (r.kind === "stereo_pair") return "t-front";
+    if (r.ht) return "t-bar";
+    if (r.pairs.length) return "t-front";
     return "t-neutral";
   }
 
@@ -101,13 +94,15 @@ export class ChorusEditor extends LitElement {
   }
 
   private _roomSummary(r: Room): string {
-    if (r.kind === "home_theater") {
-      const n = CHANNELS.filter((c) => c !== "SW" && r.slots?.[c]).length;
-      return `Home theater · ${n}.${r.slots?.SW ? "1" : "0"}`;
+    const parts: string[] = [];
+    if (r.ht) {
+      const n = CHANNELS.filter((c) => c !== "SW" && r.ht!.slots[c]).length;
+      parts.push(`Home theater · ${n}.${r.ht.slots.SW ? "1" : "0"}`);
     }
-    if (r.kind === "stereo_pair") return "Stereo pair";
-    const n = r.tray?.length ?? 0;
-    return n === 1 ? "1 speaker" : `${n} speakers`;
+    if (r.pairs.length) parts.push(r.pairs.length === 1 ? "Stereo pair" : `${r.pairs.length} pairs`);
+    const solo = r.tray.length;
+    if (solo && !r.ht) parts.push(solo === 1 ? "1 speaker" : `${solo} speakers`);
+    return parts.join(" · ") || "No speakers";
   }
 
   // ---- detail ---------------------------------------------------------
@@ -120,45 +115,34 @@ export class ChorusEditor extends LitElement {
         : nothing}
       <div class="head">
         <h1>${r.name}</h1>
-        <span class="kind">${KIND_LABEL[r.kind] ?? r.kind}</span>
+        ${r.area ? nothing : html`<span class="kind">No HA area</span>`}
       </div>
-      ${r.kind === "home_theater"
-        ? this._htDetail(r)
-        : r.kind === "stereo_pair"
-          ? this._pairDetail(r)
-          : this._soloDetail(r)}
+      ${r.ht ? this._htStage(r.ht) : nothing}
+      ${r.pairs.length
+        ? html`<div class="paircards">${r.pairs.map((p) => this._pairCard(p))}</div>`
+        : nothing}
+      ${this._traySection(r)}
     `;
   }
 
-  private _htDetail(r: Room): TemplateResult {
+  private _htStage(ht: HTLayout): TemplateResult {
     return html`
       <div class="stage">
         <div class="tv">${TV_ART}</div>
-        ${this._barTile(r)}
-        <div class="prow fronts">${this._pos(r, "LF")}${this._pos(r, "RF")}</div>
+        <div class="postile bar t-bar">
+          <span class="badge t-bar">${iconFor(ht.bar.model)}</span>
+          <span class="pmeta"><b>${ht.bar.name}</b><span>${shortModel(ht.bar.model) || "Center"}</span></span>
+        </div>
+        <div class="prow fronts">${this._pos(ht, "LF")}${this._pos(ht, "RF")}</div>
         <div class="lp"><div class="couch">${COUCH_ART}</div><small>Listening position</small></div>
-        <div class="prow rear">${this._pos(r, "LR")}${this._pos(r, "RR")}</div>
-        <div class="psub">${this._pos(r, "SW")}</div>
-      </div>
-      ${this._availablePanel()}
-    `;
-  }
-
-  private _barTile(r: Room): TemplateResult {
-    return html`
-      <div class="postile bar t-bar">
-        <span class="badge t-bar">${iconFor(r.bar?.model)}</span>
-        <span class="pmeta">
-          <b>${r.bar?.name ?? "Soundbar"}</b>
-          <span>${shortModel(r.bar?.model) || "Center"}</span>
-        </span>
+        <div class="prow rear">${this._pos(ht, "LR")}${this._pos(ht, "RR")}</div>
+        <div class="psub">${this._pos(ht, "SW")}</div>
       </div>
     `;
   }
 
-  private _pos(r: Room, ch: Channel): TemplateResult {
-    const sp = r.slots?.[ch] ?? null;
-    const tint = CH_TINT[ch];
+  private _pos(ht: HTLayout, ch: Channel): TemplateResult {
+    const sp = ht.slots[ch];
     if (!sp) {
       return html`
         <div class="postile empty">
@@ -169,7 +153,7 @@ export class ChorusEditor extends LitElement {
     }
     return html`
       <div class="postile">
-        <span class="badge ${tint}">${iconFor(sp.model)}</span>
+        <span class="badge ${CH_TINT[ch]}">${iconFor(sp.model)}</span>
         <span class="pmeta">
           <b>${sp.name}</b>
           <span>${CHANNEL_NAME[ch]} · ${shortModel(sp.model)}</span>
@@ -179,13 +163,7 @@ export class ChorusEditor extends LitElement {
   }
 
   // ---- pairs ----------------------------------------------------------
-  private _pairDetail(r: Room): TemplateResult {
-    const pairs = r.pairs ?? [];
-    if (!pairs.length) return this._soloDetail(r);
-    return html`<div class="paircards">${pairs.map((p) => this._pairCard(p))}</div>`;
-  }
-
-  private _pairCard(p: { L: EditorSpeaker | null; R: EditorSpeaker | null; sub: EditorSpeaker | null }): TemplateResult {
+  private _pairCard(p: EditorPair): TemplateResult {
     return html`
       <div class="paircard">
         <div class="pc-orbs">
@@ -215,11 +193,17 @@ export class ChorusEditor extends LitElement {
     `;
   }
 
-  // ---- solos + available ---------------------------------------------
-  private _soloDetail(r: Room): TemplateResult {
-    const solos = r.tray ?? [];
-    if (!solos.length) return html`<div class="empty">No speakers in this room.</div>`;
-    return html`<div class="rows">${solos.map((s) => this._speakerRow(s))}</div>`;
+  // ---- lone speakers / available pool --------------------------------
+  private _traySection(r: Room): TemplateResult | typeof nothing {
+    if (!r.tray.length) {
+      // Only call it "empty" when the whole room is empty.
+      return r.ht || r.pairs.length ? nothing : html`<div class="empty">No speakers in this room.</div>`;
+    }
+    const heading = r.ht || r.pairs.length ? "Available speakers" : "Speakers";
+    return html`
+      <div class="sec">${heading}</div>
+      <div class="rows">${r.tray.map((s) => this._speakerRow(s))}</div>
+    `;
   }
 
   private _speakerRow(s: EditorSpeaker): TemplateResult {
@@ -228,16 +212,6 @@ export class ChorusEditor extends LitElement {
         <span class="rt">${iconFor(s.model)}</span>
         <span class="rx"><b>${s.name}</b><span>${shortModel(s.model)}</span></span>
       </div>
-    `;
-  }
-
-  private _availablePanel(): TemplateResult {
-    const avail = availableSpeakers(this.graph);
-    return html`
-      <div class="sec">Available speakers</div>
-      ${avail.length
-        ? html`<div class="rows">${avail.map((s) => this._speakerRow(s))}</div>`
-        : html`<div class="empty small">Every speaker is in use.</div>`}
     `;
   }
 
@@ -377,9 +351,8 @@ export class ChorusEditor extends LitElement {
       color: var(--secondary-text-color);
     }
 
-    /* ---- stage ---- */
+    /* ---- stage (sits on the page background; only tiles are cards) ---- */
     .stage {
-      /* sits on the page background — only the tiles are cards */
       padding: 8px 0 18px;
       display: flex;
       flex-direction: column;
@@ -400,7 +373,6 @@ export class ChorusEditor extends LitElement {
       fill: currentColor;
     }
     .paper {
-      /* the art's cut-outs blend with the page background the stage sits on */
       fill: var(--primary-background-color, var(--card-background-color, #fff));
     }
     .prow {
@@ -492,6 +464,7 @@ export class ChorusEditor extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 12px;
+      margin-top: 8px;
     }
     .paircard {
       display: flex;
@@ -609,10 +582,6 @@ export class ChorusEditor extends LitElement {
       text-align: center;
       color: var(--secondary-text-color);
       font-size: 15px;
-    }
-    .empty.small {
-      padding: 16px;
-      font-size: 13px;
     }
     @media (max-width: 800px) {
       .grid {

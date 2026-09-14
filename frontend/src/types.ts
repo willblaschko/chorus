@@ -41,10 +41,12 @@ export interface BondPlayer {
   ip: string;
   name: string;
   model: string;
+  area?: string | null;
 }
 
 /** Result of the chorus/bond_graph websocket command. */
 export interface BondGraph {
   units: BondUnit[];
   players: BondPlayer[];
+  areas?: string[]; // all HA Area names (for offering empty areas as move targets)
 }

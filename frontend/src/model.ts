@@ -1,7 +1,7 @@
 // Editor data model: capability registry + bond-graph -> editable rooms.
 // Pure functions (no DOM, no hass) so they're unit-testable and reused by the UI.
 
-import type { BondGraph, BondUnit, UnitKind } from "./types.js";
+import type { BondGraph, BondUnit } from "./types.js";
 
 export type Channel = "LF" | "RF" | "LR" | "RR" | "SW";
 export const CHANNELS: Channel[] = ["LF", "RF", "LR", "RR", "SW"];
@@ -69,14 +69,25 @@ export interface EditorPair {
   sub: EditorSpeaker | null;
 }
 
+/** A home theater within a room: one soundbar (CC) + channel positions. */
+export interface HTLayout {
+  bar: EditorSpeaker;
+  slots: Record<Channel, EditorSpeaker | null>;
+}
+
+/**
+ * A room == a Home Assistant Area. It may hold at most one home theater, any
+ * number of stereo pairs, and lone speakers (`tray`). The tray is the pool of
+ * speakers in THIS area that can be bonded into the HT/pairs — bonding across
+ * areas requires moving the speaker into the area first.
+ */
 export interface Room {
-  key: string; // stable id (the primary uid)
+  key: string; // HA Area name, or the zone name when a unit has no area
   name: string;
-  kind: UnitKind;
-  bar?: EditorSpeaker; // home theater only
-  slots?: Record<Channel, EditorSpeaker | null>; // home theater only
-  pairs?: EditorPair[]; // stereo_pair / standalone container
-  tray?: EditorSpeaker[]; // solo speakers living in this room
+  area: string | null; // the HA Area (null when the speaker isn't assigned one)
+  ht: HTLayout | null;
+  pairs: EditorPair[];
+  tray: EditorSpeaker[];
 }
 
 function speakerOf(m: {
@@ -88,66 +99,70 @@ function speakerOf(m: {
   return { uid: m.uid, name: m.name || m.uid, model: m.model || "", ip: m.ip };
 }
 
-/** Build the editor's room list from the live bond graph. */
-export function buildRooms(graph: BondGraph | undefined): Room[] {
-  const units = graph?.units ?? [];
-  return units
-    .map((u) => unitToRoom(u))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+function unitArea(u: BondUnit): string | null {
+  const primary = u.members.find((m) => m.is_primary) ?? u.members[0];
+  return primary?.area ?? null;
 }
 
-function unitToRoom(u: BondUnit): Room {
-  if (u.kind === "home_theater") {
-    const slots: Record<Channel, EditorSpeaker | null> = {
-      LF: null,
-      RF: null,
-      LR: null,
-      RR: null,
-      SW: null,
-    };
-    let bar: EditorSpeaker | undefined;
-    for (const m of u.members) {
-      if (m.channel === "CC") bar = speakerOf(m);
-      else if (m.channel && (CHANNELS as string[]).includes(m.channel)) {
-        slots[m.channel as Channel] = speakerOf(m);
-      }
+function htLayout(u: BondUnit): HTLayout {
+  const slots: Record<Channel, EditorSpeaker | null> = {
+    LF: null,
+    RF: null,
+    LR: null,
+    RR: null,
+    SW: null,
+  };
+  let bar: EditorSpeaker | undefined;
+  for (const m of u.members) {
+    if (m.channel === "CC") bar = speakerOf(m);
+    else if (m.channel && (CHANNELS as string[]).includes(m.channel)) {
+      slots[m.channel as Channel] = speakerOf(m);
     }
-    return { key: u.primary_uid, name: u.name, kind: u.kind, bar, slots, tray: [] };
   }
-  if (u.kind === "stereo_pair") {
-    const L = u.members.find((m) => m.channel === "LF") ?? u.members[0];
-    const R = u.members.find((m) => m.channel === "RF") ?? u.members[1];
-    const sub = u.members.find((m) => m.channel === "SW") ?? null;
-    return {
-      key: u.primary_uid,
-      name: u.name,
-      kind: u.kind,
-      pairs: [
-        {
-          L: L ? speakerOf(L) : null,
-          R: R ? speakerOf(R) : null,
-          sub: sub ? speakerOf(sub) : null,
-        },
-      ],
-      tray: [],
-    };
-  }
-  // standalone
+  return { bar: bar ?? speakerOf(u.members[0]), slots };
+}
+
+function pairOf(u: BondUnit): EditorPair {
+  const L = u.members.find((m) => m.channel === "LF") ?? u.members[0];
+  const R = u.members.find((m) => m.channel === "RF") ?? u.members[1];
+  const sub = u.members.find((m) => m.channel === "SW") ?? null;
   return {
-    key: u.primary_uid,
-    name: u.name,
-    kind: u.kind,
-    pairs: [],
-    tray: u.members.map(speakerOf),
+    L: L ? speakerOf(L) : null,
+    R: R ? speakerOf(R) : null,
+    sub: sub ? speakerOf(sub) : null,
   };
 }
 
-/** Every standalone speaker on the system — the pool that can be dragged into a layout. */
-export function availableSpeakers(graph: BondGraph | undefined): EditorSpeaker[] {
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name, undefined, { numeric: true });
+
+/**
+ * Group the live bond graph into rooms by HA Area. Units whose primary speaker has
+ * no area fall back to their own zone name as the room key, so nothing is dropped.
+ */
+export function buildRooms(graph: BondGraph | undefined): Room[] {
   const units = graph?.units ?? [];
-  const out: EditorSpeaker[] = [];
+  const byKey = new Map<string, Room>();
+  const order: string[] = [];
   for (const u of units) {
-    if (u.kind === "standalone") for (const m of u.members) out.push(speakerOf(m));
+    const area = unitArea(u);
+    const key = area ?? u.name;
+    let room = byKey.get(key);
+    if (!room) {
+      room = { key, name: area ?? u.name, area, ht: null, pairs: [], tray: [] };
+      byKey.set(key, room);
+      order.push(key);
+    }
+    if (u.kind === "home_theater") {
+      // An area with two soundbars is unusual; keep the first, ignore extras.
+      if (!room.ht) room.ht = htLayout(u);
+    } else if (u.kind === "stereo_pair") {
+      room.pairs.push(pairOf(u));
+    } else {
+      for (const m of u.members) room.tray.push(speakerOf(m));
+    }
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const rooms = order.map((k) => byKey.get(k)!);
+  for (const r of rooms) r.tray.sort(byName);
+  return rooms.sort(byName);
 }
