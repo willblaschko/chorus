@@ -22,6 +22,7 @@ import {
   assignToChannel,
   clearChannel,
   assignSubToChannel,
+  bondSubToSpeaker,
   createPair,
   separatePair,
   swapPair,
@@ -89,6 +90,9 @@ export class ChorusEditor extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) public graph?: BondGraph;
   @property({ type: Boolean }) public narrow = false;
+  /** Room KEY to select on entry (e.g. clicking a room's edit pencil on the Overview
+   * page). The host sets this + switches to the editor view; we select that room. */
+  @property({ attribute: false }) public selectRoom?: string;
 
   @state() private _selected?: string;
   @state() private _working?: Room[]; // staged edits (undefined until synced from graph)
@@ -135,6 +139,10 @@ export class ChorusEditor extends LitElement {
     // (the coordinator refreshes every 30s; that must not wipe your in-progress work).
     if ((changed.has("graph") && !this._dirty) || this._working === undefined) {
       this._working = structuredClone(buildRooms(this.graph));
+    }
+    // Host asked to open a specific room (e.g. the Overview edit pencil).
+    if (changed.has("selectRoom") && this.selectRoom) {
+      this._selected = this.selectRoom;
     }
   }
 
@@ -312,18 +320,40 @@ export class ChorusEditor extends LitElement {
     };
   }
 
-  private _openSpeakerMenu(s: EditorSpeaker): void {
+  private _openSpeakerMenu(s: EditorSpeaker, roomKey: string): void {
+    const canAddSub = !isBar(s.model) && this._availableSubs().length > 0;
+    const items: MenuItem[] = [{ id: "identify", label: "Identify" }];
+    if (canAddSub) items.push({ id: "addsub", label: "Add a sub" });
+    items.push({ id: "rename", label: "Rename" }, { id: "move", label: "Move to another room" });
     this._menu = {
       heading: this._name(s),
-      items: [
-        { id: "identify", label: "Identify" },
-        { id: "rename", label: "Rename…" },
-        { id: "move", label: "Move to another room…" },
-      ],
+      items,
       onSelect: (id) => {
         if (id === "identify") this._toast(`Chiming on ${this._name(s)}`);
-        else if (id === "rename") this._renameFor = { uid: s.uid, current: this._name(s) };
+        else if (id === "addsub") {
+          const sub = this._availableSubs()[0];
+          if (sub) {
+            this._working = bondSubToSpeaker(this._rooms, roomKey, s.uid, sub.uid);
+            this._dirty = true;
+            this._toast(`${this._name(sub)} → ${CHANNEL_NAME.SW}`);
+          }
+        } else if (id === "rename") this._renameFor = { uid: s.uid, current: this._name(s) };
         else if (id === "move") this._movePick = s.uid;
+      },
+    };
+  }
+
+  private _openSpeakerSetMenu(r: Room, set: BondedSet): void {
+    this._menu = {
+      heading: this._name(set.primary),
+      items: [{ id: "removesub", label: "Remove sub" }],
+      onSelect: (id) => {
+        if (id === "removesub") {
+          // separatePair dissolves the set: speaker back to the tray, sub to the pool.
+          this._working = separatePair(this._rooms, r.key, set.id);
+          this._dirty = true;
+          this._toast("Sub removed");
+        }
       },
     };
   }
@@ -582,17 +612,6 @@ export class ChorusEditor extends LitElement {
         </div>
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
-      ${this._applying
-        ? html`<div class="settling">
-            <div class="settling-txt">${this._settleView?.label ?? "Finishing up..."}</div>
-            <div class="settling-track">
-              <div
-                class="settling-fill"
-                style="width:${Math.round((this._settleView?.ratio ?? 0.1) * 100)}%"
-              ></div>
-            </div>
-          </div>`
-        : nothing}
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
       ${this._moveOverlay()}
@@ -614,6 +633,8 @@ export class ChorusEditor extends LitElement {
       <chorus-changebar
         .rows=${rows}
         .busy=${this._applying}
+        .statusLabel=${this._settleView?.label ?? ""}
+        .progress=${this._settleView?.ratio ?? -1}
         @apply=${this._apply}
         @discard=${this._discard}
       ></chorus-changebar>
@@ -633,7 +654,7 @@ export class ChorusEditor extends LitElement {
     return r.sets.filter((s) => setKind(s) === "speaker");
   }
 
-  private _speakerSetCard(set: BondedSet): TemplateResult {
+  private _speakerSetCard(r: Room, set: BondedSet): TemplateResult {
     const sub = set.slots.SW ?? null;
     return html`
       <div class="paircard">
@@ -645,6 +666,8 @@ export class ChorusEditor extends LitElement {
         ${sub
           ? html`<span class="pc-sub"><span class="pc-sub-ic">${iconFor(sub.model)}</span> Sub · ${sub.name}</span>`
           : nothing}
+        <span class="grow"></span>
+        ${sub ? this._dots(() => this._openSpeakerSetMenu(r, set)) : nothing}
       </div>
     `;
   }
@@ -691,6 +714,7 @@ export class ChorusEditor extends LitElement {
   private _detail(r: Room): TemplateResult {
     const ht = this._htSet(r);
     const pairs = this._pairSets(r);
+    const speakerSets = this._speakerSets(r);
     return html`
       ${this.narrow
         ? html`<button type="button" class="back" @click=${() => (this._selected = undefined)}>
@@ -704,14 +728,17 @@ export class ChorusEditor extends LitElement {
         ${ht ? this._dots(() => this._openRoomMenu(r, ht)) : nothing}
       </div>
       ${this._availableSubsStrip(r)}
+      ${ht ? html`<div class="sec">Home theater</div>` : nothing}
       ${ht ? this._htStage(r, ht) : this._setupCta(r)}
       ${pairs.length
-        ? html`<div class="paircards">${pairs.map((set) => this._pairCard(r, set))}</div>`
+        ? html`<div class="sec">${pairs.length === 1 ? "Stereo pair" : "Stereo pairs"}</div>
+            <div class="paircards">${pairs.map((set) => this._pairCard(r, set))}</div>`
         : nothing}
-      ${this._speakerSets(r).length
-        ? html`<div class="paircards">
-            ${this._speakerSets(r).map((set) => this._speakerSetCard(set))}
-          </div>`
+      ${speakerSets.length
+        ? html`<div class="sec">${speakerSets.length === 1 ? "Speaker + sub" : "Speakers + sub"}</div>
+            <div class="paircards">
+              ${speakerSets.map((set) => this._speakerSetCard(r, set))}
+            </div>`
         : nothing}
       ${this._traySection(r)}
     `;
@@ -772,13 +799,16 @@ export class ChorusEditor extends LitElement {
     const bar = set.primary;
     return html`
       <div class="stage">
-        <div class="tv">${TV_ART}</div>
+        <div class="tv">
+          <div class="tv-art">${TV_ART}</div>
+          <small>Television</small>
+        </div>
         <div class="postile bar t-bar">
           <span class="badge t-bar">${iconFor(bar.model)}</span>
           <span class="pmeta"><b>${this._name(bar)}</b><span>${shortModel(bar.model) || "Center"}</span></span>
         </div>
         <div class="prow fronts">${this._pos(r, set, "LF")}${this._pos(r, set, "RF")}</div>
-        <div class="lp"><div class="couch">${COUCH_ART}</div><small>Listening position</small></div>
+        <div class="lp"><small>Listening position</small><div class="couch">${COUCH_ART}</div></div>
         <div class="prow rear">${this._pos(r, set, "LR")}${this._pos(r, set, "RR")}</div>
         <div class="psub">${this._pos(r, set, "SW")}</div>
       </div>
@@ -833,8 +863,8 @@ export class ChorusEditor extends LitElement {
       >
         <span class="badge ${CH_TINT[ch]}">${iconFor(sp.model)}</span>
         <span class="pmeta">
-          <b>${this._name(sp)}</b>
-          <span>${CHANNEL_NAME[ch]} · ${shortModel(sp.model)}</span>
+          <b>${this._name(sp)} <span class="pos">(${CHANNEL_NAME[ch]})</span></b>
+          <span>${shortModel(sp.model)}</span>
         </span>
         <button type="button" class="x" title="Remove" @click=${() => this._clear(r.key, set.id, ch, sp)}>×</button>
       </div>
@@ -918,7 +948,7 @@ export class ChorusEditor extends LitElement {
         <span class="rt">${iconFor(s.model)}</span>
         <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
         <span class="grow"></span>
-        ${this._dots(() => this._openSpeakerMenu(s))}
+        ${this._dots(() => this._openSpeakerMenu(s, roomKey))}
       </div>
     `;
   }
@@ -1144,15 +1174,25 @@ export class ChorusEditor extends LitElement {
       align-items: center;
     }
     .tv {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--secondary-text-color);
+      margin-bottom: 24px;
+    }
+    .tv-art {
       width: 210px;
       max-width: 60%;
-      color: var(--secondary-text-color);
-      margin-bottom: 6px;
     }
     .tv svg {
       width: 100%;
       height: auto;
       display: block;
+    }
+    .tv small {
+      font-size: 11px;
+      color: var(--secondary-text-color);
     }
     .ink {
       fill: currentColor;
@@ -1162,10 +1202,16 @@ export class ChorusEditor extends LitElement {
     }
     .prow {
       display: flex;
-      gap: 44px;
+      gap: 24px;
       justify-content: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap; /* L/R must never stack — shrink + truncate instead */
       margin-top: 12px;
+    }
+    /* In a row, the two tiles share the width and shrink (min-width:0 lets the
+       subtitle truncate) rather than wrapping to a stack. */
+    .prow .postile {
+      flex: 1 1 0;
+      min-width: 0;
     }
     .psub {
       margin-top: 12px;
@@ -1174,8 +1220,8 @@ export class ChorusEditor extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
-      margin: 16px 0 4px;
+      gap: 6px;
+      margin: 28px 0;
     }
     .lp .couch {
       width: 150px;
@@ -1313,9 +1359,19 @@ export class ChorusEditor extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .pmeta span {
+    /* The position, small + muted, on the same line as the (big) room name. */
+    .pmeta b .pos {
+      font-weight: 400;
       font-size: 12px;
       color: var(--secondary-text-color);
+    }
+    .pmeta span {
+      display: block;
+      font-size: 12px;
+      color: var(--secondary-text-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .x {
       position: absolute;

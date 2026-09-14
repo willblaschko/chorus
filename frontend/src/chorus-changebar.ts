@@ -27,6 +27,13 @@ export class ChorusChangebar extends LitElement {
   /** true while the host is applying the staged changes */
   @property({ type: Boolean }) public busy = false;
 
+  /** live status string shown in the head during apply, e.g.
+   *  "Reconnecting TV Left, TV Right… (1 of 2)". Falls back to "Applying…". */
+  @property({ attribute: false }) public statusLabel = "";
+
+  /** apply progress in [0, 1]; a NEGATIVE value means indeterminate (unknown). */
+  @property({ type: Number }) public progress = -1;
+
   /** whether the details list is expanded (collapsed by default) */
   @state() private open = false;
 
@@ -76,6 +83,10 @@ export class ChorusChangebar extends LitElement {
 
     const expanded = this.busy || this.open;
     const countLabel = `${n} pending change${n === 1 ? "" : "s"}`;
+    // While applying, the head reports live status instead of a static count.
+    const headLabel = this.busy ? this.statusLabel || "Applying…" : countLabel;
+    const determinate = this.progress >= 0;
+    const pct = Math.max(0, Math.min(1, this.progress)) * 100;
 
     return html`
       <div
@@ -92,7 +103,7 @@ export class ChorusChangebar extends LitElement {
             aria-expanded=${expanded ? "true" : "false"}
           >
             <span class="dot"></span>
-            <b>${countLabel}</b>
+            <b>${headLabel}</b>
             ${this.busy
               ? nothing
               : html`<span class="tog">${this.open ? "Hide" : "Details"}</span>`}
@@ -130,6 +141,24 @@ export class ChorusChangebar extends LitElement {
             `,
           )}
         </div>
+
+        ${this.busy
+          ? html`
+              <div
+                class="progress ${determinate ? "determinate" : "indeterminate"}"
+                role="progressbar"
+                aria-label="Apply progress"
+                aria-valuemin="0"
+                aria-valuemax=${determinate ? "100" : nothing}
+                aria-valuenow=${determinate ? Math.round(pct) : nothing}
+              >
+                <span
+                  class="progress-fill"
+                  style=${determinate ? `width:${pct}%` : nothing}
+                ></span>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }
@@ -360,9 +389,51 @@ export class ChorusChangebar extends LitElement {
       opacity: 0.5;
     }
 
+    /* Inline apply-progress strip: a thin footer inside the card (never
+       floating). Track uses the divider color; fill uses the theme accent. */
+    .progress {
+      position: relative;
+      height: 4px;
+      margin: 0 16px 12px;
+      border-radius: 999px;
+      background: var(--divider-color);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      border-radius: inherit;
+      background: var(--primary-color);
+    }
+
+    /* Determinate: fill width is driven by inline style; animate between
+       updates so the bar glides rather than jumps. */
+    .progress.determinate .progress-fill {
+      width: 0;
+      transition: width 0.3s ease;
+    }
+
+    /* Indeterminate: a short segment sweeps left→right on repeat. */
+    .progress.indeterminate .progress-fill {
+      width: 35%;
+      animation: cb-sweep 1.2s ease-in-out infinite;
+    }
+
     @keyframes spin {
       to {
         transform: rotate(360deg);
+      }
+    }
+
+    @keyframes cb-sweep {
+      0% {
+        left: -35%;
+      }
+      100% {
+        left: 100%;
       }
     }
 
@@ -370,6 +441,17 @@ export class ChorusChangebar extends LitElement {
       .apply-spin,
       .state.running {
         animation: none;
+      }
+      /* No sweep: show a static, subtly-filled bar so the strip still reads
+         as "in progress" without motion. */
+      .progress.indeterminate .progress-fill {
+        animation: none;
+        left: 0;
+        width: 40%;
+        opacity: 0.7;
+      }
+      .progress.determinate .progress-fill {
+        transition: none;
       }
     }
   `;
