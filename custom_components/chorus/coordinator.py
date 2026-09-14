@@ -22,12 +22,19 @@ class ChorusCoordinator(DataUpdateCoordinator):
         self.backend = backend
         self.players: dict[str, dict] = {}  # uid -> {uid, ip, name, model}
         self.snapshots: dict[str, dict] = {}  # soundbar uid -> {map, sat_ips}
+        self.bond_graph: list = []  # live units: standalones / pairs / home theaters
+        self.models: dict[str, str] = {}  # uid -> model (cache for invisible members)
 
     async def _async_update_data(self) -> dict:
         try:
             self.players = await self.hass.async_add_executor_job(self._discover)
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Sonos discovery failed: {err}") from err
+        # The bond graph is secondary — a failure here must not blank the inventory.
+        try:
+            self.bond_graph = await self.hass.async_add_executor_job(self._build_graph)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Bond-graph build failed: %s", err)
         return self.players
 
     def _discover(self) -> dict:
@@ -46,6 +53,29 @@ class ChorusCoordinator(DataUpdateCoordinator):
                 "model": info.get("model_name", ""),
             }
         return players
+
+    def _build_graph(self) -> list:
+        """Read ZoneGroupState and parse it into bonded units, model-enriched."""
+        if not self.players:
+            return []
+        ip = next(iter(self.players.values()))["ip"]  # ZGS is global; any player works
+        graph = self.backend.parse_bond_graph(self.backend.zone_group_state(ip))
+        for unit in graph:
+            for member in unit["members"]:
+                member["model"] = self._model_for(member["uid"], member.get("ip"))
+        return graph
+
+    def _model_for(self, uid: str, ip: str | None) -> str:
+        """Model for a member: discovery for visible players, else fetch (cached)."""
+        player = self.players.get(uid)
+        if player and player.get("model"):
+            return player["model"]
+        if uid in self.models:
+            return self.models[uid]
+        model = self.backend.fetch_model(ip) if ip else ""
+        if model:  # don't cache blanks — retry a failed fetch next refresh
+            self.models[uid] = model
+        return model
 
     def by_name(self, name: str) -> dict | None:
         for player in self.players.values():

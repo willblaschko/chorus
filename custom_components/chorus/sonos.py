@@ -348,3 +348,33 @@ class SonosBackend:
                     }],
                 })
         return units
+
+    # -- model enrichment (for invisible members soco can't see) ----------
+    def device_description(self, ip: str) -> str:
+        """Fetch a player's UPnP device-description XML (blocking)."""
+        url = f"http://{ip}:1400/xml/device_description.xml"
+        with urllib.request.urlopen(
+            urllib.request.Request(url), timeout=self.timeout
+        ) as resp:
+            return resp.read().decode("utf-8", "replace")
+
+    @staticmethod
+    def _parse_model(device_xml: str) -> str:
+        """Canonical model name from a device description, or ''.
+
+        The description embeds several UPnP sub-devices (MediaServer/Renderer), each
+        with its own <modelName>; the FIRST is the root device — the real model
+        (e.g. 'Sonos Arc SL'). Falls back to displayName, then modelDescription.
+        """
+        for tag in ("modelName", "displayName", "modelDescription"):
+            match = re.search(rf"<{tag}>([^<]*)</{tag}>", device_xml or "")
+            if match and match.group(1).strip():
+                return match.group(1).strip()
+        return ""
+
+    def fetch_model(self, ip: str) -> str:
+        """Best-effort model name for the player at `ip` ('' on any failure)."""
+        try:
+            return self._parse_model(self.device_description(ip))
+        except Exception:  # noqa: BLE001 - enrichment is best-effort, never fatal
+            return ""
