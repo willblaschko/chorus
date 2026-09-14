@@ -144,7 +144,9 @@ export class ChorusChangebar extends LitElement {
 
     .bar {
       position: fixed;
-      left: 50%;
+      /* Centre under the editor content (set by chorus-editor), not the raw viewport
+         — otherwise HA's sidebar pushes this bar left of the content. */
+      left: var(--chorus-bar-left, 50%);
       bottom: 22px;
       transform: translateX(-50%);
       width: min(680px, calc(100vw - 32px));

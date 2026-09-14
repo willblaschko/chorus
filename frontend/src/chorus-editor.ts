@@ -105,6 +105,30 @@ export class ChorusEditor extends LitElement {
   @state() private _audio?: { heading: string; controls: AudioControl[] };
   @state() private _movePick?: string; // uid of the speaker being moved
   @state() private _renameFor?: { uid: string; current: string };
+  private _ro?: ResizeObserver;
+
+  public override connectedCallback(): void {
+    super.connectedCallback();
+    // The bottom overlays (change bar, toast, settling banner) are position:fixed, so
+    // left:50% centers them on the VIEWPORT — which, with HA's sidebar, sits left of
+    // the content column. Center them under the editor content instead by publishing
+    // its live centre-x as a CSS var the overlays read (re-measured on any resize).
+    this._syncOverlayCentre();
+    this._ro = new ResizeObserver(() => this._syncOverlayCentre());
+    this._ro.observe(this);
+    window.addEventListener("resize", this._syncOverlayCentre);
+  }
+
+  public override disconnectedCallback(): void {
+    this._ro?.disconnect();
+    window.removeEventListener("resize", this._syncOverlayCentre);
+    super.disconnectedCallback();
+  }
+
+  private _syncOverlayCentre = (): void => {
+    const r = this.getBoundingClientRect();
+    if (r.width) this.style.setProperty("--chorus-bar-left", `${Math.round(r.left + r.width / 2)}px`);
+  };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -1619,7 +1643,7 @@ export class ChorusEditor extends LitElement {
     }
     .settling {
       position: fixed;
-      left: 50%;
+      left: var(--chorus-bar-left, 50%);
       bottom: 88px;
       transform: translateX(-50%);
       width: min(300px, calc(100vw - 40px));

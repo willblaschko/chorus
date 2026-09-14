@@ -77,12 +77,12 @@ export class ChorusToast extends LitElement {
   static override styles = css`
     :host {
       position: fixed;
-      left: 0;
-      right: 0;
+      /* Centre under the editor content (var set by chorus-editor), not the viewport. */
+      left: var(--chorus-bar-left, 50%);
       bottom: 30px;
+      transform: translateX(-50%);
       z-index: 1000;
       display: flex;
-      justify-content: center;
       pointer-events: none;
     }
     .toast {
