@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { bondSignature, fullSignature, namesResolved, settled } from "./settle.js";
+import {
+  bondSignature,
+  fullSignature,
+  namesResolved,
+  settled,
+  expectedSettleMs,
+  settleView,
+  bondsSignature,
+} from "./settle.js";
 import { buildRooms } from "./model.js";
 import { roomsToLayout } from "./layout.js";
+import type { LayoutMap, Placement, Role } from "./apply.js";
 import type { BondGraph, BondMember, BondUnit } from "./types.js";
 
 const ARC = "RINCON_ARC";
@@ -110,5 +119,94 @@ describe("settled — the add-only name plateau (the real bug)", () => {
       players: [],
     });
     expect(settled(otherIntent, topo(wrong), wrong, fullSignature(wrong))).toBe(false);
+  });
+});
+
+describe("expectedSettleMs — budget must cover the measured worst case", () => {
+  it("a pure add is quick — no speaker rediscovery to wait on", () => {
+    expect(expectedSettleMs(["add_ht"])).toBeLessThan(20000);
+  });
+
+  it("a 2x2 front swap covers the measured worst-case settle (>54s)", () => {
+    // Measured max clean swap settle across 8 real swaps was ~54s.
+    expect(expectedSettleMs(["remove_ht", "remove_ht", "add_ht", "add_ht"])).toBeGreaterThan(54000);
+  });
+
+  it("one removal costs more than several adds — rediscovery dominates", () => {
+    expect(expectedSettleMs(["remove_ht"])).toBeGreaterThan(
+      expectedSettleMs(["add_ht", "add_ht", "add_ht"])
+    );
+  });
+
+  it("separate (unpair) also triggers the rediscovery cost", () => {
+    expect(expectedSettleMs(["separate"])).toBeGreaterThan(expectedSettleMs(["add_ht"]));
+  });
+});
+
+describe("settleView — live, human-readable settle progress", () => {
+  const P = (role: Role, name: string, anchorUid = "X"): Placement => ({
+    room: "Media Room",
+    role,
+    anchorUid,
+    name,
+  });
+  // Intent: Arc HT with the LF bookshelf bonded, and the RF bookshelf released to standalone.
+  const intended: LayoutMap = {
+    ARC: P("CC", "Media Room", "ARC"),
+    BK1: P("LF", "Media Room", "ARC"),
+    BK2: P("solo", "TV Right", "BK2"),
+  };
+
+  it("says 'reconfiguring' while the bonds themselves aren't in place yet", () => {
+    const fresh: LayoutMap = {
+      ARC: P("CC", "Media Room", "ARC"),
+      BK1: P("solo", "TV Left", "BK1"), // not bonded to LF yet
+      BK2: P("solo", "TV Right", "BK2"),
+    };
+    const v = settleView(intended, fresh, ["BK2"]);
+    expect(v.label).toMatch(/Reconfiguring/);
+    expect(v.ratio).toBeLessThan(0.2);
+  });
+
+  it("names the released speaker still waiting to reconnect", () => {
+    // Bonds correct (BK1 on LF) but BK2 hasn't reappeared as a standalone yet.
+    const fresh: LayoutMap = { ARC: P("CC", "Media Room", "ARC"), BK1: P("LF", "Media Room", "ARC") };
+    const v = settleView(intended, fresh, ["BK2"]);
+    expect(v.label).toContain("TV Right");
+    expect(v.label).toContain("0 of 1");
+  });
+
+  it("ratio climbs as released speakers come back", () => {
+    const waiting: LayoutMap = { ARC: P("CC", "Media Room", "ARC"), BK1: P("LF", "Media Room", "ARC") };
+    const back: LayoutMap = { ...waiting, BK2: P("solo", "TV Right", "BK2") };
+    expect(settleView(intended, back, ["BK2"]).ratio).toBeGreaterThan(
+      settleView(intended, waiting, ["BK2"]).ratio
+    );
+  });
+
+  it("reaches 'finishing up' once bonds are correct and every released speaker is back", () => {
+    const fresh: LayoutMap = {
+      ARC: P("CC", "Media Room", "ARC"),
+      BK1: P("LF", "Media Room", "ARC"),
+      BK2: P("solo", "TV Right", "BK2"),
+    };
+    const v = settleView(intended, fresh, ["BK2"]);
+    expect(v.label).toMatch(/Finishing up/);
+    expect(v.ratio).toBeGreaterThan(0.9);
+  });
+
+  it("a pure add (nothing released) goes straight to finishing once bonded", () => {
+    const fresh: LayoutMap = {
+      ARC: P("CC", "Media Room", "ARC"),
+      BK1: P("LF", "Media Room", "ARC"),
+      BK2: P("solo", "TV Right", "BK2"),
+    };
+    expect(settleView(intended, fresh, []).label).toMatch(/Finishing up/);
+  });
+
+  it("bondsSignature ignores standalones (only the bonds matter)", () => {
+    const a: LayoutMap = { ARC: P("CC", "Media Room", "ARC"), BK1: P("LF", "Media Room", "ARC"), X: P("solo", "Kitchen", "X") };
+    const b: LayoutMap = { ARC: P("CC", "Media Room", "ARC"), BK1: P("LF", "Media Room", "ARC") };
+    expect(bondsSignature(a)).toBe(bondsSignature(b));
   });
 });

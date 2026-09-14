@@ -31,7 +31,15 @@ import {
   setupHT,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
-import { bondSignature, fullSignature, settled } from "./settle.js";
+import {
+  bondSignature,
+  fullSignature,
+  settled,
+  expectedSettleMs,
+  settleView,
+  type SettleView,
+} from "./settle.js";
+import type { LayoutMap } from "./apply.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
 import "./chorus-menu.js";
@@ -88,6 +96,9 @@ export class ChorusEditor extends LitElement {
   @state() private _dirty = false;
   @state() private _applying = false;
   @state() private _rows: ChangeRow[] = []; // live rows during apply
+  @state() private _settleView: SettleView | null = null; // live settle progress
+  private _releasedUids: string[] = []; // speakers this apply un-bonds (awaited back)
+  private _settleTimedOut = false; // convergence budget exhausted without settling
   @state() private _picker?: { roomKey: string; ch: Channel };
   @state() private _pairPick?: { roomKey: string; first?: string };
   private _drag?: { uid: string; roomKey: string; model: string };
@@ -453,6 +464,17 @@ export class ChorusEditor extends LitElement {
   private async _apply(): Promise<void> {
     const plan = this._plan();
     if (isEmpty(plan) || this._applying) return;
+    // The speakers this plan un-bonds are the ones we'll wait to see reappear as
+    // standalones -- measured to be the slow part of settling (~30-54s). Track them
+    // so the progress banner can name who it's waiting on.
+    const released: string[] = [];
+    for (const op of plan.ops) {
+      if (op.type === "remove_ht") released.push(op.touches[0]);
+      else if (op.type === "separate") released.push(...op.touches);
+    }
+    this._releasedUids = released;
+    this._settleTimedOut = false;
+    this._settleView = { label: "Applying changes...", ratio: 0.05 };
     this._applying = true;
     this._rows = plan.rows;
     await applyPlan(this.hass, plan, (rows) => {
@@ -461,8 +483,10 @@ export class ChorusEditor extends LitElement {
     // The service calls have returned, but Sonos keeps re-syncing for a beat after.
     // Wait for the live topology to actually converge to what we asked for before
     // reporting done — mirror what the Sonos app does.
-    const intended = bondSignature(roomsToLayout(this._rooms));
-    const fresh = await this._awaitConvergence(intended);
+    const intendedMap = roomsToLayout(this._rooms);
+    const intended = bondSignature(intendedMap);
+    const budgetMs = Math.round(expectedSettleMs(plan.ops.map((o) => o.type)) * 1.5);
+    const fresh = await this._awaitConvergence(intended, intendedMap, budgetMs);
     const failed = this._rows.filter((r) => r.status === "error").length;
     this._applying = false;
     this._dirty = false;
@@ -474,7 +498,12 @@ export class ChorusEditor extends LitElement {
     } else {
       this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
     }
-    this._toast(failed ? `Applied with ${failed} error${failed === 1 ? "" : "s"}` : "Applied");
+    const msg = failed
+      ? `Applied with ${failed} error${failed === 1 ? "" : "s"}`
+      : this._settleTimedOut
+        ? "Applied -- speakers still reconnecting"
+        : "Applied";
+    this._toast(msg);
   }
 
   // A stable fingerprint of the bonding topology (each speaker's role + anchor),
@@ -488,10 +517,15 @@ export class ChorusEditor extends LitElement {
 
   // Re-discover until the live bonding matches `intended` AND the full graph has been
   // STABLE across two consecutive polls (no more transitions), or the budget runs out.
-  private async _awaitConvergence(intended: string): Promise<BondGraph | undefined> {
+  private async _awaitConvergence(
+    intended: string,
+    intendedMap: LayoutMap,
+    budgetMs: number
+  ): Promise<BondGraph | undefined> {
     let last: BondGraph | undefined;
     let prevFull = " "; // sentinel so the first poll can never count as "stable"
-    for (let i = 0; i < 24; i++) {
+    const start = Date.now();
+    while (Date.now() - start < budgetMs) {
       let fresh: BondGraph;
       try {
         fresh = await this.hass.connection.sendMessagePromise<BondGraph>({ type: "chorus/refresh" });
@@ -499,11 +533,15 @@ export class ChorusEditor extends LitElement {
         return last;
       }
       last = fresh;
-      const topo = bondSignature(roomsToLayout(buildRooms(fresh)));
+      const freshMap = roomsToLayout(buildRooms(fresh));
+      const topo = bondSignature(freshMap);
+      // Publish live progress for the banner: which released speakers are back yet.
+      this._settleView = settleView(intendedMap, freshMap, this._releasedUids);
       if (settled(intended, topo, fresh, prevFull)) return fresh;
       prevFull = fullSignature(fresh);
-      await new Promise((r) => window.setTimeout(r, 1000));
+      await new Promise((r) => window.setTimeout(r, 1500));
     }
+    this._settleTimedOut = true;
     return last;
   }
 
@@ -531,8 +569,13 @@ export class ChorusEditor extends LitElement {
       </div>
       ${this._applying
         ? html`<div class="settling">
-            <div class="settling-txt">Finishing up — your speakers are reconnecting…</div>
-            <div class="settling-track"><div class="settling-fill"></div></div>
+            <div class="settling-txt">${this._settleView?.label ?? "Finishing up..."}</div>
+            <div class="settling-track">
+              <div
+                class="settling-fill"
+                style="width:${Math.round((this._settleView?.ratio ?? 0.1) * 100)}%"
+              ></div>
+            </div>
           </div>`
         : nothing}
       ${this._pickerOverlay()}
@@ -1469,22 +1512,14 @@ export class ChorusEditor extends LitElement {
       width: 0;
       background: var(--primary-color);
       border-radius: 2px;
-      /* Fill toward ~92% over the typical ~60s settle — reads as progress toward
-         done; when the change truly settles the banner unmounts (jumps to gone). */
-      animation: settle-fill 60s cubic-bezier(0.15, 0.7, 0.2, 1) forwards;
-    }
-    @keyframes settle-fill {
-      from {
-        width: 6%;
-      }
-      to {
-        width: 92%;
-      }
+      /* Width is driven by the live settleView ratio (bonds done, then each released
+         speaker reappearing), so the bar reflects real progress, not a fixed timer.
+         It transitions smoothly between polls; the banner unmounts once settled. */
+      transition: width 0.6s ease;
     }
     @media (prefers-reduced-motion: reduce) {
       .settling-fill {
-        animation: none;
-        width: 45%;
+        transition: none;
       }
     }
     @media (max-width: 800px) {
