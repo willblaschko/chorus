@@ -63,30 +63,50 @@ export interface EditorSpeaker {
   ip: string | null;
 }
 
-export interface EditorPair {
-  L: EditorSpeaker | null;
-  R: EditorSpeaker | null;
-  sub: EditorSpeaker | null;
+/**
+ * The one unifying shape for everything bonded: a visible PRIMARY anchor plus
+ * satellites keyed by channel. A home theater, a stereo pair, and a speaker+sub
+ * are the same structure — only the primary and which channels are filled differ:
+ *   - home theater: primary = soundbar (CC); slots = LF/RF/LR/RR/SW
+ *   - stereo pair:  primary = left speaker;  slots = RF (partner) [+ SW]
+ *   - speaker+sub:  primary = a speaker;     slots = SW
+ * A sub is just a speaker that can only occupy an SW slot, on ANY set.
+ */
+export interface BondedSet {
+  id: string; // stable id = the primary speaker's uid
+  primary: EditorSpeaker; // visible anchor: soundbar / pair-left / lone speaker
+  slots: Partial<Record<Channel, EditorSpeaker>>; // bonded satellites by channel
 }
 
-/** A home theater within a room: one soundbar (CC) + channel positions. */
-export interface HTLayout {
-  bar: EditorSpeaker;
-  slots: Record<Channel, EditorSpeaker | null>;
+export type SetKind = "home_theater" | "stereo_pair" | "speaker";
+
+/** A set's kind is DERIVED from its primary + satellites (no stored discriminant). */
+export function setKind(set: BondedSet): SetKind {
+  if (isBar(set.primary.model)) return "home_theater";
+  if (set.slots.RF) return "stereo_pair";
+  return "speaker";
+}
+
+/** Channels a set can still accept, from the primary's capabilities (excludes
+ * already-filled slots). Soundbar → the 5 HT channels; a pairable speaker → a
+ * partner (RF) and a sub (SW); any set can take a sub. */
+export function openSlots(set: BondedSet): Channel[] {
+  const all: Channel[] = isBar(set.primary.model)
+    ? ["LF", "RF", "LR", "RR", "SW"]
+    : [...(canPair(set.primary.model) ? (["RF"] as Channel[]) : []), "SW"];
+  return all.filter((ch) => !set.slots[ch]);
 }
 
 /**
- * A room == a Home Assistant Area. It may hold at most one home theater, any
- * number of stereo pairs, and lone speakers (`tray`). The tray is the pool of
- * speakers in THIS area that can be bonded into the HT/pairs — bonding across
- * areas requires moving the speaker into the area first.
+ * A room == a Home Assistant Area. It holds any number of bonded `sets` (home
+ * theaters, stereo pairs, speaker+sub) plus lone non-sub speakers in `tray`
+ * (available to bond). Unbonded subs live in one global pseudo-room, AVAILABLE_SUBS_KEY.
  */
 export interface Room {
   key: string; // HA Area name, or the zone name when a unit has no area
   name: string;
   area: string | null; // the HA Area (null when the speaker isn't assigned one)
-  ht: HTLayout | null;
-  pairs: EditorPair[];
+  sets: BondedSet[];
   tray: EditorSpeaker[];
 }
 
@@ -104,14 +124,10 @@ function unitArea(u: BondUnit): string | null {
   return primary?.area ?? null;
 }
 
-function htLayout(u: BondUnit): HTLayout {
-  const slots: Record<Channel, EditorSpeaker | null> = {
-    LF: null,
-    RF: null,
-    LR: null,
-    RR: null,
-    SW: null,
-  };
+// A home theater unit -> a set whose primary is the CC soundbar and whose slots
+// are the bonded satellites (LF/RF/LR/RR/SW).
+function htSet(u: BondUnit): BondedSet {
+  const slots: Partial<Record<Channel, EditorSpeaker>> = {};
   let bar: EditorSpeaker | undefined;
   for (const m of u.members) {
     if (m.channel === "CC") bar = speakerOf(m);
@@ -119,18 +135,24 @@ function htLayout(u: BondUnit): HTLayout {
       slots[m.channel as Channel] = speakerOf(m);
     }
   }
-  return { bar: bar ?? speakerOf(u.members[0]), slots };
+  const primary = bar ?? speakerOf(u.members[0]);
+  return { id: primary.uid, primary, slots };
 }
 
-function pairOf(u: BondUnit): EditorPair {
-  const L = u.members.find((m) => m.channel === "LF") ?? u.members[0];
-  const R = u.members.find((m) => m.channel === "RF") ?? u.members[1];
-  const sub = u.members.find((m) => m.channel === "SW") ?? null;
-  return {
-    L: L ? speakerOf(L) : null,
-    R: R ? speakerOf(R) : null,
-    sub: sub ? speakerOf(sub) : null,
-  };
+// A stereo-pair unit -> a set whose primary is the left/visible half; the right
+// half is the RF slot, and a bonded sub (if any) is the SW slot.
+function pairSet(u: BondUnit): BondedSet {
+  const left =
+    u.members.find((m) => m.channel === "LF") ??
+    u.members.find((m) => m.is_primary) ??
+    u.members[0];
+  const right = u.members.find((m) => m.channel === "RF");
+  const sub = u.members.find((m) => m.channel === "SW");
+  const primary = speakerOf(left);
+  const slots: Partial<Record<Channel, EditorSpeaker>> = {};
+  if (right) slots.RF = speakerOf(right);
+  if (sub) slots.SW = speakerOf(sub);
+  return { id: primary.uid, primary, slots };
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -169,23 +191,23 @@ export function buildRooms(graph: BondGraph | undefined): Room[] {
     const key = area ?? u.name;
     let room = byKey.get(key);
     if (!room) {
-      room = { key, name: area ?? u.name, area, ht: null, pairs: [], tray: [] };
+      room = { key, name: area ?? u.name, area, sets: [], tray: [] };
       byKey.set(key, room);
       order.push(key);
     }
     if (u.kind === "home_theater") {
       const bar = u.members.find((m) => m.channel === "CC") ?? u.members[0];
-      // A real home theater is a soundbar plus >=1 satellite. A single-member
-      // "home theater", or one whose center is a sub, is a just-unbonded sub
-      // masquerading -- never a soundbar; treat its members as loose speakers.
+      // A real home theater is a soundbar plus >=1 satellite. A single-member unit
+      // (a lone soundbar, or a just-unbonded sub masquerading as a home-theater-of-
+      // one) is NOT a set: route its members loose (a bar -> tray for the setup CTA,
+      // a sub -> the unassigned pool).
       if (isSub(bar?.model) || u.members.length <= 1) {
         for (const m of u.members) routeLoose(room, speakerOf(m));
-      } else if (!room.ht) {
-        // An area with two soundbars is unusual; keep the first, ignore extras.
-        room.ht = htLayout(u);
+      } else {
+        room.sets.push(htSet(u));
       }
     } else if (u.kind === "stereo_pair") {
-      room.pairs.push(pairOf(u));
+      room.sets.push(pairSet(u));
     } else {
       for (const m of u.members) routeLoose(room, speakerOf(m));
     }
@@ -195,7 +217,7 @@ export function buildRooms(graph: BondGraph | undefined): Room[] {
   // (e.g. a lone unbonded sub whose zone name became a phantom room).
   const rooms = order
     .map((k) => byKey.get(k)!)
-    .filter((r) => r.ht || r.pairs.length > 0 || r.tray.length > 0);
+    .filter((r) => r.sets.length > 0 || r.tray.length > 0);
   for (const r of rooms) r.tray.sort(byName);
   rooms.sort(byName);
   if (availableSubs.length) {
@@ -204,8 +226,7 @@ export function buildRooms(graph: BondGraph | undefined): Room[] {
       key: AVAILABLE_SUBS_KEY,
       name: "Available subs",
       area: null,
-      ht: null,
-      pairs: [],
+      sets: [],
       tray: availableSubs,
     });
   }

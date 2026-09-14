@@ -9,12 +9,10 @@ import {
   swapPair,
   dissolveHT,
   moveSpeaker,
-  addSubToPair,
-  removeSubFromPair,
   setupHT,
 } from "./layout.js";
 import { computeOps } from "./apply.js";
-import { AVAILABLE_SUBS_KEY, type Room, type EditorSpeaker } from "./model.js";
+import { AVAILABLE_SUBS_KEY, setKind, type Room, type EditorSpeaker } from "./model.js";
 
 const spk = (uid: string, name: string, model = "Sonos One"): EditorSpeaker => ({
   uid,
@@ -23,45 +21,44 @@ const spk = (uid: string, name: string, model = "Sonos One"): EditorSpeaker => (
   ip: null,
 });
 
-// Media Room area: an Arc HT with only Rear-L bonded, plus two lone Era 300s.
+// Media Room: an Arc home-theater SET (id "BAR") with only Rear-L bonded, plus two
+// lone Era 300s in the tray.
+const HT = "BAR";
 function mediaRoom(): Room[] {
   return [
     {
       key: "Media Room",
       name: "Media Room",
       area: "Media Room",
-      ht: {
-        bar: spk("BAR", "Media Room", "Sonos Arc"),
-        slots: {
-          LF: null,
-          RF: null,
-          LR: spk("LR", "Media Room", "Symfonisk Frame"),
-          RR: null,
-          SW: null,
+      sets: [
+        {
+          id: HT,
+          primary: spk("BAR", "Media Room", "Sonos Arc"),
+          slots: { LR: spk("LR", "Media Room", "Symfonisk Frame") },
         },
-      },
-      pairs: [],
+      ],
       tray: [spk("E1", "Media Room 2", "Sonos Era 300"), spk("E2", "Media Room 3", "Sonos Era 300")],
     },
   ];
 }
+const htOf = (rooms: Room[], name = "Media Room") => rooms.find((r) => r.name === name)!.sets.find((s) => setKind(s) === "home_theater")!;
+const pairOf = (rooms: Room[], name = "Media Room") => rooms.find((r) => r.name === name)!.sets.find((s) => setKind(s) === "stereo_pair")!;
 
 describe("roomsToLayout", () => {
-  it("maps a home theater to CC + channel placements anchored on the bar", () => {
+  it("maps a home-theater set to CC + channel placements anchored on the bar", () => {
     const m = roomsToLayout(mediaRoom());
     expect(m["BAR"]).toMatchObject({ room: "Media Room", role: "CC", anchorUid: "BAR" });
     expect(m["LR"]).toMatchObject({ role: "LR", anchorUid: "BAR", name: "Media Room" });
     expect(m["E1"]).toMatchObject({ role: "solo", anchorUid: "E1", name: "Media Room 2" });
   });
 
-  it("maps a stereo pair to pairL/pairR anchored on the left uid", () => {
+  it("maps a stereo-pair set to pairL/pairR anchored on the left uid", () => {
     const rooms: Room[] = [
       {
         key: "Bedroom",
         name: "Bedroom",
         area: "Bedroom",
-        ht: null,
-        pairs: [{ L: spk("PL", "Bedroom"), R: spk("PR", "Bedroom"), sub: null }],
+        sets: [{ id: "PL", primary: spk("PL", "Bedroom"), slots: { RF: spk("PR", "Bedroom") } }],
         tray: [],
       },
     ];
@@ -74,59 +71,62 @@ describe("roomsToLayout", () => {
 describe("assignToChannel", () => {
   it("moves a tray speaker onto an empty channel and is pure", () => {
     const before = mediaRoom();
-    const after = assignToChannel(before, "Media Room", "LF", "E1");
-    expect(after[0].ht!.slots.LF?.uid).toBe("E1");
+    const after = assignToChannel(before, "Media Room", HT, "LF", "E1");
+    expect(htOf(after).slots.LF?.uid).toBe("E1");
     expect(after[0].tray.map((s) => s.uid)).toEqual(["E2"]);
     // input untouched
-    expect(before[0].ht!.slots.LF).toBeNull();
+    expect(htOf(before).slots.LF).toBeUndefined();
     expect(before[0].tray.map((s) => s.uid)).toEqual(["E1", "E2"]);
   });
 
   it("displaces the current occupant back to the tray", () => {
-    const after = assignToChannel(mediaRoom(), "Media Room", "LR", "E1");
-    expect(after[0].ht!.slots.LR?.uid).toBe("E1");
+    const after = assignToChannel(mediaRoom(), "Media Room", HT, "LR", "E1");
+    expect(htOf(after).slots.LR?.uid).toBe("E1");
     expect(after[0].tray.some((s) => s.uid === "LR")).toBe(true);
   });
 
   it("is a no-op when the speaker isn't in the room's tray", () => {
-    const after = assignToChannel(mediaRoom(), "Media Room", "LF", "NOPE");
-    expect(after[0].ht!.slots.LF).toBeNull();
+    const after = assignToChannel(mediaRoom(), "Media Room", HT, "LF", "NOPE");
+    expect(htOf(after).slots.LF).toBeUndefined();
   });
 });
 
-describe("clearChannel / createPair / separatePair", () => {
+describe("clearChannel / createPair / separatePair / swap / dissolve / move", () => {
   it("clearChannel returns the satellite to the tray", () => {
-    const after = clearChannel(mediaRoom(), "Media Room", "LR");
-    expect(after[0].ht!.slots.LR).toBeNull();
+    const after = clearChannel(mediaRoom(), "Media Room", HT, "LR");
+    expect(htOf(after).slots.LR).toBeUndefined();
     expect(after[0].tray.some((s) => s.uid === "LR")).toBe(true);
   });
 
-  it("createPair consumes two tray speakers into a pair", () => {
+  it("createPair consumes two tray speakers into a new pair set", () => {
     const after = createPair(mediaRoom(), "Media Room", "E1", "E2");
-    expect(after[0].pairs).toHaveLength(1);
-    expect(after[0].pairs[0].L?.uid).toBe("E1");
-    expect(after[0].pairs[0].R?.uid).toBe("E2");
+    expect(after[0].sets).toHaveLength(2); // the HT + the new pair
+    const pair = pairOf(after);
+    expect(pair.primary.uid).toBe("E1");
+    expect(pair.slots.RF?.uid).toBe("E2");
     expect(after[0].tray).toHaveLength(0);
   });
 
   it("separatePair returns both halves to the tray", () => {
     const paired = createPair(mediaRoom(), "Media Room", "E1", "E2");
-    const after = separatePair(paired, "Media Room", 0);
-    expect(after[0].pairs).toHaveLength(0);
+    const after = separatePair(paired, "Media Room", "E1");
+    expect(after[0].sets.some((s) => setKind(s) === "stereo_pair")).toBe(false);
     expect(after[0].tray.map((s) => s.uid).sort()).toEqual(["E1", "E2"]);
   });
 
-  it("swapPair flips L and R", () => {
+  it("swapPair flips primary and RF (id follows the new primary)", () => {
     const paired = createPair(mediaRoom(), "Media Room", "E1", "E2");
-    const after = swapPair(paired, "Media Room", 0);
-    expect(after[0].pairs[0].L?.uid).toBe("E2");
-    expect(after[0].pairs[0].R?.uid).toBe("E1");
+    const after = swapPair(paired, "Media Room", "E1");
+    const pair = pairOf(after);
+    expect(pair.primary.uid).toBe("E2");
+    expect(pair.slots.RF?.uid).toBe("E1");
+    expect(pair.id).toBe("E2");
   });
 
-  it("dissolveHT clears every channel back to the tray, bar stays", () => {
-    const after = dissolveHT(mediaRoom(), "Media Room");
-    expect(after[0].ht?.bar.uid).toBe("BAR");
-    expect(after[0].ht?.slots.LR).toBeNull();
+  it("dissolveHT clears channels to the tray and leaves the soundbar standalone", () => {
+    const after = dissolveHT(mediaRoom(), "Media Room", HT);
+    expect(after[0].sets).toHaveLength(0); // the HT set is gone
+    expect(after[0].tray.some((s) => s.uid === "BAR")).toBe(true); // bar is standalone
     expect(after[0].tray.some((s) => s.uid === "LR")).toBe(true);
   });
 
@@ -137,57 +137,37 @@ describe("clearChannel / createPair / separatePair", () => {
   });
 });
 
-// Living Room: a stereo pair (no sub) plus a lone Sub and a lone Beam in the tray.
+// Living Room: a stereo-pair set (no sub) plus a lone Beam in the tray.
 function pairRoom(): Room[] {
   return [
     {
       key: "Living Room",
       name: "Living Room",
       area: "Living Room",
-      ht: null,
-      pairs: [{ L: spk("PL", "Living Room", "Sonos Era 100"), R: spk("PR", "Living Room 2", "Sonos Era 100"), sub: null }],
-      tray: [spk("SUB", "Living Room Sub", "Sonos Sub"), spk("BEAM", "Living Room Beam", "Sonos Beam")],
+      sets: [
+        {
+          id: "PL",
+          primary: spk("PL", "Living Room", "Sonos Era 100"),
+          slots: { RF: spk("PR", "Living Room 2", "Sonos Era 100") },
+        },
+      ],
+      tray: [spk("BEAM", "Living Room Beam", "Sonos Beam")],
     },
   ];
 }
 
-describe("addSubToPair / removeSubFromPair", () => {
-  it("moves a tray sub into the pair's .sub and out of the tray; input unchanged", () => {
-    const before = pairRoom();
-    const after = addSubToPair(before, "Living Room", 0, "SUB");
-    expect(after[0].pairs[0].sub?.uid).toBe("SUB");
-    expect(after[0].tray.some((s) => s.uid === "SUB")).toBe(false);
-    // purity: input untouched
-    expect(before[0].pairs[0].sub).toBeNull();
-    expect(before[0].tray.map((s) => s.uid)).toEqual(["SUB", "BEAM"]);
-  });
-
-  it("is a no-op for a bad sub uid", () => {
-    const after = addSubToPair(pairRoom(), "Living Room", 0, "NOPE");
-    expect(after[0].pairs[0].sub).toBeNull();
-    expect(after[0].tray.map((s) => s.uid)).toEqual(["SUB", "BEAM"]);
-  });
-
-  it("removeSubFromPair returns the pair's sub to the tray and nulls .sub", () => {
-    const withSub = addSubToPair(pairRoom(), "Living Room", 0, "SUB");
-    const after = removeSubFromPair(withSub, "Living Room", 0);
-    expect(after[0].pairs[0].sub).toBeNull();
-    expect(after[0].tray.some((s) => s.uid === "SUB")).toBe(true);
-  });
-});
-
 describe("setupHT", () => {
-  it("promotes a tray soundbar to an HT with five null slots, out of the tray", () => {
+  it("promotes a tray soundbar to an empty home-theater set, out of the tray", () => {
     const after = setupHT(pairRoom(), "Living Room", "BEAM");
-    expect(after[0].ht?.bar.uid).toBe("BEAM");
-    expect(after[0].ht?.slots).toEqual({ LF: null, RF: null, LR: null, RR: null, SW: null });
+    const ht = htOf(after, "Living Room");
+    expect(ht.primary.uid).toBe("BEAM");
+    expect(ht.slots).toEqual({});
     expect(after[0].tray.some((s) => s.uid === "BEAM")).toBe(false);
   });
 
-  it("is a no-op when the room already has an ht", () => {
-    const after = setupHT(mediaRoom(), "Media Room", "E1");
-    expect(after[0].ht?.bar.uid).toBe("BAR");
-    expect(after[0].tray.some((s) => s.uid === "E1")).toBe(true);
+  it("is a no-op when the uid isn't a tray speaker", () => {
+    const after = setupHT(pairRoom(), "Living Room", "NOPE");
+    expect(after[0].sets.some((s) => setKind(s) === "home_theater")).toBe(false);
   });
 });
 
@@ -198,7 +178,7 @@ describe("location change -> service op (via computeOps)", () => {
 
   it("assigning a speaker to a channel emits one add_ht (set_home_theater)", () => {
     const before = mediaRoom();
-    const ops = opsFor(before, assignToChannel(before, "Media Room", "LF", "E1"));
+    const ops = opsFor(before, assignToChannel(before, "Media Room", HT, "LF", "E1"));
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "add_ht" });
     expect(ops[0].service.service).toBe("set_home_theater");
@@ -207,10 +187,9 @@ describe("location change -> service op (via computeOps)", () => {
 
   it("clearing a channel emits one remove_ht (remove_home_theater by channel)", () => {
     const before = mediaRoom();
-    const ops = opsFor(before, clearChannel(before, "Media Room", "LR"));
+    const ops = opsFor(before, clearChannel(before, "Media Room", HT, "LR"));
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "remove_ht" });
-    expect(ops[0].service.service).toBe("remove_home_theater");
     expect(ops[0].service.data).toMatchObject({ soundbar: "BAR", channel: "LR" });
   });
 
@@ -228,66 +207,69 @@ describe("location change -> service op (via computeOps)", () => {
   });
 });
 
-describe("available subs — assign/clear across rooms", () => {
+describe("available subs — one SW path across HTs and pairs", () => {
   const sub = (uid: string, name = "Sub Mini") => spk(uid, name, "Sonos Sub Mini");
   const htRoom = (key: string, sw: EditorSpeaker | null): Room => ({
     key,
     name: key,
     area: key,
-    ht: { bar: spk(`${key}-BAR`, key, "Sonos Arc"), slots: { LF: null, RF: null, LR: null, RR: null, SW: sw } },
-    pairs: [],
+    sets: [{ id: `${key}-BAR`, primary: spk(`${key}-BAR`, key, "Sonos Arc"), slots: sw ? { SW: sw } : {} }],
     tray: [],
   });
   const pool = (...subs: EditorSpeaker[]): Room => ({
     key: AVAILABLE_SUBS_KEY,
     name: "Available subs",
     area: null,
-    ht: null,
-    pairs: [],
+    sets: [],
     tray: subs,
   });
 
-  it("assigns a pooled sub into a room's SW slot and empties (prunes) the pool", () => {
+  it("assigns a pooled sub into a home-theater SW slot and prunes the pool", () => {
     const before = [htRoom("Media Room", null), pool(sub("SUB"))];
-    const after = assignSubToChannel(before, "Media Room", "SUB");
-    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW?.uid).toBe("SUB");
+    const after = assignSubToChannel(before, "Media Room", "Media Room-BAR", "SUB");
+    expect(htOf(after).slots.SW?.uid).toBe("SUB");
     expect(after.some((r) => r.key === AVAILABLE_SUBS_KEY)).toBe(false);
   });
 
-  it("assigning a pooled sub emits exactly one add_ht with the sw field", () => {
+  it("assigning a pooled sub to an HT emits exactly one add_ht with the sw field", () => {
     const before = [htRoom("Media Room", null), pool(sub("SUB"))];
-    const ops = computeOps(roomsToLayout(before), roomsToLayout(assignSubToChannel(before, "Media Room", "SUB")));
+    const ops = computeOps(
+      roomsToLayout(before),
+      roomsToLayout(assignSubToChannel(before, "Media Room", "Media Room-BAR", "SUB"))
+    );
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "add_ht" });
     expect(ops[0].service.data).toMatchObject({ soundbar: "Media Room-BAR", sw: "SUB" });
   });
 
-  it("clearing a SW sends the sub to the available pool, NOT the room tray", () => {
+  it("clearing an HT SW sends the sub to the available pool, NOT the room tray", () => {
     const before = [htRoom("Media Room", sub("SUB"))];
-    const after = clearChannel(before, "Media Room", "SW");
-    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW).toBeNull();
-    expect(after.find((r) => r.key === "Media Room")!.tray.some((s) => s.uid === "SUB")).toBe(false);
+    const after = clearChannel(before, "Media Room", "Media Room-BAR", "SW");
+    expect(htOf(after).slots.SW).toBeUndefined();
+    expect(after.find((r) => r.name === "Media Room")!.tray.some((s) => s.uid === "SUB")).toBe(false);
     expect(after.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["SUB"]);
   });
 
-  it("clearing a SW then re-reading emits one remove_ht", () => {
-    const before = [htRoom("Media Room", sub("SUB"))];
-    const ops = computeOps(roomsToLayout(before), roomsToLayout(clearChannel(before, "Media Room", "SW")));
-    expect(ops).toHaveLength(1);
-    expect(ops[0]).toMatchObject({ type: "remove_ht" });
-  });
-
-  it("moves a sub from one room's SW to another's (cross-room)", () => {
+  it("moves a sub from one home theater's SW to another's (cross-room)", () => {
     const before = [htRoom("A", sub("SUB")), htRoom("B", null)];
-    const after = assignSubToChannel(before, "B", "SUB");
-    expect(after.find((r) => r.key === "A")!.ht!.slots.SW).toBeNull();
-    expect(after.find((r) => r.key === "B")!.ht!.slots.SW?.uid).toBe("SUB");
+    const after = assignSubToChannel(before, "B", "B-BAR", "SUB");
+    expect(htOf(after, "A").slots.SW).toBeUndefined();
+    expect(htOf(after, "B").slots.SW?.uid).toBe("SUB");
   });
 
   it("displaces an existing sub back to the pool when a new one is assigned", () => {
     const before = [htRoom("Media Room", sub("OLD")), pool(sub("NEW"))];
-    const after = assignSubToChannel(before, "Media Room", "NEW");
-    expect(after.find((r) => r.key === "Media Room")!.ht!.slots.SW?.uid).toBe("NEW");
+    const after = assignSubToChannel(before, "Media Room", "Media Room-BAR", "NEW");
+    expect(htOf(after).slots.SW?.uid).toBe("NEW");
     expect(after.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["OLD"]);
+  });
+
+  it("a sub can be placed on a PAIR set (same SW path) but is GATED — no op yet", () => {
+    const before = [pairRoom()[0], pool(sub("SUB"))];
+    const after = assignSubToChannel(before, "Living Room", "PL", "SUB");
+    // model holds it on the pair's SW slot...
+    expect(pairOf(after, "Living Room").slots.SW?.uid).toBe("SUB");
+    // ...but there's no validated pair+sub service, so it diffs to nothing.
+    expect(computeOps(roomsToLayout(before), roomsToLayout(after))).toEqual([]);
   });
 });

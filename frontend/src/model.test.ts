@@ -8,6 +8,8 @@ import {
   hasHeight,
   positionAccepts,
   buildRooms,
+  setKind,
+  openSlots,
   AVAILABLE_SUBS_KEY,
 } from "./model.js";
 import type { BondGraph } from "./types.js";
@@ -126,12 +128,14 @@ describe("buildRooms — group by HA Area", () => {
   it("puts the home theater and a lone speaker from the SAME area in one room", () => {
     const r = room("Media Room");
     expect(r.area).toBe("Media Room");
-    expect(r.ht).not.toBeNull();
-    expect(r.ht!.bar.model).toBe("Sonos Arc SL");
-    expect(r.ht!.slots.LR?.uid).toBe("S_LR");
-    expect(r.ht!.slots.SW?.name).toBe("Sub Mini");
-    expect(r.ht!.slots.LF).toBeNull();
-    // the lone Era 300 in the SAME area is the room's available pool
+    expect(r.sets).toHaveLength(1);
+    const set = r.sets[0];
+    expect(setKind(set)).toBe("home_theater");
+    expect(set.primary.model).toBe("Sonos Arc SL");
+    expect(set.slots.LR?.uid).toBe("S_LR");
+    expect(set.slots.SW?.name).toBe("Sub Mini");
+    expect(set.slots.LF).toBeUndefined();
+    // the lone Era 300 in the SAME area is the room's available (tray) pool
     expect(r.tray.map((s) => s.uid)).toEqual(["ERA"]);
   });
 
@@ -139,15 +143,17 @@ describe("buildRooms — group by HA Area", () => {
     // Kitchen's speaker must NOT appear in Media Room's tray, and vice versa.
     expect(room("Media Room").tray.some((s) => s.uid === "SOLO")).toBe(false);
     expect(room("Kitchen").tray.map((s) => s.uid)).toEqual(["SOLO"]);
-    expect(room("Kitchen").ht).toBeNull();
+    expect(room("Kitchen").sets).toHaveLength(0);
   });
 
-  it("groups a stereo pair under its area", () => {
+  it("groups a stereo pair under its area as a set", () => {
     const r = room("Bedroom");
-    expect(r.pairs).toHaveLength(1);
-    expect(r.pairs[0].L?.uid).toBe("PL");
-    expect(r.pairs[0].R?.uid).toBe("PR");
-    expect(r.pairs[0].sub).toBeNull();
+    expect(r.sets).toHaveLength(1);
+    const set = r.sets[0];
+    expect(setKind(set)).toBe("stereo_pair");
+    expect(set.primary.uid).toBe("PL");
+    expect(set.slots.RF?.uid).toBe("PR");
+    expect(set.slots.SW).toBeUndefined();
   });
 
   it("falls back to the zone name when a speaker has no area", () => {
@@ -163,12 +169,17 @@ describe("buildRooms — group by HA Area", () => {
     expect(buildRooms({ units: [], players: [] })).toEqual([]);
   });
 
-  it("keeps a bonded sub in its home theater (not the available pool)", () => {
-    // The Media Room HT's SW is bonded -> it must stay in the HT, and there must be
-    // NO available-subs pool for a fully-bonded system.
+  it("keeps a bonded sub in its home-theater SW slot (not the available pool)", () => {
     const rooms = buildRooms(GRAPH);
-    expect(room("Media Room").ht!.slots.SW?.uid).toBe("S_SW");
+    expect(room("Media Room").sets[0].slots.SW?.uid).toBe("S_SW");
     expect(rooms.some((r) => r.key === AVAILABLE_SUBS_KEY)).toBe(false);
+  });
+
+  it("openSlots: a home theater offers its empty channels; a pair offers a sub", () => {
+    const mr = room("Media Room").sets[0]; // LR + SW filled
+    expect(openSlots(mr).sort()).toEqual(["LF", "RF", "RR"]);
+    const bed = room("Bedroom").sets[0]; // pair, RF filled
+    expect(openSlots(bed)).toEqual(["SW"]);
   });
 });
 
@@ -207,8 +218,8 @@ describe("buildRooms — unbonded subs go to the global available pool", () => {
       players: [],
     };
     const rooms = buildRooms(graph);
-    // no room has an HT (the sub is not a bar)
-    expect(rooms.every((r) => r.ht === null)).toBe(true);
+    // no room has a set (the sub is not a bar / not bonded to anything)
+    expect(rooms.every((r) => r.sets.length === 0)).toBe(true);
     expect(rooms.find((r) => r.key === AVAILABLE_SUBS_KEY)!.tray.map((s) => s.uid)).toEqual(["DSUB"]);
   });
 
