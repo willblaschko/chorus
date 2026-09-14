@@ -45,7 +45,9 @@ export function roomsToLayout(rooms: Room[]): LayoutMap {
         if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
       } else {
         map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: p.name };
-        // set.slots.SW (a sub on a lone SPEAKER) still omitted — not yet verified.
+        const sw = set.slots.SW;
+        // A sub on a lone speaker is a real op now (add_pair_sub with no `right`).
+        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
       }
     }
     for (const s of r.tray) {
@@ -166,6 +168,42 @@ export function assignSubToChannel(
   const existing = target.slots.SW;
   if (existing) toPool(next, existing);
   target.slots.SW = sub;
+  return prunePool(next);
+}
+
+// ── bond an available sub to a LONE speaker (forms a speaker+sub set) ───────────
+export function bondSubToSpeaker(
+  rooms: Room[],
+  roomKey: string,
+  speakerUid: string,
+  subUid: string
+): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room) return next;
+  const si = room.tray.findIndex((s) => s.uid === speakerUid);
+  if (si === -1) return next;
+  // Detach the sub from the pool (or any set's SW slot).
+  let sub: EditorSpeaker | undefined;
+  const pool = next.find((r) => r.key === AVAILABLE_SUBS_KEY);
+  if (pool) {
+    const i = pool.tray.findIndex((s) => s.uid === subUid);
+    if (i >= 0) sub = pool.tray.splice(i, 1)[0];
+  }
+  if (!sub) {
+    outer: for (const r of next) {
+      for (const s of r.sets) {
+        if (s.slots.SW?.uid === subUid) {
+          sub = s.slots.SW;
+          delete s.slots.SW;
+          break outer;
+        }
+      }
+    }
+  }
+  if (!sub) return next;
+  const [speaker] = room.tray.splice(si, 1);
+  room.sets.push({ id: speaker.uid, primary: speaker, slots: { SW: sub } });
   return prunePool(next);
 }
 

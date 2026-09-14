@@ -237,26 +237,34 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
     const b = working[uid];
     const wasSub = a?.role === "pairSub";
     const isSubNow = b?.role === "pairSub";
+    // A pairSub anchored on a pair-left has a `right` (the pair's other half); one
+    // anchored on a lone speaker does not — omit `right` there (speaker + sub).
     if (isSubNow && !wasSub) {
       const left = b.anchorUid;
       const right = pairRightOf(working, left);
-      if (right)
-        ops.push({
-          type: "add_pair_sub",
-          touches: [uid, left, right],
-          service: { domain: "chorus", service: "add_pair_sub", data: { left, right, sub: uid } },
-          summary: `${b.room} — add Sub to pair`,
-        });
+      ops.push({
+        type: "add_pair_sub",
+        touches: right ? [uid, left, right] : [uid, left],
+        service: {
+          domain: "chorus",
+          service: "add_pair_sub",
+          data: right ? { left, right, sub: uid } : { left, sub: uid },
+        },
+        summary: `${b.room} — add Sub`,
+      });
     } else if (wasSub && !isSubNow) {
       const left = a.anchorUid;
       const right = pairRightOf(applied, left);
-      if (right)
-        ops.push({
-          type: "remove_pair_sub",
-          touches: [uid, left, right],
-          service: { domain: "chorus", service: "remove_pair_sub", data: { left, right, sub: uid } },
-          summary: `${a.room} — remove Sub from pair`,
-        });
+      ops.push({
+        type: "remove_pair_sub",
+        touches: right ? [uid, left, right] : [uid, left],
+        service: {
+          domain: "chorus",
+          service: "remove_pair_sub",
+          data: right ? { left, right, sub: uid } : { left, sub: uid },
+        },
+        summary: `${a.room} — remove Sub`,
+      });
     }
   }
 

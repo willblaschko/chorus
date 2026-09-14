@@ -4,6 +4,7 @@ import {
   assignToChannel,
   clearChannel,
   assignSubToChannel,
+  bondSubToSpeaker,
   createPair,
   separatePair,
   swapPair,
@@ -282,5 +283,35 @@ describe("available subs — one SW path across HTs and pairs", () => {
     expect(ops).toHaveLength(1);
     expect(ops[0]).toMatchObject({ type: "remove_pair_sub" });
     expect(ops[0].service.data).toMatchObject({ left: "PL", right: "PR", sub: "SUB" });
+  });
+
+  it("bonding a sub to a LONE speaker emits add_pair_sub with NO right", () => {
+    const before: Room[] = [
+      { key: "Office", name: "Office", area: "Office", sets: [], tray: [spk("OFF", "Office", "Sonos Era 100")] },
+      pool(sub("SUB")),
+    ];
+    const after = bondSubToSpeaker(before, "Office", "OFF", "SUB");
+    const set = after.find((r) => r.name === "Office")!.sets[0];
+    expect(setKind(set)).toBe("speaker");
+    expect(set.slots.SW?.uid).toBe("SUB");
+    const ops = computeOps(roomsToLayout(before), roomsToLayout(after));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "add_pair_sub" });
+    expect(ops[0].service.data).toMatchObject({ left: "OFF", sub: "SUB" });
+    expect(ops[0].service.data).not.toHaveProperty("right");
+  });
+
+  it("removing a sub from a speaker+sub set emits remove_pair_sub with NO right", () => {
+    const start: Room[] = [
+      { key: "Office", name: "Office", area: "Office", sets: [], tray: [spk("OFF", "Office", "Sonos Era 100")] },
+      pool(sub("SUB")),
+    ];
+    const bonded = bondSubToSpeaker(start, "Office", "OFF", "SUB");
+    const after = separatePair(bonded, "Office", "OFF"); // dissolves the speaker+sub set
+    const ops = computeOps(roomsToLayout(bonded), roomsToLayout(after));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ type: "remove_pair_sub" });
+    expect(ops[0].service.data).toMatchObject({ left: "OFF", sub: "SUB" });
+    expect(ops[0].service.data).not.toHaveProperty("right");
   });
 });
