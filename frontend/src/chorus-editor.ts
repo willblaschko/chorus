@@ -528,7 +528,7 @@ export class ChorusEditor extends LitElement {
     }
     return html`
       <div
-        class="postile"
+        class="postile filled"
         @dragover=${(e: DragEvent) => this._onDragOver(e, r, ch)}
         @dragleave=${(e: DragEvent) => (e.currentTarget as HTMLElement).classList.remove("over")}
         @drop=${(e: DragEvent) => this._onDrop(e, r, ch)}
@@ -600,6 +600,11 @@ export class ChorusEditor extends LitElement {
         class="row drag"
         draggable="true"
         @dragstart=${(e: DragEvent) => {
+          // Don't start a drag from the ••• button (or its menu).
+          if ((e.target as HTMLElement).closest(".dots")) {
+            e.preventDefault();
+            return;
+          }
           this._drag = { uid: s.uid, roomKey, model: s.model };
           if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
           (e.currentTarget as HTMLElement).classList.add("dragging");
@@ -966,6 +971,9 @@ export class ChorusEditor extends LitElement {
     .x:hover {
       color: var(--error-color, #d32f2f);
       background: var(--secondary-background-color);
+    }
+    .postile.filled .pmeta {
+      padding-right: 22px; /* clear the absolutely-positioned × */
     }
     /* drag & drop + tactile feedback */
     .postile {

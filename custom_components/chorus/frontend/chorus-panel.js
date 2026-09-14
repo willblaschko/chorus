@@ -936,7 +936,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
         </div>
       `}return I`
       <div
-        class="postile"
+        class="postile filled"
         @dragover=${t=>this._onDragOver(t,e,r)}
         @dragleave=${e=>e.currentTarget.classList.remove("over")}
         @drop=${t=>this._onDrop(t,e,r)}
@@ -978,7 +978,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       <div
         class="row drag"
         draggable="true"
-        @dragstart=${r=>{this._drag={uid:e.uid,roomKey:t,model:e.model},r.dataTransfer&&(r.dataTransfer.effectAllowed="move"),r.currentTarget.classList.add("dragging")}}
+        @dragstart=${r=>{r.target.closest(".dots")?r.preventDefault():(this._drag={uid:e.uid,roomKey:t,model:e.model},r.dataTransfer&&(r.dataTransfer.effectAllowed="move"),r.currentTarget.classList.add("dragging"))}}
         @dragend=${e=>{this._drag=void 0,e.currentTarget.classList.remove("dragging")}}
       >
         <span class="rt">${Re(e.model)}</span>
@@ -1309,6 +1309,9 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
     .x:hover {
       color: var(--error-color, #d32f2f);
       background: var(--secondary-background-color);
+    }
+    .postile.filled .pmeta {
+      padding-right: 22px; /* clear the absolutely-positioned × */
     }
     /* drag & drop + tactile feedback */
     .postile {
