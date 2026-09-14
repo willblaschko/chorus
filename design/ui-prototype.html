@@ -96,7 +96,7 @@
   /* ===== STAGE on a grouped card ===== */
   /* stage scales proportionally: 1em tracks the stage's own width (container query) */
   .stage{position:relative;padding:.6em 0 .8em;container-type:inline-size;font-size:clamp(8px,1.7cqw,13px)}
-  .tv{width:66cqw;max-width:27em;margin:.15em auto 1em;color:var(--text-3)}
+  .tv{width:12.5em;margin:.15em auto 1em;color:var(--text-3)}
   .tv svg{width:100%;height:auto;display:block}
   .ink{fill:currentColor}.paper{fill:var(--bg)}
   .prow{display:flex;justify-content:center;gap:9em}.prow.fronts{margin-top:1.1em}.prow.rear{margin-top:.46em}
@@ -104,7 +104,7 @@
   .lp{display:flex;flex-direction:column;align-items:center;gap:.4em;margin:1.1em 0;pointer-events:none}
   .lp .couch{color:var(--text-3);margin-bottom:.23em}
   .lp .couch{color:var(--text-3)}
-  .lp .couch svg{width:9.6em;height:auto;display:block}
+  .lp .couch svg{width:12.5em;height:auto;display:block}
   .lp small{font-size:.82em;color:var(--text-3)}
 
   .posw{position:relative;display:flex}
@@ -512,7 +512,7 @@
     var stage=el("div","stage");var _tv=el("div","tv");var _tva=document.getElementById("tvArt").cloneNode(true);_tva.removeAttribute("id");_tv.appendChild(_tva);stage.appendChild(_tv);
     var b1=el("div","prow");b1.appendChild(pos(r,"CC"));stage.appendChild(b1);
     var f=el("div","prow fronts");f.appendChild(pos(r,"LF"));f.appendChild(pos(r,"RF"));stage.appendChild(f);
-    var lp=el("div","lp");var _c=el("div","couch");var _ca=document.getElementById("couchArt").cloneNode(true);_ca.removeAttribute("id");_c.appendChild(_ca);lp.appendChild(_c);lp.appendChild(el("small",null,"You"));stage.appendChild(lp);
+    var lp=el("div","lp");var _c=el("div","couch");var _ca=document.getElementById("couchArt").cloneNode(true);_ca.removeAttribute("id");_c.appendChild(_ca);lp.appendChild(_c);stage.appendChild(lp);
     var re=el("div","prow rear");re.appendChild(pos(r,"LR"));re.appendChild(pos(r,"RR"));stage.appendChild(re);
     var s=el("div","psub");s.appendChild(pos(r,"SW"));stage.appendChild(s);
     m.appendChild(stage);
