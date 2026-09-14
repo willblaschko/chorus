@@ -5,6 +5,8 @@ import {
   buildRooms,
   positionAccepts,
   canPair,
+  isSub,
+  isBar,
   CHANNELS,
   CHANNEL_NAME,
   type Channel,
@@ -24,6 +26,9 @@ import {
   swapPair,
   dissolveHT,
   moveSpeaker,
+  addSubToPair,
+  removeSubFromPair,
+  setupHT,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import "./chorus-changebar.js";
@@ -88,6 +93,8 @@ export class ChorusEditor extends LitElement {
   @state() private _menu?: { heading: string; items: MenuItem[]; onSelect: (id: string) => void };
   @state() private _audio?: { heading: string; controls: AudioControl[] };
   @state() private _movePick?: string; // uid of the speaker being moved
+  @state() private _subPick?: { roomKey: string; pairIndex: number };
+  @state() private _renameFor?: { uid: string; current: string };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -212,16 +219,24 @@ export class ChorusEditor extends LitElement {
   }
 
   private _openPairMenu(r: Room, index: number): void {
+    const hasSub = !!r.pairs[index]?.sub;
     this._menu = {
       heading: "Stereo pair",
       items: [
         { id: "audio", label: "Audio settings" },
+        hasSub ? { id: "removesub", label: "Remove sub" } : { id: "addsub", label: "Add a sub…" },
         { id: "swap", label: "Swap L / R" },
         { id: "separate", label: "Separate pair", danger: true },
       ],
       onSelect: (id) => {
         if (id === "audio") {
           this._openAudio(r.pairs[index]?.L?.name ?? r.name);
+        } else if (id === "addsub") {
+          this._subPick = { roomKey: r.key, pairIndex: index };
+        } else if (id === "removesub") {
+          this._working = removeSubFromPair(this._rooms, r.key, index);
+          this._dirty = true;
+          this._toast("Sub removed");
         } else if (id === "swap") {
           this._working = swapPair(this._rooms, r.key, index);
           this._dirty = true;
@@ -233,18 +248,94 @@ export class ChorusEditor extends LitElement {
     };
   }
 
+  private _doAddSub(roomKey: string, pairIndex: number, sub: EditorSpeaker): void {
+    this._working = addSubToPair(this._rooms, roomKey, pairIndex, sub.uid);
+    this._dirty = true;
+    this._subPick = undefined;
+    this._toast(`${this._name(sub)} → Sub`);
+  }
+
+  private _subOverlay(): TemplateResult | typeof nothing {
+    if (!this._subPick) return nothing;
+    const { roomKey, pairIndex } = this._subPick;
+    const currentSub = this._rooms.find((r) => r.key === roomKey)?.pairs[pairIndex]?.sub?.uid;
+    // Subs that addSubToPair can relocate: lone (tray) subs + subs bonded to other pairs.
+    const subs: Array<{ sp: EditorSpeaker; where: string }> = [];
+    for (const r of this._rooms) {
+      for (const s of r.tray) if (isSub(s.model) && s.uid !== currentSub) subs.push({ sp: s, where: `${r.name} · available` });
+      for (const p of r.pairs) if (p.sub && isSub(p.sub.model) && p.sub.uid !== currentSub) subs.push({ sp: p.sub, where: `${r.name} · paired` });
+    }
+    return html`
+      <div class="backdrop" @click=${() => (this._subPick = undefined)}>
+        <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="sheet-h">Add a sub</div>
+          ${subs.length
+            ? subs.map(
+                ({ sp, where }) => html`
+                  <button type="button" class="sheet-item" @click=${() => this._doAddSub(roomKey, pairIndex, sp)}>
+                    <span class="rt">${iconFor(sp.model)}</span>
+                    <span class="rx"><b>${this._name(sp)}</b><span>${where}</span></span>
+                  </button>
+                `
+              )
+            : html`<div class="sheet-empty">No sub available to add.</div>`}
+          <button type="button" class="sheet-cancel" @click=${() => (this._subPick = undefined)}>Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
   private _openSpeakerMenu(s: EditorSpeaker): void {
     this._menu = {
       heading: this._name(s),
       items: [
         { id: "identify", label: "Identify" },
+        { id: "rename", label: "Rename…" },
         { id: "move", label: "Move to another room…" },
       ],
       onSelect: (id) => {
         if (id === "identify") this._toast(`Chiming on ${this._name(s)}`);
+        else if (id === "rename") this._renameFor = { uid: s.uid, current: this._name(s) };
         else if (id === "move") this._movePick = s.uid;
       },
     };
+  }
+
+  private _doRename(): void {
+    const input = this.shadowRoot?.querySelector(".rename-input") as HTMLInputElement | null;
+    const value = input?.value.trim();
+    const target = this._renameFor;
+    this._renameFor = undefined;
+    if (!target || !value || value === target.current) return;
+    // Applies immediately (renames the Sonos zone); then reload so the name shows.
+    void this.hass.callService("chorus", "rename", { speaker: target.uid, name: value });
+    this._toast(`Renamed to ${value}`);
+    this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
+  }
+
+  private _renameOverlay(): TemplateResult | typeof nothing {
+    if (!this._renameFor) return nothing;
+    return html`
+      <div class="backdrop" @click=${() => (this._renameFor = undefined)}>
+        <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="sheet-h">Rename speaker</div>
+          <input
+            class="rename-input"
+            type="text"
+            .value=${this._renameFor.current}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") this._doRename();
+            }}
+          />
+          <div class="rename-btns">
+            <button type="button" class="sheet-cancel" @click=${() => (this._renameFor = undefined)}>
+              Cancel
+            </button>
+            <button type="button" class="rename-save" @click=${() => this._doRename()}>Save</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   private _doMove(uid: string, target: string): void {
@@ -441,6 +532,8 @@ export class ChorusEditor extends LitElement {
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
       ${this._moveOverlay()}
+      ${this._subOverlay()}
+      ${this._renameOverlay()}
       <chorus-menu
         .open=${!!this._menu}
         .heading=${this._menu?.heading ?? ""}
@@ -516,11 +609,29 @@ export class ChorusEditor extends LitElement {
         <span class="grow"></span>
         ${r.ht ? this._dots(() => this._openRoomMenu(r)) : nothing}
       </div>
-      ${r.ht ? this._htStage(r, r.ht) : nothing}
+      ${r.ht ? this._htStage(r, r.ht) : this._setupCta(r)}
       ${r.pairs.length
         ? html`<div class="paircards">${r.pairs.map((p, i) => this._pairCard(r, p, i))}</div>`
         : nothing}
       ${this._traySection(r)}
+    `;
+  }
+
+  private _setupCta(r: Room): TemplateResult | typeof nothing {
+    const bar = r.tray.find((s) => isBar(s.model));
+    if (!bar) return nothing;
+    return html`
+      <button
+        type="button"
+        class="cta"
+        @click=${() => {
+          this._working = setupHT(this._rooms, r.key, bar.uid);
+          this._dirty = true;
+          this._toast("Home theater created");
+        }}
+      >
+        ＋ Set up a home theater with ${this._name(bar)}
+      </button>
     `;
   }
 
@@ -1204,6 +1315,56 @@ export class ChorusEditor extends LitElement {
     .newpair:hover {
       border-color: var(--primary-color);
       background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    }
+    .cta {
+      width: 100%;
+      margin: 4px 0 8px;
+      border: 1.5px dashed var(--divider-color);
+      background: none;
+      color: var(--primary-color);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 14px;
+      padding: 14px;
+      cursor: pointer;
+    }
+    .cta:hover {
+      border-color: var(--primary-color);
+      background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    }
+    .rename-input {
+      width: 100%;
+      box-sizing: border-box;
+      font: inherit;
+      font-size: 15px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--divider-color);
+      background: var(--secondary-background-color);
+      color: var(--primary-text-color);
+      margin: 8px 0 8px;
+    }
+    .rename-input:focus {
+      outline: 2px solid var(--primary-color);
+      border-color: transparent;
+    }
+    .rename-btns {
+      display: flex;
+      gap: 8px;
+    }
+    .rename-btns button {
+      flex: 1;
+    }
+    .rename-save {
+      border: none;
+      background: var(--primary-color);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      padding: 11px;
+      border-radius: 12px;
+      cursor: pointer;
     }
 
     /* ---- picker sheet ---- */

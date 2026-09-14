@@ -155,6 +155,80 @@ export function moveSpeaker(rooms: Room[], speakerUid: string, targetRoom: strin
   return next;
 }
 
+/**
+ * Move a sub speaker (found anywhere in `rooms` — a room tray OR another pair's
+ * `.sub`) into `rooms[roomKey].pairs[pairIndex].sub`, detaching it from its old
+ * location first. If the target pair already has a sub, that old sub is returned to
+ * the target room's tray. No-op (returns a clone) if the sub uid or the target pair
+ * can't be found.
+ */
+export function addSubToPair(
+  rooms: Room[],
+  roomKey: string,
+  pairIndex: number,
+  subUid: string
+): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room) return next;
+  const pair = room.pairs[pairIndex];
+  if (!pair) return next;
+  // Detach the sub from wherever it currently lives (a tray or another pair's sub).
+  let sub: EditorSpeaker | undefined;
+  for (const r of next) {
+    const i = r.tray.findIndex((s) => s.uid === subUid);
+    if (i !== -1) {
+      sub = r.tray.splice(i, 1)[0];
+      break;
+    }
+    const p = r.pairs.find((pp) => pp.sub?.uid === subUid);
+    if (p) {
+      sub = p.sub!;
+      p.sub = null;
+      break;
+    }
+  }
+  if (!sub) return next;
+  // Displace an existing sub on the target pair back to the target room's tray.
+  if (pair.sub) {
+    room.tray.push(pair.sub);
+    room.tray.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }
+  pair.sub = sub;
+  return next;
+}
+
+/** Move the pair's sub back to the room's tray; pair.sub becomes null. No-op if none. */
+export function removeSubFromPair(rooms: Room[], roomKey: string, pairIndex: number): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room) return next;
+  const pair = room.pairs[pairIndex];
+  if (!pair || !pair.sub) return next;
+  room.tray.push(pair.sub);
+  pair.sub = null;
+  room.tray.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return next;
+}
+
+/**
+ * Turn a standalone soundbar (currently in the room's tray, identified by uid) into
+ * a home theater: set room.ht = { bar, slots: all null } and remove it from the
+ * tray. No-op if the room already has an ht, or the uid isn't in the tray.
+ */
+export function setupHT(rooms: Room[], roomKey: string, barUid: string): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room || room.ht) return next;
+  const idx = room.tray.findIndex((s) => s.uid === barUid);
+  if (idx === -1) return next;
+  const [bar] = room.tray.splice(idx, 1);
+  const slots = {} as Record<Channel, EditorSpeaker | null>;
+  for (const ch of CHANNELS) slots[ch] = null;
+  room.ht = { bar, slots };
+  return next;
+}
+
 /** Separate a whole home theater — every satellite returns to the tray, the
  * soundbar stays (as a standalone soundbar ready to rebuild). */
 export function dissolveHT(rooms: Room[], roomKey: string): Room[] {

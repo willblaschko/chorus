@@ -18,7 +18,8 @@ SERVICE_CREATE_STEREO_PAIR = "create_stereo_pair"
 SERVICE_SEPARATE = "separate"
 SERVICE_SET_HOME_THEATER = "set_home_theater"
 SERVICE_REMOVE_HOME_THEATER = "remove_home_theater"
-SERVICE_MOVE = "move"  # SetZoneAttributes rename == move to another room
+SERVICE_MOVE = "move"  # SetZoneAttributes rename + HA Area reassign == move rooms
+SERVICE_RENAME = "rename"  # SetZoneAttributes rename only (keep the room)
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
 

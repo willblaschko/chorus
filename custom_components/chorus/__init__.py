@@ -20,6 +20,7 @@ from .const import (
     ERR_PRIMARY_NOT_SOUNDBAR,
     SERVICE_CREATE_STEREO_PAIR,
     SERVICE_MOVE,
+    SERVICE_RENAME,
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_RESTORE,
     SERVICE_SEPARATE,
@@ -43,6 +44,7 @@ _ALL_SERVICES = (
     SERVICE_SET_HOME_THEATER,
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_MOVE,
+    SERVICE_RENAME,
     SERVICE_SNAPSHOT,
     SERVICE_RESTORE,
 )
@@ -184,6 +186,12 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         set_speaker_area(hass, speaker["uid"], name)
         await coordinator.async_request_refresh()
 
+    async def rename(call: ServiceCall) -> None:
+        # Rename the speaker's Sonos zone only — keep its room (no Area change).
+        speaker = resolve(call.data["speaker"])
+        await run(backend.set_zone_name, speaker["ip"], call.data["name"])
+        await coordinator.async_request_refresh()
+
     # --- snapshot / restore of a soundbar's HT layout ---------------------
     async def snapshot(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
@@ -228,6 +236,10 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     )
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE, move,
+        schema=vol.Schema({vol.Required("speaker"): name, vol.Required("name"): name}),
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_RENAME, rename,
         schema=vol.Schema({vol.Required("speaker"): name, vol.Required("name"): name}),
     )
     hass.services.async_register(

@@ -8,6 +8,9 @@ import {
   swapPair,
   dissolveHT,
   moveSpeaker,
+  addSubToPair,
+  removeSubFromPair,
+  setupHT,
 } from "./layout.js";
 import { computeOps } from "./apply.js";
 import type { Room, EditorSpeaker } from "./model.js";
@@ -130,6 +133,60 @@ describe("clearChannel / createPair / separatePair", () => {
     const after = moveSpeaker(mediaRoom(), "E1", "Kitchen");
     expect(after.find((r) => r.name === "Media Room")!.tray.some((s) => s.uid === "E1")).toBe(false);
     expect(after.find((r) => r.name === "Kitchen")!.tray.map((s) => s.uid)).toEqual(["E1"]);
+  });
+});
+
+// Living Room: a stereo pair (no sub) plus a lone Sub and a lone Beam in the tray.
+function pairRoom(): Room[] {
+  return [
+    {
+      key: "Living Room",
+      name: "Living Room",
+      area: "Living Room",
+      ht: null,
+      pairs: [{ L: spk("PL", "Living Room", "Sonos Era 100"), R: spk("PR", "Living Room 2", "Sonos Era 100"), sub: null }],
+      tray: [spk("SUB", "Living Room Sub", "Sonos Sub"), spk("BEAM", "Living Room Beam", "Sonos Beam")],
+    },
+  ];
+}
+
+describe("addSubToPair / removeSubFromPair", () => {
+  it("moves a tray sub into the pair's .sub and out of the tray; input unchanged", () => {
+    const before = pairRoom();
+    const after = addSubToPair(before, "Living Room", 0, "SUB");
+    expect(after[0].pairs[0].sub?.uid).toBe("SUB");
+    expect(after[0].tray.some((s) => s.uid === "SUB")).toBe(false);
+    // purity: input untouched
+    expect(before[0].pairs[0].sub).toBeNull();
+    expect(before[0].tray.map((s) => s.uid)).toEqual(["SUB", "BEAM"]);
+  });
+
+  it("is a no-op for a bad sub uid", () => {
+    const after = addSubToPair(pairRoom(), "Living Room", 0, "NOPE");
+    expect(after[0].pairs[0].sub).toBeNull();
+    expect(after[0].tray.map((s) => s.uid)).toEqual(["SUB", "BEAM"]);
+  });
+
+  it("removeSubFromPair returns the pair's sub to the tray and nulls .sub", () => {
+    const withSub = addSubToPair(pairRoom(), "Living Room", 0, "SUB");
+    const after = removeSubFromPair(withSub, "Living Room", 0);
+    expect(after[0].pairs[0].sub).toBeNull();
+    expect(after[0].tray.some((s) => s.uid === "SUB")).toBe(true);
+  });
+});
+
+describe("setupHT", () => {
+  it("promotes a tray soundbar to an HT with five null slots, out of the tray", () => {
+    const after = setupHT(pairRoom(), "Living Room", "BEAM");
+    expect(after[0].ht?.bar.uid).toBe("BEAM");
+    expect(after[0].ht?.slots).toEqual({ LF: null, RF: null, LR: null, RR: null, SW: null });
+    expect(after[0].tray.some((s) => s.uid === "BEAM")).toBe(false);
+  });
+
+  it("is a no-op when the room already has an ht", () => {
+    const after = setupHT(mediaRoom(), "Media Room", "E1");
+    expect(after[0].ht?.bar.uid).toBe("BAR");
+    expect(after[0].tray.some((s) => s.uid === "E1")).toBe(true);
   });
 });
 

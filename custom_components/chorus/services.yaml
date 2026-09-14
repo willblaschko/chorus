@@ -101,6 +101,22 @@ move:
       selector:
         text:
 
+rename:
+  name: Rename speaker
+  description: Rename a speaker's Sonos zone (SetZoneAttributes) without changing its room.
+  fields:
+    speaker:
+      name: Speaker
+      description: Sonos room/speaker name or RINCON UID.
+      required: true
+      selector:
+        text:
+    name:
+      name: New name
+      required: true
+      selector:
+        text:
+
 snapshot:
   name: Snapshot home theater
   description: Save a soundbar's current home-theater layout so it can be restored later.

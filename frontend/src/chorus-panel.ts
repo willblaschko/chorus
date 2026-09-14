@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { BondGraph, BondUnit, BondMember, HomeAssistant } from "./types.js";
 import "./chorus-editor.js";
+import "./chorus-help.js";
 
 type View = "editor" | "overview";
 
@@ -44,6 +45,7 @@ export class ChorusPanel extends LitElement {
   @state() private _graph?: BondGraph;
   @state() private _error?: string;
   @state() private _loading = true;
+  @state() private _help = false;
 
   private _pollTimer?: number;
   private _polling = false;
@@ -107,6 +109,7 @@ export class ChorusPanel extends LitElement {
         ${this._header()}
         ${this._view === "overview" ? this._overview() : this._editor()}
       </div>
+      <chorus-help .open=${this._help} @close=${() => (this._help = false)}></chorus-help>
     `;
   }
 
@@ -140,6 +143,7 @@ export class ChorusPanel extends LitElement {
           ? html`<span class="count">${units} unit${units === 1 ? "" : "s"}</span>`
           : nothing}
         <button class="refresh" @click=${() => this._load(true)}>Refresh</button>
+        <button class="refresh" title="How it works" @click=${() => (this._help = true)}>?</button>
       </header>
     `;
   }
