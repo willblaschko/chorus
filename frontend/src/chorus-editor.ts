@@ -542,7 +542,7 @@ export class ChorusEditor extends LitElement {
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
       ${this._applying
-        ? html`<div class="settling">Settling — waiting for your speakers to finish…</div>`
+        ? html`<div class="settling">Finishing up… this can take up to a minute.</div>`
         : nothing}
       ${this._pickerOverlay()}
       ${this._pairOverlay()}

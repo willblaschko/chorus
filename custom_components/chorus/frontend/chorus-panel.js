@@ -907,7 +907,7 @@ function e(e,t,r,o){var i,s=arguments.length,a=s<3?t:null===o?o=Object.getOwnPro
         </div>
         <div class="col-detail">${t?this._detail(t):q}</div>
       </div>
-      ${this._applying?W`<div class="settling">Settling — waiting for your speakers to finish…</div>`:q}
+      ${this._applying?W`<div class="settling">Finishing up… this can take up to a minute.</div>`:q}
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
       ${this._moveOverlay()}
