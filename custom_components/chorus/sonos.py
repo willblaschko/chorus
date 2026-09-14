@@ -60,6 +60,12 @@ class SonosBackend:
             text = err.read().decode("utf-8", "replace")
             match = re.search(r"<errorCode>(\d+)</errorCode>", text)
             raise SonosSoapError(match.group(1) if match else None, text) from err
+        except (urllib.error.URLError, TimeoutError, OSError) as err:
+            # A connection reset / timeout while the device is mid-reconfigure (the
+            # window right after a Separate/Remove). Surface as a code-less SoapError
+            # so callers wrap it cleanly (a 400, not a raw 500) and the settle-retry
+            # loop can try again instead of the exception escaping unhandled.
+            raise SonosSoapError(None, f"{type(err).__name__}: {err}") from err
 
     def _dp(self, ip: str, action: str, body: str = "") -> str:
         return self._soap(ip, "/DeviceProperties/Control", _DP_NS, action, body)
@@ -132,7 +138,10 @@ class SonosBackend:
             try:
                 return apply_fn()
             except SonosSoapError as err:
-                if err.code == "800" and time.monotonic() < deadline:
+                # Retry the transient states while there's still time: 800 (not
+                # settled) and a code-less error (a connection reset/timeout while the
+                # device is still cycling). Past the deadline it raises -> a clean 400.
+                if err.code in ("800", None) and time.monotonic() < deadline:
                     time.sleep(2.0)
                     continue
                 raise
