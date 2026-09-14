@@ -260,7 +260,7 @@ export class ChorusEditor extends LitElement {
         ]
       : [
           { id: "audio", label: "Audio settings" },
-          { id: "addsub", label: "Add a sub…" },
+          { id: "addsub", label: "Add a sub" },
           { id: "swap", label: "Swap L / R" },
           { id: "separate", label: "Separate pair", danger: true },
         ];
