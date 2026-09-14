@@ -140,7 +140,15 @@ class SonosBackend:
     # -- stereo pair -------------------------------------------------------
     def create_stereo_pair(self, left_ip: str, left_uid: str, right_uid: str) -> str:
         body = f"<ChannelMapSet>{left_uid}:LF,LF;{right_uid}:RF,RF</ChannelMapSet>"
-        return self._dp(left_ip, "CreateStereoPair", body)
+        # A swap re-pairs a speaker that was JUST separated (an L/R swap = separate ->
+        # re-create reversed); the freed speaker passes through limbo, so CreateStereoPair
+        # returns 800 if fired too soon. Wait for the left speaker to settle to a
+        # standalone, then apply with retry-on-800 (same crux as add_ht_satellite).
+        return self._apply_with_settle(
+            lambda: self._dp(left_ip, "CreateStereoPair", body),
+            wait_uid=left_uid,
+            wait_ip=left_ip,
+        )
 
     def separate_stereo_pair(self, left_ip: str, left_uid: str, right_uid: str) -> str:
         body = f"<ChannelMapSet>{left_uid}:LF,LF;{right_uid}:RF,RF</ChannelMapSet>"

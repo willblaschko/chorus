@@ -113,7 +113,23 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
 
     # --- stereo pair ------------------------------------------------------
     async def create_stereo_pair(call: ServiceCall) -> None:
-        left, right = resolve(call.data["left"]), resolve(call.data["right"])
+        left_id, right_id = call.data["left"], call.data["right"]
+        # An L/R swap is separate -> re-create reversed: the re-created "left" is a
+        # speaker that was JUST unbonded, so soco.discover hasn't caught up. Resolve
+        # by UID against a FRESH topology (same fix as set_home_theater's resolve_sat),
+        # seeding the ZGS query from whichever speaker the coordinator can already see.
+        seed = (
+            coordinator.players.get(left_id)
+            or coordinator.players.get(right_id)
+            or coordinator.by_name(left_id)
+            or coordinator.by_name(right_id)
+            or next(iter(coordinator.players.values()), None)
+        )
+        if not seed:
+            raise HomeAssistantError("No Sonos speakers available to query")
+        ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
+        left = await hass.async_add_executor_job(resolve_sat, left_id, ip_map)
+        right = await hass.async_add_executor_job(resolve_sat, right_id, ip_map)
         for p in (left, right):
             if not can_pair(p["model"]):
                 raise HomeAssistantError(f"{p['name']} ({p['model']}) can't be stereo-paired")
