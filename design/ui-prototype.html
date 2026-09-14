@@ -521,7 +521,7 @@
   }
   function speakerRow(r,sp){var row=el("div","row");row.draggable=true;var rt=el("div","rt");rt.appendChild(orb(sp,"t-neutral"));rt.firstChild.style.width="44px";rt.firstChild.style.height="44px";rt.firstChild.draggable=false;
     var meta=el("div","rx");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=sp.name;$("span",meta).textContent=sm(sp.model);
-    row.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};row.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id)}catch(_){}} );
+    row.addEventListener("dragstart",function(e){drag={roomKey:current,sp:sp};e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",sp.id);e.dataTransfer.setDragImage(rt.firstChild,22,22)}catch(_){}row.classList.add("dragging")});
     row.addEventListener("dragend",function(){row.classList.remove("dragging");drag=null});
     row.addEventListener("click",function(){speakerSheet(sp)});
     row.appendChild(rt);row.appendChild(meta);row.appendChild(el("div","rowchev","›"));return row;}
