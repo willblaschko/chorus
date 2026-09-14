@@ -4,6 +4,7 @@ import type { BondGraph, HomeAssistant } from "./types.js";
 import {
   buildRooms,
   positionAccepts,
+  canPair,
   CHANNELS,
   CHANNEL_NAME,
   type Channel,
@@ -14,7 +15,7 @@ import {
 } from "./model.js";
 import { iconFor, shortModel } from "./icons.js";
 import { TV_ART, COUCH_ART } from "./art.js";
-import { roomsToLayout, assignToChannel, clearChannel, separatePair } from "./layout.js";
+import { roomsToLayout, assignToChannel, clearChannel, createPair, separatePair } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
@@ -46,6 +47,7 @@ export class ChorusEditor extends LitElement {
   @state() private _applying = false;
   @state() private _rows: ChangeRow[] = []; // live rows during apply
   @state() private _picker?: { roomKey: string; ch: Channel };
+  @state() private _pairPick?: { roomKey: string; first?: string };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -99,6 +101,20 @@ export class ChorusEditor extends LitElement {
     this._working = separatePair(this._rooms, roomKey, index);
     this._dirty = true;
     this._toast("Stereo pair separated");
+  }
+
+  private _pickPairMember(sp: EditorSpeaker): void {
+    if (!this._pairPick) return;
+    const { roomKey, first } = this._pairPick;
+    if (!first) {
+      this._pairPick = { roomKey, first: sp.uid }; // pick the partner next
+      return;
+    }
+    if (sp.uid === first) return;
+    this._working = createPair(this._rooms, roomKey, first, sp.uid);
+    this._dirty = true;
+    this._pairPick = undefined;
+    this._toast("Stereo pair created");
   }
 
   private _discard(): void {
@@ -189,6 +205,7 @@ export class ChorusEditor extends LitElement {
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
       ${this._pickerOverlay()}
+      ${this._pairOverlay()}
       <chorus-changebar
         .rows=${rows}
         .busy=${this._applying}
@@ -341,9 +358,15 @@ export class ChorusEditor extends LitElement {
       return r.ht || r.pairs.length ? nothing : html`<div class="empty">No speakers in this room.</div>`;
     }
     const heading = r.ht || r.pairs.length ? "Available speakers" : "Speakers";
+    const pairable = r.tray.filter((s) => canPair(s.model)).length >= 2;
     return html`
       <div class="sec">${heading}</div>
       <div class="rows">${r.tray.map((s) => this._speakerRow(s))}</div>
+      ${pairable
+        ? html`<button type="button" class="newpair" @click=${() => (this._pairPick = { roomKey: r.key })}>
+            ＋ Create stereo pair
+          </button>`
+        : nothing}
     `;
   }
 
@@ -377,6 +400,34 @@ export class ChorusEditor extends LitElement {
               )
             : html`<div class="sheet-empty">No eligible speaker in this room.</div>`}
           <button type="button" class="sheet-cancel" @click=${() => (this._picker = undefined)}>Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ---- picker overlay (create stereo pair) ---------------------------
+  private _pairOverlay(): TemplateResult | typeof nothing {
+    if (!this._pairPick) return nothing;
+    const { roomKey, first } = this._pairPick;
+    const room = this._rooms.find((r) => r.key === roomKey);
+    const candidates = (room?.tray ?? []).filter((s) => canPair(s.model) && s.uid !== first);
+    return html`
+      <div class="backdrop" @click=${() => (this._pairPick = undefined)}>
+        <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="sheet-h">
+            ${first ? "Pick the partner speaker" : "Create stereo pair — pick the first speaker"}
+          </div>
+          ${candidates.length
+            ? candidates.map(
+                (s) => html`
+                  <button type="button" class="sheet-item" @click=${() => this._pickPairMember(s)}>
+                    <span class="rt">${iconFor(s.model)}</span>
+                    <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
+                  </button>
+                `
+              )
+            : html`<div class="sheet-empty">No speaker available to pair.</div>`}
+          <button type="button" class="sheet-cancel" @click=${() => (this._pairPick = undefined)}>Cancel</button>
         </div>
       </div>
     `;
@@ -797,6 +848,24 @@ export class ChorusEditor extends LitElement {
       text-align: center;
       color: var(--secondary-text-color);
       font-size: 15px;
+    }
+
+    .newpair {
+      width: 100%;
+      margin-top: 10px;
+      border: 1.5px dashed var(--divider-color);
+      background: none;
+      color: var(--primary-color);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 14px;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .newpair:hover {
+      border-color: var(--primary-color);
+      background: color-mix(in srgb, var(--primary-color) 8%, transparent);
     }
 
     /* ---- picker sheet ---- */
