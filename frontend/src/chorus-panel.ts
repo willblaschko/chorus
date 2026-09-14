@@ -117,8 +117,10 @@ export class ChorusPanel extends LitElement {
       return html`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;
     }
     return html`<chorus-editor
+      .hass=${this.hass}
       .graph=${this._graph}
       .narrow=${this.narrow}
+      @chorus-refresh=${() => this._load()}
     ></chorus-editor>`;
   }
 

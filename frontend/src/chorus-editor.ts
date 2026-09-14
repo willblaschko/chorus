@@ -1,8 +1,9 @@
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BondGraph } from "./types.js";
+import type { BondGraph, HomeAssistant } from "./types.js";
 import {
   buildRooms,
+  positionAccepts,
   CHANNELS,
   CHANNEL_NAME,
   type Channel,
@@ -13,8 +14,12 @@ import {
 } from "./model.js";
 import { iconFor, shortModel } from "./icons.js";
 import { TV_ART, COUCH_ART } from "./art.js";
+import { roomsToLayout, assignToChannel, clearChannel, separatePair } from "./layout.js";
+import { planChanges, applyPlan, isEmpty } from "./staged.js";
+import "./chorus-changebar.js";
+import "./chorus-toast.js";
+import type { ChangeRow } from "./chorus-changebar.js";
 
-// Channel -> tint class on the position tile / badge.
 const CH_TINT: Record<Channel, string> = {
   LF: "t-front",
   RF: "t-front",
@@ -24,22 +29,34 @@ const CH_TINT: Record<Channel, string> = {
 };
 
 /**
- * The primary editor view (read-only structure + full styling).
- * Master-detail: a room list (grouped by HA Area) -> the selected room's detail.
- * A room may hold a home-theater stage (TV art + tinted Front/Rear/Sub tiles +
- * listening-position couch), stereo-pair cards, and its lone speakers (the pool
- * available to bond — scoped to this room's area). Drag/drop + tap-to-assign + a
- * staged Apply land on top of this same layout next.
+ * The primary editor: rooms grouped by HA Area, a spatial home-theater stage, and
+ * interactive editing. Tap an empty channel to assign a speaker from the room; tap
+ * the × to remove one; separate a pair. Edits stage locally (nothing hits Sonos)
+ * and surface in the change bar; Apply pushes them via the chorus.* services.
  */
 @customElement("chorus-editor")
 export class ChorusEditor extends LitElement {
+  @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) public graph?: BondGraph;
   @property({ type: Boolean }) public narrow = false;
 
   @state() private _selected?: string;
+  @state() private _working?: Room[]; // staged edits (undefined until synced from graph)
+  @state() private _dirty = false;
+  @state() private _applying = false;
+  @state() private _rows: ChangeRow[] = []; // live rows during apply
+  @state() private _picker?: { roomKey: string; ch: Channel };
+
+  protected override willUpdate(changed: PropertyValues): void {
+    // Sync the working model from the live graph — but never clobber staged edits
+    // (the coordinator refreshes every 30s; that must not wipe your in-progress work).
+    if ((changed.has("graph") && !this._dirty) || this._working === undefined) {
+      this._working = structuredClone(buildRooms(this.graph));
+    }
+  }
 
   private get _rooms(): Room[] {
-    return buildRooms(this.graph);
+    return this._working ?? buildRooms(this.graph);
   }
 
   private _room(): Room | undefined {
@@ -51,12 +68,71 @@ export class ChorusEditor extends LitElement {
     return this.narrow ? undefined : rooms[0];
   }
 
+  // ---- staged plan + apply -------------------------------------------
+  private _plan() {
+    const base = roomsToLayout(buildRooms(this.graph));
+    const working = roomsToLayout(this._rooms);
+    return planChanges(base, working);
+  }
+
+  private _toast(message: string): void {
+    const el = this.shadowRoot?.querySelector("chorus-toast") as
+      | { show(m: string): void }
+      | null;
+    el?.show(message);
+  }
+
+  private _assign(roomKey: string, ch: Channel, sp: EditorSpeaker): void {
+    this._working = assignToChannel(this._rooms, roomKey, ch, sp.uid);
+    this._dirty = true;
+    this._picker = undefined;
+    this._toast(`${sp.name} → ${CHANNEL_NAME[ch]}`);
+  }
+
+  private _clear(roomKey: string, ch: Channel, sp: EditorSpeaker): void {
+    this._working = clearChannel(this._rooms, roomKey, ch);
+    this._dirty = true;
+    this._toast(`${sp.name} removed from ${CHANNEL_NAME[ch]}`);
+  }
+
+  private _separate(roomKey: string, index: number): void {
+    this._working = separatePair(this._rooms, roomKey, index);
+    this._dirty = true;
+    this._toast("Stereo pair separated");
+  }
+
+  private _discard(): void {
+    this._working = structuredClone(buildRooms(this.graph));
+    this._dirty = false;
+    this._picker = undefined;
+    this._toast("Changes discarded");
+  }
+
+  private async _apply(): Promise<void> {
+    const plan = this._plan();
+    if (isEmpty(plan) || this._applying) return;
+    this._applying = true;
+    this._rows = plan.rows;
+    await applyPlan(this.hass, plan, (rows) => {
+      this._rows = [...rows];
+    });
+    const failed = this._rows.filter((r) => r.status === "error").length;
+    this._applying = false;
+    this._dirty = false;
+    // Ask the panel to reload the live graph; willUpdate then resets the working model.
+    this.dispatchEvent(new CustomEvent("chorus-refresh", { bubbles: true, composed: true }));
+    this._toast(failed ? `Applied with ${failed} error${failed === 1 ? "" : "s"}` : "Applied");
+  }
+
   public override render(): TemplateResult {
     const rooms = this._rooms;
     if (!rooms.length) {
-      return html`<div class="empty">No Sonos speakers discovered yet.</div>`;
+      return html`<div class="empty">No Sonos speakers discovered yet.</div>
+        <chorus-toast></chorus-toast>`;
     }
     const room = this._room();
+    const plan = this._plan();
+    const rows = this._applying ? this._rows : plan.rows;
     return html`
       <div class="grid" data-detail=${room ? "on" : "off"}>
         <div class="col-list">
@@ -65,6 +141,14 @@ export class ChorusEditor extends LitElement {
         </div>
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
+      ${this._pickerOverlay()}
+      <chorus-changebar
+        .rows=${rows}
+        .busy=${this._applying}
+        @apply=${this._apply}
+        @discard=${this._discard}
+      ></chorus-changebar>
+      <chorus-toast></chorus-toast>
     `;
   }
 
@@ -117,15 +201,15 @@ export class ChorusEditor extends LitElement {
         <h1>${r.name}</h1>
         ${r.area ? nothing : html`<span class="kind">No HA area</span>`}
       </div>
-      ${r.ht ? this._htStage(r.ht) : nothing}
+      ${r.ht ? this._htStage(r, r.ht) : nothing}
       ${r.pairs.length
-        ? html`<div class="paircards">${r.pairs.map((p) => this._pairCard(p))}</div>`
+        ? html`<div class="paircards">${r.pairs.map((p, i) => this._pairCard(r, p, i))}</div>`
         : nothing}
       ${this._traySection(r)}
     `;
   }
 
-  private _htStage(ht: HTLayout): TemplateResult {
+  private _htStage(r: Room, ht: HTLayout): TemplateResult {
     return html`
       <div class="stage">
         <div class="tv">${TV_ART}</div>
@@ -133,22 +217,29 @@ export class ChorusEditor extends LitElement {
           <span class="badge t-bar">${iconFor(ht.bar.model)}</span>
           <span class="pmeta"><b>${ht.bar.name}</b><span>${shortModel(ht.bar.model) || "Center"}</span></span>
         </div>
-        <div class="prow fronts">${this._pos(ht, "LF")}${this._pos(ht, "RF")}</div>
+        <div class="prow fronts">${this._pos(r, ht, "LF")}${this._pos(r, ht, "RF")}</div>
         <div class="lp"><div class="couch">${COUCH_ART}</div><small>Listening position</small></div>
-        <div class="prow rear">${this._pos(ht, "LR")}${this._pos(ht, "RR")}</div>
-        <div class="psub">${this._pos(ht, "SW")}</div>
+        <div class="prow rear">${this._pos(r, ht, "LR")}${this._pos(r, ht, "RR")}</div>
+        <div class="psub">${this._pos(r, ht, "SW")}</div>
       </div>
     `;
   }
 
-  private _pos(ht: HTLayout, ch: Channel): TemplateResult {
+  private _pos(r: Room, ht: HTLayout, ch: Channel): TemplateResult {
     const sp = ht.slots[ch];
+    const eligible = r.tray.some((s) => positionAccepts(ch, s.model));
     if (!sp) {
       return html`
-        <div class="postile empty">
+        <button
+          type="button"
+          class="postile empty ${eligible ? "actionable" : ""}"
+          ?disabled=${!eligible}
+          title=${eligible ? `Add ${CHANNEL_NAME[ch]}` : "No eligible speaker in this room"}
+          @click=${() => eligible && (this._picker = { roomKey: r.key, ch })}
+        >
           <span class="badge empty-badge">${ch}</span>
-          <span class="pmeta"><b>${CHANNEL_NAME[ch]}</b><span>Empty</span></span>
-        </div>
+          <span class="pmeta"><b>${CHANNEL_NAME[ch]}</b><span>${eligible ? "Tap to add" : "Empty"}</span></span>
+        </button>
       `;
     }
     return html`
@@ -158,12 +249,13 @@ export class ChorusEditor extends LitElement {
           <b>${sp.name}</b>
           <span>${CHANNEL_NAME[ch]} · ${shortModel(sp.model)}</span>
         </span>
+        <button type="button" class="x" title="Remove" @click=${() => this._clear(r.key, ch, sp)}>×</button>
       </div>
     `;
   }
 
   // ---- pairs ----------------------------------------------------------
-  private _pairCard(p: EditorPair): TemplateResult {
+  private _pairCard(r: Room, p: EditorPair, index: number): TemplateResult {
     return html`
       <div class="paircard">
         <div class="pc-orbs">
@@ -178,6 +270,9 @@ export class ChorusEditor extends LitElement {
         ${p.sub
           ? html`<span class="pc-sub"><span class="pc-sub-ic">${iconFor(p.sub.model)}</span> Sub · ${p.sub.name}</span>`
           : nothing}
+        <button type="button" class="pc-sep" title="Separate pair" @click=${() => this._separate(r.key, index)}>
+          Separate
+        </button>
       </div>
     `;
   }
@@ -196,7 +291,6 @@ export class ChorusEditor extends LitElement {
   // ---- lone speakers / available pool --------------------------------
   private _traySection(r: Room): TemplateResult | typeof nothing {
     if (!r.tray.length) {
-      // Only call it "empty" when the whole room is empty.
       return r.ht || r.pairs.length ? nothing : html`<div class="empty">No speakers in this room.</div>`;
     }
     const heading = r.ht || r.pairs.length ? "Available speakers" : "Speakers";
@@ -211,6 +305,32 @@ export class ChorusEditor extends LitElement {
       <div class="row">
         <span class="rt">${iconFor(s.model)}</span>
         <span class="rx"><b>${s.name}</b><span>${shortModel(s.model)}</span></span>
+      </div>
+    `;
+  }
+
+  // ---- picker overlay (tap-to-assign) --------------------------------
+  private _pickerOverlay(): TemplateResult | typeof nothing {
+    if (!this._picker) return nothing;
+    const { roomKey, ch } = this._picker;
+    const room = this._rooms.find((r) => r.key === roomKey);
+    const candidates = (room?.tray ?? []).filter((s) => positionAccepts(ch, s.model));
+    return html`
+      <div class="backdrop" @click=${() => (this._picker = undefined)}>
+        <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="sheet-h">Add ${CHANNEL_NAME[ch]}</div>
+          ${candidates.length
+            ? candidates.map(
+                (s) => html`
+                  <button type="button" class="sheet-item" @click=${() => this._assign(roomKey, ch, s)}>
+                    <span class="rt">${iconFor(s.model)}</span>
+                    <span class="rx"><b>${s.name}</b><span>${shortModel(s.model)}</span></span>
+                  </button>
+                `
+              )
+            : html`<div class="sheet-empty">No eligible speaker in this room.</div>`}
+          <button type="button" class="sheet-cancel" @click=${() => (this._picker = undefined)}>Cancel</button>
+        </div>
       </div>
     `;
   }
@@ -329,7 +449,6 @@ export class ChorusEditor extends LitElement {
       font-weight: 600;
     }
 
-    /* ---- tints ---- */
     .t-front {
       background: color-mix(in srgb, var(--chorus-front) 16%, var(--card-background-color));
       color: var(--chorus-front);
@@ -351,7 +470,6 @@ export class ChorusEditor extends LitElement {
       color: var(--secondary-text-color);
     }
 
-    /* ---- stage (sits on the page background; only tiles are cards) ---- */
     .stage {
       padding: 8px 0 18px;
       display: flex;
@@ -415,6 +533,13 @@ export class ChorusEditor extends LitElement {
       display: flex;
       align-items: center;
       gap: 11px;
+      position: relative;
+    }
+    button.postile {
+      font: inherit;
+      color: var(--primary-text-color);
+      text-align: left;
+      cursor: pointer;
     }
     .postile.bar {
       min-width: 200px;
@@ -423,6 +548,14 @@ export class ChorusEditor extends LitElement {
       background: none;
       border: 1.5px dashed var(--divider-color);
       box-shadow: none;
+    }
+    .postile.empty.actionable:hover {
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+    .postile.empty[disabled] {
+      cursor: default;
+      opacity: 0.75;
     }
     .badge {
       width: 40px;
@@ -458,8 +591,24 @@ export class ChorusEditor extends LitElement {
       font-size: 12px;
       color: var(--secondary-text-color);
     }
+    .x {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: none;
+      background: none;
+      color: var(--secondary-text-color);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 6px;
+    }
+    .x:hover {
+      color: var(--error-color, #d32f2f);
+      background: var(--secondary-background-color);
+    }
 
-    /* ---- pairs ---- */
     .paircards {
       display: flex;
       flex-direction: column;
@@ -529,8 +678,22 @@ export class ChorusEditor extends LitElement {
       height: 15px;
       display: block;
     }
+    .pc-sep {
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color);
+      color: var(--secondary-text-color);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .pc-sep:hover {
+      color: var(--error-color, #d32f2f);
+      border-color: var(--error-color, #d32f2f);
+    }
 
-    /* ---- rows ---- */
     .sec {
       font-size: 13px;
       font-weight: 700;
@@ -582,6 +745,67 @@ export class ChorusEditor extends LitElement {
       text-align: center;
       color: var(--secondary-text-color);
       font-size: 15px;
+    }
+
+    /* ---- picker sheet ---- */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.32);
+      display: grid;
+      place-items: center;
+      z-index: 50;
+    }
+    .sheet {
+      background: var(--card-background-color, #fff);
+      border-radius: 18px;
+      box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.5);
+      width: 320px;
+      max-width: 92vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .sheet-h {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 12px 10px 8px;
+    }
+    .sheet-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      border: none;
+      background: none;
+      font: inherit;
+      color: var(--primary-text-color);
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .sheet-item:hover {
+      background: var(--secondary-background-color);
+    }
+    .sheet-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--secondary-text-color);
+      font-size: 13px;
+    }
+    .sheet-cancel {
+      width: 100%;
+      border: none;
+      background: var(--secondary-background-color);
+      color: var(--primary-text-color);
+      font: inherit;
+      font-weight: 600;
+      padding: 11px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 5px;
     }
     @media (max-width: 800px) {
       .grid {
