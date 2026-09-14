@@ -297,6 +297,9 @@
   var CH=["LF","RF","LR","RR","SW"],CHNAME={LF:"Front L",RF:"Front R",LR:"Rear L",RR:"Rear R",SW:"Sub"};
   var TINT={LF:"t-front",RF:"t-front",LR:"t-rear",RR:"t-rear",SW:"t-sub",CC:"t-bar"};
   var current="media",drag=null,looseSubs=[{id:"freesub",name:"Sub",model:"Sonos Sub"}];
+  // The full set of Home Assistant areas. Some already hold Sonos (they show as rooms);
+  // the rest are valid move targets so we never create a duplicate area.
+  var haAreas=["Media Room","Bedroom","Guest Bedroom","Pantry","Office","Kitchen","Dining Room","Patio","Living Room","Family Room","Primary Bath","Basement","Garage","Hallway","Sunroom"];
   var $=function(s,r){return (r||document).querySelector(s)};
   function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
   function sm(m){return m.replace("Sonos ","").replace("Symfonisk ","")}
@@ -364,11 +367,10 @@
       b.addEventListener("dragleave",function(){b.classList.remove("droproom")});
       b.addEventListener("drop",function(e){e.preventDefault();b.classList.remove("droproom");moveSpeaker(drag,k)});
       box.appendChild(b);});
-    var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>New room</b><span>drop a speaker here</span></span>';
+    var nr=el("button","room newroom");nr.innerHTML='<span class="ric ric-new">+</span><span class="rmeta"><b>Another space</b><span>drop a speaker here</span></span>';
     nr.addEventListener("dragover",function(e){if(drag){e.preventDefault();nr.classList.add("droproom")}});
     nr.addEventListener("dragleave",function(){nr.classList.remove("droproom")});
-    nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");var d=drag;if(!d)return;
-      nameModal({title:"New room",message:"Name this room for "+d.sp.name,placeholder:"Room name",confirmLabel:"Create",onConfirm:function(name){createRoomWith(d,name)}});});
+    nr.addEventListener("drop",function(e){e.preventDefault();nr.classList.remove("droproom");var d=drag;if(!d)return;pickSpace(d);});
     box.appendChild(nr);
     renderChangeBar();
   }
@@ -378,6 +380,14 @@
     newRoomN++;var key="new"+newRoomN;sp.height=false;
     rooms[key]={name:(name&&name.trim())||"New Room",type:"solo",tray:[sp]};
     drag=null;current=key;toast("Created “"+rooms[key].name+"” with "+sp.name);render();}
+  var AREA_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>';
+  var PLUS_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg>';
+  function nameTaken(name){var n=(name||"").trim().toLowerCase();if(!n)return false;var t=false;Object.keys(rooms).forEach(function(k){if(rooms[k].name.toLowerCase()===n)t=true});haAreas.forEach(function(a){if(a.toLowerCase()===n)t=true});return t;}
+  function pickSpace(d){var used={};Object.keys(rooms).forEach(function(k){used[rooms[k].name.toLowerCase()]=1});
+    var unused=haAreas.filter(function(a){return !used[a.toLowerCase()]});
+    var items=unused.map(function(a){return {label:a,sub:"Home Assistant area · no Sonos yet",icon:AREA_IC,fn:function(){createRoomWith(d,a)}}});
+    items.push({label:"Create a new space…",icon:PLUS_IC,fn:function(){nameModal({title:"New space",message:"Name a new area for "+d.sp.name,placeholder:"Area name",confirmLabel:"Create",onConfirm:function(name){if(nameTaken(name)){toast("“"+name.trim()+"” already exists");return;}createRoomWith(d,name);}})}});
+    actionSheet("Move "+d.sp.name+" to…","Pick a Home Assistant space",items);}
   function nameModal(opts){var back=el("div","modal-back"),modal=el("div","modal");
     modal.innerHTML='<h3></h3><p></p><input type="text" autocomplete="off"><div class="modal-btns"><button class="mbtn-cancel">Cancel</button><button class="mbtn-ok"></button></div>';
     $("h3",modal).textContent=opts.title;$("p",modal).textContent=opts.message||"";
@@ -497,12 +507,12 @@
   function dropPos(r,ch,tileEl,paint){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;if(!posAccepts(ch,sp))return;
     r.tray=r.tray.filter(function(x){return x.id!==sp.id});Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id)r.slots[k]=null});
     if(r.slots[ch]){r.slots[ch].height=false;r.tray.push(r.slots[ch])}
-    r.slots[ch]=Object.assign({},sp,{height:false});renderHT(r);buildRooms();}
-  function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);renderHT(r);buildRooms()}
-  function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});renderHT(r);buildRooms()}
-  function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};delete r.type;r.pairs=r.pairs||[];render();}
+    r.slots[ch]=Object.assign({},sp,{height:false});toast(sp.name+" → "+(ch==="SW"?"Sub":CHNAME[ch]));renderHT(r);buildRooms();}
+  function unbond(r,ch){var sp=r.slots[ch];if(!sp)return;sp.height=false;r.slots[ch]=null;r.tray.push(sp);toast(sp.name+" removed from theater");renderHT(r);buildRooms()}
+  function unbondToShelf(r){if(!drag||drag.roomKey!==current)return;var sp=drag.sp;Object.keys(r.slots).forEach(function(k){if(r.slots[k]&&r.slots[k].id===sp.id){r.slots[k]=null;if(!r.tray.some(function(x){return x.id===sp.id}))r.tray.push(sp)}});toast(sp.name+" removed from theater");renderHT(r);buildRooms()}
+  function dissolve(r){Object.keys(r.slots).forEach(function(k){if(r.slots[k]){r.slots[k].height=false;r.tray.push(r.slots[k])}});if(r.bar)r.tray.unshift(r.bar);r.bar=null;r.slots={};delete r.type;r.pairs=r.pairs||[];toast("Home theater separated");render();}
 
-  function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";renderHT(r);buildRooms();}
+  function setupHT(r){var bar=barIn(r);if(!bar)return;r.tray=r.tray.filter(function(x){return x!==bar});r.bar=bar;r.slots={LF:null,RF:null,LR:null,RR:null,SW:null};r.type="ht";toast("Home theater created");renderHT(r);buildRooms();}
   function renderBarSetup(r){var m=$("#main");m.innerHTML="";var bar=barIn(r),others=r.tray.filter(function(x){return x!==bar});
     var head=el("div","head");var left=el("div","head-l");left.innerHTML='<h1></h1><div class="chips"><span class="chip">Soundbar</span><span class="chip">Standalone</span></div>';$("h1",left).textContent=r.name;head.appendChild(left);m.appendChild(head);
     var sec=el("div","sec");sec.innerHTML='<h2>Home theater</h2><span class="sc">not set up yet</span>';m.appendChild(sec);
@@ -529,7 +539,7 @@
     if(!pairs.length&&!solos.length){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">No speakers here yet</div><div class="wm" style="max-width:34ch;text-align:center">Drop a speaker onto “'+r.name+'” in the sidebar to move one in.</div>';m.appendChild(e);}
   }
   function startPair(r){if(!drag)return;var sp=drag.sp;if(!speakerKind(sp.model).pair){drag=null;return;}
-    detach(rooms[drag.roomKey],sp);sp.height=false;if(!r.pairs)r.pairs=[];r.pairs.push({L:sp,R:null,sub:null});drag=null;render();}
+    detach(rooms[drag.roomKey],sp);sp.height=false;if(!r.pairs)r.pairs=[];r.pairs.push({L:sp,R:null,sub:null});toast("Pairing "+sp.name+" — drop a partner");drag=null;render();}
   function pairCard(r,p){var complete=p.L&&p.R,card=el("div","paircard");
     var orbs=el("div","pc-orbs");orbs.appendChild(pcSlot(r,p,"L"));orbs.appendChild(el("div","pc-div","·"));orbs.appendChild(pcSlot(r,p,"R"));card.appendChild(orbs);
     var meta=el("div","pc-meta");meta.innerHTML='<b></b><span></span>';$("b",meta).textContent=complete?"Stereo pair":"Pairing…";$("span",meta).textContent=complete?sm(p.L.model):"drop a partner on the empty side";card.appendChild(meta);
@@ -540,18 +550,18 @@
     else{s.appendChild(el("div","pc-drop",side));s.appendChild(el("div","pc-side","drop partner"));
       s.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();s.classList.add("over")}});
       s.addEventListener("dragleave",function(){s.classList.remove("over")});
-      s.addEventListener("drop",function(e){e.preventDefault();s.classList.remove("over");if(!drag||drag.roomKey!==current)return;var b=drag.sp;if(!speakerKind(b.model).pair)return;detach(rooms[current],b);b.height=false;p[side]=b;drag=null;render();});}
+      s.addEventListener("drop",function(e){e.preventDefault();s.classList.remove("over");if(!drag||drag.roomKey!==current)return;var b=drag.sp;if(!speakerKind(b.model).pair)return;detach(rooms[current],b);b.height=false;p[side]=b;toast("Stereo pair created");drag=null;render();});}
     return s;}
   function pairMenu(r,p){var complete=p.L&&p.R,items=[];
     if(complete){items.push(["Audio settings",0,function(){audioSheet(p,"pair","Stereo pair")}]);
-      items.push(["Swap left / right",0,function(){var t=p.L;p.L=p.R;p.R=t;render()}]);
-      if(p.sub)items.push(["Remove Sub",0,function(){looseSubs.push(p.sub);p.sub=null;render()}]);
+      items.push(["Swap left / right",0,function(){var t=p.L;p.L=p.R;p.R=t;toast("Swapped left / right");render()}]);
+      if(p.sub)items.push(["Remove Sub",0,function(){toast(p.sub.name+" removed");looseSubs.push(p.sub);p.sub=null;render()}]);
       else if(allSubs(p).length)items.push(["Add a Sub",0,function(){subPicker(r,p)}]);
       items.push(["sep"]);items.push(["Separate pair",1,function(){separatePair(r,p)}]);}
     else items.push(["Cancel pairing",1,function(){separatePair(r,p)}]);
     return menuFrom(items);}
-  function separatePair(r,p){[p.L,p.R].forEach(function(mm){if(mm)r.tray.push(mm)});if(p.sub)looseSubs.push(p.sub);r.pairs=r.pairs.filter(function(x){return x!==p});render();}
-  function subPicker(r,p){var opts=allSubs(p);actionSheet("Add a Sub","Choose a Sub to bond to this pair",opts.map(function(o){return {label:o.sub.name+" · "+sm(o.sub.model),sub:o.loc,icon:ICON.sub,fn:function(){o.take();p.sub=Object.assign({},o.sub);render()}}}))}
+  function separatePair(r,p){var wc=p.L&&p.R;[p.L,p.R].forEach(function(mm){if(mm)r.tray.push(mm)});if(p.sub)looseSubs.push(p.sub);r.pairs=r.pairs.filter(function(x){return x!==p});toast(wc?"Pair separated":"Pairing cancelled");render();}
+  function subPicker(r,p){var opts=allSubs(p);actionSheet("Add a Sub","Choose a Sub to bond to this pair",opts.map(function(o){return {label:o.sub.name+" · "+sm(o.sub.model),sub:o.loc,icon:ICON.sub,fn:function(){o.take();p.sub=Object.assign({},o.sub);toast(o.sub.name+" → Sub");render()}}}))}
 
   var DOTS='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>';
   function closeMenus(){var o=document.querySelectorAll(".menu.open");for(var i=0;i<o.length;i++)o[i].classList.remove("open")}
