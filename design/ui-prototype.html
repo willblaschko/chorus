@@ -519,11 +519,12 @@
     if(pairs.length){var sec=el("div","sec");sec.innerHTML='<h2>'+(pairs.length>1?"Stereo pairs":"Stereo pair")+'</h2><span class="sc">tap a speaker to identify</span>';m.appendChild(sec);
       var pg=el("div","paircards");pairs.forEach(function(p){pg.appendChild(pairCard(r,p))});m.appendChild(pg);}
     var pairableSolos=solos.filter(function(s){return speakerKind(s.model).pair});
-    if(pairableSolos.length){var nz=el("div","newpair");nz.innerHTML='<span class="np-ic">＋</span><span class="np-t">New stereo pair</span><small>drag a speaker here, then drop its partner on the empty side</small>';
+    var showZone=pairableSolos.length>=2;
+    if(showZone){var nz=el("div","newpair");nz.innerHTML='<span class="np-ic">＋</span><span class="np-t">New stereo pair</span><small>drag a speaker here, then drop its partner on the empty side</small>';
       nz.addEventListener("dragover",function(e){if(drag&&drag.roomKey===current&&speakerKind(drag.sp.model).pair){e.preventDefault();nz.classList.add("over")}});
       nz.addEventListener("dragleave",function(){nz.classList.remove("over")});
       nz.addEventListener("drop",function(e){e.preventDefault();nz.classList.remove("over");startPair(r)});m.appendChild(nz);}
-    if(solos.length){var sec2=el("div","sec");sec2.innerHTML='<h2>'+(pairs.length?"Other speakers":(solos.length>1?"Speakers":"Speaker"))+'</h2><span class="sc">drag onto “New stereo pair”, or a room to move</span>';m.appendChild(sec2);
+    if(solos.length){var sec2=el("div","sec");sec2.innerHTML='<h2>'+(pairs.length?"Other speakers":(solos.length>1?"Speakers":"Speaker"))+'</h2><span class="sc">'+(showZone?"drag onto “New stereo pair”, or a room to move":"drag onto a room to move it")+'</span>';m.appendChild(sec2);
       var grp=el("div","group"),rowsEl=el("div","rows");solos.forEach(function(sp){rowsEl.appendChild(speakerRow(r,sp))});grp.appendChild(rowsEl);m.appendChild(grp);}
     if(!pairs.length&&!solos.length){var e=el("div","solo");e.innerHTML='<div class="wn" style="color:var(--text-2)">No speakers here yet</div><div class="wm" style="max-width:34ch;text-align:center">Drop a speaker onto “'+r.name+'” in the sidebar to move one in.</div>';m.appendChild(e);}
   }
