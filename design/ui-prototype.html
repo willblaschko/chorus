@@ -498,7 +498,7 @@
 
   function chanMap(r){var p=["<b>arc</b>:CC"];CH.forEach(function(ch){var s=r.slots[ch];if(!s)return;var c=ch;if(s.height&&ch!=="SW")c+=(ch[0]==="L"?",L":",R")+(ch[1]==="F"?"TF":"TR");p.push("<b>"+s.id+"</b>:"+c)});return p.join(";")}
 
-  var COUCH='<svg viewBox="0 0 56 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="52" height="34" rx="9"/><rect x="8.5" y="7" width="12.6" height="13" rx="2.8"/><rect x="21.7" y="7" width="12.6" height="13" rx="2.8"/><rect x="34.9" y="7" width="12.6" height="13" rx="2.8"/></svg>';
+  var COUCH='<svg viewBox="0 0 56 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="52" height="22" rx="7"/><rect x="8" y="5" width="12.6" height="12.6" rx="2.8"/><rect x="21.7" y="5" width="12.6" height="12.6" rx="2.8"/><rect x="35.4" y="5" width="12.6" height="12.6" rx="2.8"/></svg>';
   function renderHT(r){var m=shell();
     var head=el("div","head");var left=el("div","head-l");
     left.innerHTML='<h1></h1><div class="chips"><span class="chip accent">5.1</span><span class="chip">'+r.tray.length+' available</span></div>';
