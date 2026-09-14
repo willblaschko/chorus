@@ -485,11 +485,24 @@ export class ChorusEditor extends LitElement {
       .join(";");
   }
 
-  // Re-discover (forcing a fresh Sonos scan) until the live bonding matches `intended`
-  // or we exhaust the budget; returns the last graph we saw.
+  // Full-graph fingerprint: every speaker's channel + NAME + membership. Changes
+  // while the device is still cycling (names resolving, removed speakers reappearing
+  // as standalones), so "unchanged" == truly settled. Measured: a 2×2 front swap's
+  // topology is right at ~9s but the graph doesn't stop changing until ~53s.
+  private _fullSignature(graph: BondGraph): string {
+    const parts: string[] = [];
+    for (const u of graph.units ?? []) {
+      for (const m of u.members) parts.push(`${m.uid}:${m.channel ?? "-"}:${m.name ?? ""}`);
+    }
+    return parts.sort().join(";");
+  }
+
+  // Re-discover until the live bonding matches `intended` AND the full graph has been
+  // STABLE across two consecutive polls (no more transitions), or the budget runs out.
   private async _awaitConvergence(intended: string): Promise<BondGraph | undefined> {
     let last: BondGraph | undefined;
-    for (let i = 0; i < 5; i++) {
+    let prevFull = " "; // sentinel so the first poll can never count as "stable"
+    for (let i = 0; i < 24; i++) {
       let fresh: BondGraph;
       try {
         fresh = await this.hass.connection.sendMessagePromise<BondGraph>({ type: "chorus/refresh" });
@@ -497,12 +510,11 @@ export class ChorusEditor extends LitElement {
         return last;
       }
       last = fresh;
-      // Converge on the bonding topology (fast + reliable). A freshly-bonded
-      // satellite's *name* can lag the bond by longer than we want to spin — but we
-      // never surface a raw UID, so the display fills the model in until the name
-      // resolves on a later background refresh.
-      if (this._bondSignature(roomsToLayout(buildRooms(fresh))) === intended) return fresh;
-      await new Promise((r) => window.setTimeout(r, 1500));
+      const topo = this._bondSignature(roomsToLayout(buildRooms(fresh)));
+      const full = this._fullSignature(fresh);
+      if (topo === intended && full === prevFull) return fresh; // settled: matched + stable
+      prevFull = full;
+      await new Promise((r) => window.setTimeout(r, 1000));
     }
     return last;
   }
@@ -522,13 +534,16 @@ export class ChorusEditor extends LitElement {
     const plan = this._plan();
     const rows = this._applying ? this._rows : plan.rows;
     return html`
-      <div class="grid" data-detail=${room ? "on" : "off"}>
+      <div class="grid ${this._applying ? "locked" : ""}" data-detail=${room ? "on" : "off"}>
         <div class="col-list">
           <div class="eyebrow">Rooms</div>
           <div class="list">${rooms.map((r) => this._roomButton(r, room))}</div>
         </div>
         <div class="col-detail">${room ? this._detail(room) : nothing}</div>
       </div>
+      ${this._applying
+        ? html`<div class="settling">Settling — waiting for your speakers to finish…</div>`
+        : nothing}
       ${this._pickerOverlay()}
       ${this._pairOverlay()}
       ${this._moveOverlay()}
@@ -1426,6 +1441,26 @@ export class ChorusEditor extends LitElement {
       border-radius: 12px;
       cursor: pointer;
       margin-top: 5px;
+    }
+    .grid.locked {
+      pointer-events: none;
+      opacity: 0.55;
+      transition: opacity 0.2s;
+    }
+    .settling {
+      position: fixed;
+      left: 50%;
+      bottom: 88px;
+      transform: translateX(-50%);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color);
+      color: var(--secondary-text-color);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 999px;
+      box-shadow: var(--ha-card-box-shadow, 0 2px 10px rgba(0, 0, 0, 0.15));
+      z-index: 40;
     }
     @media (max-width: 800px) {
       .grid {
