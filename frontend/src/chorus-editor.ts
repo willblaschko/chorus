@@ -31,6 +31,7 @@ import {
   setupHT,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
+import { bondSignature, fullSignature, settled } from "./settle.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
 import "./chorus-menu.js";
@@ -460,7 +461,7 @@ export class ChorusEditor extends LitElement {
     // The service calls have returned, but Sonos keeps re-syncing for a beat after.
     // Wait for the live topology to actually converge to what we asked for before
     // reporting done — mirror what the Sonos app does.
-    const intended = this._bondSignature(roomsToLayout(this._rooms));
+    const intended = bondSignature(roomsToLayout(this._rooms));
     const fresh = await this._awaitConvergence(intended);
     const failed = this._rows.filter((r) => r.status === "error").length;
     this._applying = false;
@@ -478,24 +479,12 @@ export class ChorusEditor extends LitElement {
 
   // A stable fingerprint of the bonding topology (each speaker's role + anchor),
   // ignoring names/rooms — so convergence tracks the actual bonds, not transient labels.
-  private _bondSignature(map: ReturnType<typeof roomsToLayout>): string {
-    return Object.keys(map)
-      .sort()
-      .map((u) => `${u}:${map[u].role}:${map[u].anchorUid}`)
-      .join(";");
-  }
+  // (topology / full-graph signatures + the settle predicate now live in ./settle.ts)
 
   // Full-graph fingerprint: every speaker's channel + NAME + membership. Changes
   // while the device is still cycling (names resolving, removed speakers reappearing
   // as standalones), so "unchanged" == truly settled. Measured: a 2×2 front swap's
   // topology is right at ~9s but the graph doesn't stop changing until ~53s.
-  private _fullSignature(graph: BondGraph): string {
-    const parts: string[] = [];
-    for (const u of graph.units ?? []) {
-      for (const m of u.members) parts.push(`${m.uid}:${m.channel ?? "-"}:${m.name ?? ""}`);
-    }
-    return parts.sort().join(";");
-  }
 
   // Re-discover until the live bonding matches `intended` AND the full graph has been
   // STABLE across two consecutive polls (no more transitions), or the budget runs out.
@@ -510,10 +499,9 @@ export class ChorusEditor extends LitElement {
         return last;
       }
       last = fresh;
-      const topo = this._bondSignature(roomsToLayout(buildRooms(fresh)));
-      const full = this._fullSignature(fresh);
-      if (topo === intended && full === prevFull) return fresh; // settled: matched + stable
-      prevFull = full;
+      const topo = bondSignature(roomsToLayout(buildRooms(fresh)));
+      if (settled(intended, topo, fresh, prevFull)) return fresh;
+      prevFull = fullSignature(fresh);
       await new Promise((r) => window.setTimeout(r, 1000));
     }
     return last;
