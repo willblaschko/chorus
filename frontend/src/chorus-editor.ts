@@ -48,6 +48,7 @@ export class ChorusEditor extends LitElement {
   @state() private _rows: ChangeRow[] = []; // live rows during apply
   @state() private _picker?: { roomKey: string; ch: Channel };
   @state() private _pairPick?: { roomKey: string; first?: string };
+  private _drag?: { uid: string; roomKey: string; model: string };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -88,7 +89,32 @@ export class ChorusEditor extends LitElement {
     this._working = assignToChannel(this._rooms, roomKey, ch, sp.uid);
     this._dirty = true;
     this._picker = undefined;
-    this._toast(`${sp.name} → ${CHANNEL_NAME[ch]}`);
+    this._toast(`${this._name(sp)} → ${CHANNEL_NAME[ch]}`);
+  }
+
+  // ---- drag & drop (desktop; tap-to-assign remains for touch) ---------
+  private _canDrop(r: Room, ch: Channel): boolean {
+    return !!this._drag && this._drag.roomKey === r.key && positionAccepts(ch, this._drag.model);
+  }
+
+  private _dropOnChannel(r: Room, ch: Channel): void {
+    if (!this._canDrop(r, ch)) return;
+    const sp = r.tray.find((s) => s.uid === this._drag!.uid);
+    this._drag = undefined;
+    if (sp) this._assign(r.key, ch, sp);
+  }
+
+  private _onDragOver(e: DragEvent, r: Room, ch: Channel): void {
+    if (this._canDrop(r, ch)) {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).classList.add("over");
+    }
+  }
+
+  private _onDrop(e: DragEvent, r: Room, ch: Channel): void {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).classList.remove("over");
+    this._dropOnChannel(r, ch);
   }
 
   private _clear(roomKey: string, ch: Channel, sp: EditorSpeaker): void {
@@ -310,6 +336,9 @@ export class ChorusEditor extends LitElement {
               add();
             }
           }}
+          @dragover=${(e: DragEvent) => this._onDragOver(e, r, ch)}
+          @dragleave=${(e: DragEvent) => (e.currentTarget as HTMLElement).classList.remove("over")}
+          @drop=${(e: DragEvent) => this._onDrop(e, r, ch)}
         >
           <span class="badge empty-badge">${ch}</span>
           <span class="pmeta"><b>${CHANNEL_NAME[ch]}</b><span>${eligible ? "Tap to add" : "Empty"}</span></span>
@@ -317,7 +346,12 @@ export class ChorusEditor extends LitElement {
       `;
     }
     return html`
-      <div class="postile">
+      <div
+        class="postile"
+        @dragover=${(e: DragEvent) => this._onDragOver(e, r, ch)}
+        @dragleave=${(e: DragEvent) => (e.currentTarget as HTMLElement).classList.remove("over")}
+        @drop=${(e: DragEvent) => this._onDrop(e, r, ch)}
+      >
         <span class="badge ${CH_TINT[ch]}">${iconFor(sp.model)}</span>
         <span class="pmeta">
           <b>${this._name(sp)}</b>
@@ -371,7 +405,7 @@ export class ChorusEditor extends LitElement {
     const pairable = r.tray.filter((s) => canPair(s.model)).length >= 2;
     return html`
       <div class="sec">${heading}</div>
-      <div class="rows">${r.tray.map((s) => this._speakerRow(s))}</div>
+      <div class="rows">${r.tray.map((s) => this._speakerRow(s, r.key))}</div>
       ${pairable
         ? html`<button type="button" class="newpair" @click=${() => (this._pairPick = { roomKey: r.key })}>
             ＋ Create stereo pair
@@ -380,9 +414,21 @@ export class ChorusEditor extends LitElement {
     `;
   }
 
-  private _speakerRow(s: EditorSpeaker): TemplateResult {
+  private _speakerRow(s: EditorSpeaker, roomKey: string): TemplateResult {
     return html`
-      <div class="row">
+      <div
+        class="row drag"
+        draggable="true"
+        @dragstart=${(e: DragEvent) => {
+          this._drag = { uid: s.uid, roomKey, model: s.model };
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+          (e.currentTarget as HTMLElement).classList.add("dragging");
+        }}
+        @dragend=${(e: DragEvent) => {
+          this._drag = undefined;
+          (e.currentTarget as HTMLElement).classList.remove("dragging");
+        }}
+      >
         <span class="rt">${iconFor(s.model)}</span>
         <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
       </div>
@@ -720,6 +766,36 @@ export class ChorusEditor extends LitElement {
     .x:hover {
       color: var(--error-color, #d32f2f);
       background: var(--secondary-background-color);
+    }
+    /* drag & drop + tactile feedback */
+    .postile {
+      transition: box-shadow 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.6, 1);
+    }
+    .postile.over {
+      box-shadow: 0 0 0 3px var(--primary-color);
+      border-color: var(--primary-color);
+      transform: scale(1.04);
+    }
+    .postile.actionable:active {
+      transform: scale(0.98);
+    }
+    .row.drag {
+      cursor: grab;
+    }
+    .row.drag:active {
+      cursor: grabbing;
+    }
+    .row.dragging {
+      opacity: 0.4;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .postile {
+        transition: none;
+      }
+      .postile.over,
+      .postile.actionable:active {
+        transform: none;
+      }
     }
 
     .paircards {
