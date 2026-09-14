@@ -267,6 +267,24 @@
   .newpair .np-t{font-size:14px;font-weight:600}
   .newpair small{font-size:11.5px;color:var(--text-3)}
   .newpair.over{border-color:var(--accent);border-style:solid;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .modal.plan{width:min(700px,93vw);max-width:93vw;text-align:left}
+  .plan-h b{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  .plan-h span{display:block;font-size:13px;color:var(--text-2);margin-top:4px}
+  .plan-lanes{display:flex;gap:12px;margin:18px 0 8px;overflow-x:auto;padding-bottom:4px}
+  .plan-lane{flex:1 0 190px;min-width:190px;background:var(--tile);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .plan-lane-h{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
+  .plan-op{display:flex;align-items:flex-start;gap:9px;background:var(--card);border-radius:11px;padding:10px 11px;box-shadow:var(--shadow);transition:opacity .25s}
+  .plan-op .po-dot{width:9px;height:9px;border-radius:50%;background:var(--hair-2);flex:none;margin-top:3px;transition:.25s}
+  .plan-op.active .po-dot{background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent);animation:pdpulse 1s infinite}
+  .plan-op.done .po-dot{background:#34c759;box-shadow:none}
+  .plan-op.done{opacity:.62}
+  @keyframes pdpulse{50%{opacity:.45}}
+  .po-tx b{display:block;font-size:13.5px;font-weight:600}
+  .po-tx>span{font-size:11.5px;color:var(--text-3)}
+  .plan-then{font-size:10px;color:var(--text-3);text-align:center;letter-spacing:.05em;text-transform:uppercase}
+  .plan-note{font-size:12px;color:var(--text-3);text-align:center;margin-top:6px}
+  .plan-btns{display:flex;gap:10px;margin-top:18px}
+  .plan-btns .btn{flex:1}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -635,9 +653,65 @@
       if(!a){out.push({name:b.name,from:"New",to:labelFor(b)});return;}
       if(a.room!==b.room||a.role!==b.role||a.height!==b.height)out.push({name:b.name,from:labelFor(a),to:labelFor(b)});});
     return out;}
+  // Synthesise the pending diff into atomic operations, each tagged with the device UIDs
+  // it touches. Ops sharing a device must serialise; disjoint ops run in parallel — so the
+  // apply plan (planLanes) falls straight out of a union-find over touch-sets.
+  function uniq(a){var s={},o=[];a.forEach(function(x){if(!s[x]){s[x]=1;o.push(x)}});return o;}
+  function computeOps(){if(!applied)return [];
+    var A=assignMap(applied),B=assignMap({rooms:rooms,subs:looseSubs});
+    function changed(id){var a=A[id],b=B[id];if(!a&&b)return true;if(a&&!b)return true;return !!a&&!!b&&(a.room!==b.room||a.role!==b.role||a.height!==b.height);}
+    var ops=[];
+    Object.keys(rooms).forEach(function(k){var r=rooms[k],av=applied.rooms[k];
+      if(r.type==="ht"){var mem=[];if(r.bar)mem.push(r.bar.id);CH.forEach(function(ch){if(r.slots[ch])mem.push(r.slots[ch].id)});
+        if(av&&av.type==="ht"){if(av.bar)mem.push(av.bar.id);CH.forEach(function(ch){if(av.slots&&av.slots[ch])mem.push(av.slots[ch].id)})}
+        mem=uniq(mem);var cnt=Object.keys(r.slots).filter(function(c){return r.slots[c]}).length;
+        if(mem.some(changed))ops.push({kind:"ht",label:r.name+" home theater",detail:"configure "+cnt+".1",touch:mem,order:2});
+      }else{(r.pairs||[]).forEach(function(p){if(p.L&&p.R){var mem=[p.L.id,p.R.id];if(p.sub)mem.push(p.sub.id);
+          if(mem.some(changed))ops.push({kind:"pair",label:r.name+" pair",detail:sm(p.L.model)+(p.sub?" + Sub":""),touch:mem,order:2})}});
+        (r.tray||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",label:s.name,detail:"move to "+r.name,touch:[s.id],order:1})})}
+    });
+    Object.keys(applied.rooms).forEach(function(k){var av=applied.rooms[k],wv=rooms[k];
+      if(av.type==="ht"&&(!wv||wv.type!=="ht")){var mem=[];if(av.bar)mem.push(av.bar.id);CH.forEach(function(ch){if(av.slots&&av.slots[ch])mem.push(av.slots[ch].id)});mem=uniq(mem);
+        if(mem.some(changed))ops.push({kind:"separate",label:av.name+" theater",detail:"separate",touch:mem,order:0})}
+    });
+    (looseSubs||[]).forEach(function(s){if(changed(s.id))ops.push({kind:"move",label:s.name,detail:"return to available",touch:[s.id],order:1})});
+    return ops;}
+  function planLanes(ops){var parent=ops.map(function(_,i){return i});
+    function find(x){while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x]}return x}
+    function union(a,b){parent[find(a)]=find(b)}
+    var byDev={};ops.forEach(function(op,i){op.touch.forEach(function(d){if(byDev[d]!=null)union(i,byDev[d]);byDev[d]=i})});
+    var lanes={};ops.forEach(function(op,i){var r=find(i);(lanes[r]=lanes[r]||[]).push(op)});
+    return Object.keys(lanes).map(function(k){return lanes[k].sort(function(a,b){return a.order-b.order})});}
   function applyChanges(){var n=computeChanges().length;if(!n)return;var bar=$("#changebar");if(bar)bar.classList.add("busy");
     toast("Applying "+n+" change"+(n>1?"s":"")+" to your Sonos…");
     setTimeout(function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};toast("Applied — your speakers are set");render();},1200);}
+  function applyPlanModal(){var ops=computeOps();if(!ops.length){applyChanges();return;}
+    var lanes=planLanes(ops),back=el("div","modal-back"),modal=el("div","modal plan");
+    function close(){back.classList.remove("on");setTimeout(function(){back.remove()},220)}
+    var h=el("div","plan-h");h.innerHTML='<b>Apply plan</b><span></span>';
+    h.querySelector("span").textContent=ops.length+" operation"+(ops.length>1?"s":"")+" · "+lanes.length+" group"+(lanes.length>1?"s":"")+(lanes.length>1?" in parallel":"");
+    modal.appendChild(h);
+    var lanesEl=el("div","plan-lanes");
+    lanes.forEach(function(lane,li){var col=el("div","plan-lane");col.appendChild(el("div","plan-lane-h","Group "+(li+1)));
+      lane.forEach(function(op,oi){var chip=el("div","plan-op "+op.kind);chip.setAttribute("data-li",li);chip.setAttribute("data-oi",oi);
+        chip.innerHTML='<span class="po-dot"></span><span class="po-tx"><b></b><span></span></span>';
+        chip.querySelector("b").textContent=op.label;chip.querySelector(".po-tx span").textContent=op.detail||"";
+        col.appendChild(chip);if(oi<lane.length-1)col.appendChild(el("div","plan-then","then"))});
+      lanesEl.appendChild(col)});
+    modal.appendChild(lanesEl);
+    modal.appendChild(el("div","plan-note","Groups run at the same time; steps within a group run in order."));
+    var btns=el("div","plan-btns"),cancel=el("button","btn soft","Cancel"),run=el("button","btn fill");
+    run.textContent="Apply "+ops.length+" operation"+(ops.length>1?"s":"");cancel.onclick=close;
+    run.onclick=function(){cancel.disabled=true;run.disabled=true;run.textContent="Applying…";runPlan(modal,lanes,function(){applied={rooms:clone(rooms),subs:clone(looseSubs)};close();toast("Applied — your speakers are set");render()})};
+    btns.appendChild(cancel);btns.appendChild(run);modal.appendChild(btns);
+    back.addEventListener("click",function(e){if(e.target===back&&!run.disabled)close()});
+    back.appendChild(modal);document.body.appendChild(back);requestAnimationFrame(function(){back.classList.add("on")})}
+  function runPlan(modal,lanes,done){modal.classList.add("running");var step=560,maxLen=0;
+    lanes.forEach(function(lane,li){maxLen=Math.max(maxLen,lane.length);
+      lane.forEach(function(op,oi){var chip=modal.querySelector('.plan-op[data-li="'+li+'"][data-oi="'+oi+'"]');
+        setTimeout(function(){if(chip)chip.classList.add("active")},oi*step+140);
+        setTimeout(function(){if(chip){chip.classList.remove("active");chip.classList.add("done")}},(oi+1)*step+140)})});
+    setTimeout(done,maxLen*step+520)}
   function discardChanges(){if(!applied)return;rooms=clone(applied.rooms);looseSubs=clone(applied.subs);if(!rooms[current])current=Object.keys(rooms)[0];toast("Changes discarded");render();}
   function renderChangeBar(){var bar=$("#changebar");if(!bar){bar=el("div","changebar");bar.id="changebar";document.body.appendChild(bar);}
     var ch=computeChanges(),wasOpen=bar.classList.contains("open");
@@ -646,7 +720,7 @@
     var head=el("div","cb-head"),info=el("button","cb-info"),acts=el("div","cb-acts");
     info.innerHTML='<span class="cb-dot"></span><b>'+ch.length+' pending change'+(ch.length>1?'s':'')+'</b><span class="cb-tog">Details</span>';
     var disc=el("button","cb-disc","Discard"),app=el("button","cb-apply","Apply");
-    disc.onclick=discardChanges;app.onclick=applyChanges;acts.appendChild(disc);acts.appendChild(app);
+    disc.onclick=discardChanges;app.onclick=applyPlanModal;acts.appendChild(disc);acts.appendChild(app);
     head.appendChild(info);head.appendChild(acts);bar.appendChild(head);
     var list=el("div","cb-list");
     ch.forEach(function(c){var row=el("div","cb-row");row.innerHTML='<b></b><span class="cb-from"></span><span class="cb-arw">→</span><span class="cb-to"></span>';
