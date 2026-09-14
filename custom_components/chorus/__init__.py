@@ -31,6 +31,7 @@ from .const import (
     is_sub,
 )
 from .coordinator import ChorusCoordinator
+from .panel import async_register_panel, async_unregister_panel
 from .sonos import SonosBackend, SonosSoapError
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,15 +53,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     _register_services(hass, coordinator)
+    await async_register_panel(hass)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry and, if it's the last, its services."""
+    """Unload a config entry and, if it's the last, its services + panel."""
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     if not hass.data.get(DOMAIN):
         for service in _ALL_SERVICES:
             hass.services.async_remove(DOMAIN, service)
+        async_unregister_panel(hass)
     return True
 
 
