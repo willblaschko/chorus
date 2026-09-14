@@ -33,19 +33,18 @@ separate:
         text:
 
 add_pair_sub:
-  name: Add a sub to a stereo pair
-  description: Bond a sub to an existing stereo pair (re-issues CreateStereoPair with the sub appended to the pair's channel map).
+  name: Add a sub to a set
+  description: Bond a sub to a stereo pair OR a lone speaker (re-issues CreateStereoPair with the sub appended to the channel map). Omit "right" for a lone speaker + sub.
   fields:
     left:
-      name: Pair left speaker
-      description: The pair's visible left/primary speaker (name or UID).
+      name: Primary speaker
+      description: The set's visible primary — a pair's left speaker, or a lone speaker (name or UID).
       required: true
       selector:
         text:
     right:
-      name: Pair right speaker
-      description: The pair's right speaker (UID).
-      required: true
+      name: Pair right speaker (pairs only)
+      description: The pair's right speaker (UID). Omit for a lone speaker + sub.
       selector:
         text:
     sub:
@@ -56,17 +55,16 @@ add_pair_sub:
         text:
 
 remove_pair_sub:
-  name: Remove a sub from a stereo pair
-  description: Unbond a sub from a stereo pair (separates the whole set, then re-pairs the two speakers).
+  name: Remove a sub from a set
+  description: Unbond a sub from a stereo pair or a lone speaker (separates the set; for a pair, re-pairs the two speakers). Omit "right" for a lone speaker.
   fields:
     left:
-      name: Pair left speaker
+      name: Primary speaker
       required: true
       selector:
         text:
     right:
-      name: Pair right speaker
-      required: true
+      name: Pair right speaker (pairs only)
       selector:
         text:
     sub:

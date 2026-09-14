@@ -163,36 +163,43 @@ class SonosBackend:
         body = f"<ChannelMapSet>{left_uid}:LF,LF;{right_uid}:RF,RF</ChannelMapSet>"
         return self._dp(left_ip, "SeparateStereoPair", body)
 
-    # -- sub bonded to a stereo pair (verified on hardware) ----------------
-    # A sub joins a pair by RE-ISSUING CreateStereoPair with the sub appended to the
-    # pair's ChannelMapSet as `SW,SW` (CreateStereoPair is additive on an existing
-    # pair). Removing it can't shrink the map (returns 402), so we SeparateStereoPair
-    # the whole 3-member set, then re-create the 2-member pair.
+    # -- sub bonded to a SET: a stereo pair OR a lone speaker (both verified) ---
+    # A sub joins a set by (re-)issuing CreateStereoPair with the sub appended to the
+    # set's ChannelMapSet as `SW,SW` (CreateStereoPair is additive). A PAIR keeps its
+    # two halves (L:LF,LF;R:RF,RF); a lone SPEAKER takes both channels (P:LF,RF).
+    # Removing can't shrink the map (402), so SeparateStereoPair the whole set; for a
+    # pair we then re-create the 2-member pair (a lone speaker just falls to standalone).
     @staticmethod
-    def _pair_map(left_uid: str, right_uid: str, sub_uid: str | None = None) -> str:
-        m = f"{left_uid}:LF,LF;{right_uid}:RF,RF"
-        return f"{m};{sub_uid}:SW,SW" if sub_uid else m
+    def _set_map(primary_uid: str, sub_uid: str, right_uid: str | None = None) -> str:
+        if right_uid:
+            return f"{primary_uid}:LF,LF;{right_uid}:RF,RF;{sub_uid}:SW,SW"
+        return f"{primary_uid}:LF,RF;{sub_uid}:SW,SW"
 
-    def add_pair_sub(self, left_ip: str, left_uid: str, right_uid: str, sub_uid: str) -> str:
-        body = f"<ChannelMapSet>{self._pair_map(left_uid, right_uid, sub_uid)}</ChannelMapSet>"
+    def add_pair_sub(
+        self, primary_ip: str, primary_uid: str, sub_uid: str, right_uid: str | None = None
+    ) -> str:
+        body = f"<ChannelMapSet>{self._set_map(primary_uid, sub_uid, right_uid)}</ChannelMapSet>"
         # The sub is an (invisible) standalone, immediately available; just retry
-        # transients. No wait_uid — a sub is Invisible whether bonded or free, so the
-        # standalone poll would never pass.
-        return self._apply_with_settle(lambda: self._dp(left_ip, "CreateStereoPair", body))
+        # transients. No wait_uid — a sub is Invisible whether bonded or free.
+        return self._apply_with_settle(lambda: self._dp(primary_ip, "CreateStereoPair", body))
 
-    def remove_pair_sub(self, left_ip: str, left_uid: str, right_uid: str, sub_uid: str) -> str:
-        # Dissolve the whole 3-member set, then re-pair the two speakers (sub falls free).
+    def remove_pair_sub(
+        self, primary_ip: str, primary_uid: str, sub_uid: str, right_uid: str | None = None
+    ) -> str:
+        # Dissolve the whole set (the sub falls free).
         self._dp(
-            left_ip,
+            primary_ip,
             "SeparateStereoPair",
-            f"<ChannelMapSet>{self._pair_map(left_uid, right_uid, sub_uid)}</ChannelMapSet>",
+            f"<ChannelMapSet>{self._set_map(primary_uid, sub_uid, right_uid)}</ChannelMapSet>",
         )
-        body = f"<ChannelMapSet>{self._pair_map(left_uid, right_uid)}</ChannelMapSet>"
-        # Wait for the right half to settle to a visible standalone, then re-pair.
+        if not right_uid:
+            return "OK"  # a lone speaker is already standalone — nothing to rebuild
+        # Re-pair the two speakers once the right half settles to a visible standalone.
+        body = f"<ChannelMapSet>{primary_uid}:LF,LF;{right_uid}:RF,RF</ChannelMapSet>"
         return self._apply_with_settle(
-            lambda: self._dp(left_ip, "CreateStereoPair", body),
+            lambda: self._dp(primary_ip, "CreateStereoPair", body),
             wait_uid=right_uid,
-            wait_ip=left_ip,
+            wait_ip=primary_ip,
         )
 
     # -- home theater ------------------------------------------------------

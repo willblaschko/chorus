@@ -150,17 +150,18 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await coordinator.async_request_refresh()
 
     async def add_pair_sub(call: ServiceCall) -> None:
-        # left is the pair's visible primary (resolvable); right + sub are UIDs.
-        left = resolve(call.data["left"])
+        # `left` is the set's visible primary (a pair-left or a lone speaker); sub is a
+        # UID; `right` is the pair's other half (omit it for a lone speaker + sub).
+        primary = resolve(call.data["left"])
         await run(
-            backend.add_pair_sub, left["ip"], left["uid"], call.data["right"], call.data["sub"]
+            backend.add_pair_sub, primary["ip"], primary["uid"], call.data["sub"], call.data.get("right")
         )
         await coordinator.async_request_refresh()
 
     async def remove_pair_sub(call: ServiceCall) -> None:
-        left = resolve(call.data["left"])
+        primary = resolve(call.data["left"])
         await run(
-            backend.remove_pair_sub, left["ip"], left["uid"], call.data["right"], call.data["sub"]
+            backend.remove_pair_sub, primary["ip"], primary["uid"], call.data["sub"], call.data.get("right")
         )
         await coordinator.async_request_refresh()
 
@@ -253,7 +254,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         schema=vol.Schema({vol.Required("left"): name, vol.Required("right"): name}),
     )
     pair_sub_schema = vol.Schema(
-        {vol.Required("left"): name, vol.Required("right"): name, vol.Required("sub"): name}
+        {vol.Required("left"): name, vol.Optional("right"): name, vol.Required("sub"): name}
     )
     hass.services.async_register(DOMAIN, SERVICE_ADD_PAIR_SUB, add_pair_sub, schema=pair_sub_schema)
     hass.services.async_register(
