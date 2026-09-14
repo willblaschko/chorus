@@ -46,6 +46,9 @@ export class ChorusPanel extends LitElement {
   @state() private _error?: string;
   @state() private _loading = true;
   @state() private _help = false;
+  // Room key to pre-select when the user jumps into the editor via a card's
+  // pencil. Fed to <chorus-editor>.selectRoom (see _editor / _openInEditor).
+  @state() private _editRoom?: string;
 
   private _pollTimer?: number;
   private _polling = false;
@@ -117,9 +120,9 @@ export class ChorusPanel extends LitElement {
     const units = this._graph?.units?.length ?? 0;
     return html`
       <header>
-        <span class="mark"><i></i></span>
+        <img class="mark" src="/chorus_static/chorus-icon.png" alt="" />
         <h1>Chorus</h1>
-        <span class="tag">Sonos speaker manager</span>
+        <span class="tag">Set up your Sonos speakers, right here in Home Assistant.</span>
         <span class="spacer"></span>
         <div class="seg" role="tablist">
           <button
@@ -159,6 +162,7 @@ export class ChorusPanel extends LitElement {
       .hass=${this.hass}
       .graph=${this._graph}
       .narrow=${this.narrow}
+      .selectRoom=${this._editRoom}
       @chorus-graph=${(e: Event) => {
         this._graph = (e as CustomEvent).detail as BondGraph;
         this._loading = false;
@@ -186,12 +190,39 @@ export class ChorusPanel extends LitElement {
     return html`<div class="grid">${sorted.map((u) => this._card(u))}</div>`;
   }
 
+  // Room key for a unit, mirroring model.ts buildRooms(): group by the HA Area
+  // of the unit's primary member, falling back to the zone name when it has no
+  // area. Must match so <chorus-editor>.selectRoom lands on the same room.
+  private _roomKey(unit: BondUnit): string {
+    const primary = unit.members.find((m) => m.is_primary) ?? unit.members[0];
+    return primary?.area ?? unit.name;
+  }
+
+  private _openInEditor(unit: BondUnit): void {
+    this._editRoom = this._roomKey(unit);
+    this._view = "editor";
+  }
+
   private _card(unit: BondUnit): TemplateResult {
+    const title = unit.name || unit.primary_uid;
     return html`
       <div class="card">
         <h2>
-          ${unit.name || unit.primary_uid}
+          <span class="title">${title}</span>
           <span class="kind">${KIND_LABEL[unit.kind] ?? unit.kind}</span>
+          <button
+            class="edit"
+            title="Edit in editor"
+            aria-label=${`Edit ${title} in the editor`}
+            @click=${() => this._openInEditor(unit)}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+              />
+            </svg>
+          </button>
         </h2>
         <div class="members">${unit.members.map((m) => this._member(m))}</div>
       </div>
@@ -240,19 +271,10 @@ export class ChorusPanel extends LitElement {
       flex-wrap: wrap;
     }
     .mark {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
-      background: var(--primary-text-color);
-      display: grid;
-      place-items: center;
+      width: 30px;
+      height: 30px;
       flex: none;
-    }
-    .mark i {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 2.4px solid var(--card-background-color, #fff);
+      display: block;
     }
     h1 {
       font-size: 22px;
@@ -326,6 +348,12 @@ export class ChorusPanel extends LitElement {
       align-items: center;
       gap: 8px;
     }
+    .card h2 .title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .kind {
       font-size: 11px;
       text-transform: uppercase;
@@ -335,6 +363,33 @@ export class ChorusPanel extends LitElement {
       border-radius: 10px;
       padding: 1px 7px;
       font-weight: 600;
+      flex: none;
+    }
+    .card h2 .edit {
+      margin-left: auto;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: 8px;
+      background: none;
+      color: var(--secondary-text-color);
+      cursor: pointer;
+    }
+    .card h2 .edit:hover {
+      color: var(--primary-color);
+      background: var(--secondary-background-color);
+    }
+    .card h2 .edit:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+    .card h2 .edit svg {
+      display: block;
     }
     .members {
       margin-top: 12px;
