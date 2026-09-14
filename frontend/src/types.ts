@@ -23,6 +23,7 @@ export interface BondMember {
   ip: string | null;
   name: string | null;
   model?: string;
+  area?: string | null; // Home Assistant Area this speaker belongs to
   invisible: boolean;
   is_primary: boolean;
 }

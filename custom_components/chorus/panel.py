@@ -13,6 +13,7 @@ from homeassistant.components import frontend, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant, callback
 
+from .areas import all_area_names, speaker_area_map
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,14 +77,23 @@ def ws_bond_graph(hass: HomeAssistant, connection, msg) -> None:
     """Return the live bonded units plus the flat (visible) player inventory."""
     coordinator = _first_coordinator(hass)
     if coordinator is None:
-        connection.send_result(msg["id"], {"units": [], "players": []})
+        connection.send_result(msg["id"], {"units": [], "players": [], "areas": []})
         return
+    units = coordinator.bond_graph
+    players = list(coordinator.players.values())
+    # Resolve every speaker's HA Area once, then annotate shallow copies (never
+    # mutate the coordinator's live dicts from this read-only handler).
+    uids = {p["uid"] for p in players}
+    uids.update(m["uid"] for u in units for m in u["members"])
+    area_of = speaker_area_map(hass, list(uids))
+    players_out = [{**p, "area": area_of.get(p["uid"])} for p in players]
+    units_out = [
+        {**u, "members": [{**m, "area": area_of.get(m["uid"])} for m in u["members"]]}
+        for u in units
+    ]
     connection.send_result(
         msg["id"],
-        {
-            "units": coordinator.bond_graph,
-            "players": list(coordinator.players.values()),
-        },
+        {"units": units_out, "players": players_out, "areas": all_area_names(hass)},
     )
 
 
