@@ -28,8 +28,33 @@ import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
 import "./chorus-menu.js";
+import "./chorus-audio.js";
 import type { ChangeRow } from "./chorus-changebar.js";
 import type { MenuItem } from "./chorus-menu.js";
+import type { AudioControl } from "./chorus-audio.js";
+
+// Sonos audio settings exposed by HA as number.<slug>_<key> / switch.<slug>_<key>.
+// Only the ones that actually exist for a given speaker are shown.
+const AUDIO_SPEC: Array<{ key: string; label: string; group: string; toggle?: boolean }> = [
+  { key: "bass", label: "Bass", group: "EQ" },
+  { key: "treble", label: "Treble", group: "EQ" },
+  { key: "loudness", label: "Loudness", group: "EQ", toggle: true },
+  { key: "sub_gain", label: "Sub level", group: "Surround & sub" },
+  { key: "subwoofer_enabled", label: "Subwoofer", group: "Surround & sub", toggle: true },
+  { key: "surround_level", label: "Surround level", group: "Surround & sub" },
+  { key: "surround_enabled", label: "Surround", group: "Surround & sub", toggle: true },
+  { key: "night_sound", label: "Night sound", group: "TV audio", toggle: true },
+  { key: "speech_enhancement", label: "Speech enhancement", group: "TV audio", toggle: true },
+  { key: "audio_delay", label: "Audio delay", group: "TV audio" },
+  { key: "crossfade", label: "Crossfade", group: "Playback", toggle: true },
+  { key: "balance", label: "Balance", group: "Playback" },
+];
+
+const slugify = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
 const CH_TINT: Record<Channel, string> = {
   LF: "t-front",
@@ -60,6 +85,7 @@ export class ChorusEditor extends LitElement {
   @state() private _pairPick?: { roomKey: string; first?: string };
   private _drag?: { uid: string; roomKey: string; model: string };
   @state() private _menu?: { heading: string; items: MenuItem[]; onSelect: (id: string) => void };
+  @state() private _audio?: { heading: string; controls: AudioControl[] };
 
   protected override willUpdate(changed: PropertyValues): void {
     // Sync the working model from the live graph — but never clobber staged edits
@@ -163,13 +189,18 @@ export class ChorusEditor extends LitElement {
 
   private _openRoomMenu(r: Room): void {
     const items: MenuItem[] = [];
-    if (r.ht) items.push({ id: "dissolve", label: "Separate home theater", danger: true });
+    if (r.ht) {
+      items.push({ id: "audio", label: "Audio settings" });
+      items.push({ id: "dissolve", label: "Separate home theater", danger: true });
+    }
     if (!items.length) return;
     this._menu = {
       heading: r.name,
       items,
       onSelect: (id) => {
-        if (id === "dissolve") {
+        if (id === "audio") {
+          this._openAudio(r.ht!.bar.name);
+        } else if (id === "dissolve") {
           this._working = dissolveHT(this._rooms, r.key);
           this._dirty = true;
           this._toast("Home theater separated");
@@ -182,11 +213,14 @@ export class ChorusEditor extends LitElement {
     this._menu = {
       heading: "Stereo pair",
       items: [
+        { id: "audio", label: "Audio settings" },
         { id: "swap", label: "Swap L / R" },
         { id: "separate", label: "Separate pair", danger: true },
       ],
       onSelect: (id) => {
-        if (id === "swap") {
+        if (id === "audio") {
+          this._openAudio(r.pairs[index]?.L?.name ?? r.name);
+        } else if (id === "swap") {
           this._working = swapPair(this._rooms, r.key, index);
           this._dirty = true;
           this._toast("Swapped L / R");
@@ -206,6 +240,58 @@ export class ChorusEditor extends LitElement {
       },
     };
   }
+
+  private _openAudio(name: string): void {
+    const slug = slugify(name);
+    const controls: AudioControl[] = [];
+    for (const spec of AUDIO_SPEC) {
+      const eid = `${spec.toggle ? "switch" : "number"}.${slug}_${spec.key}`;
+      const ent = this.hass?.states?.[eid];
+      if (!ent || ent.state === "unavailable" || ent.state === "unknown") continue;
+      if (spec.toggle) {
+        controls.push({
+          id: eid,
+          kind: "toggle",
+          label: spec.label,
+          group: spec.group,
+          value: ent.state === "on",
+        });
+      } else {
+        const a = ent.attributes as { min?: number; max?: number; step?: number };
+        controls.push({
+          id: eid,
+          kind: "slider",
+          label: spec.label,
+          group: spec.group,
+          value: Number(ent.state),
+          min: a.min ?? 0,
+          max: a.max ?? 100,
+          step: a.step ?? 1,
+        });
+      }
+    }
+    if (!controls.length) {
+      this._toast("No audio settings available for this speaker");
+      return;
+    }
+    this._audio = { heading: `${name} · Audio`, controls };
+  }
+
+  private _onAudioChange = (e: Event): void => {
+    const { id, value } = (e as CustomEvent).detail as { id: string; value: number | boolean };
+    if (typeof value === "boolean") {
+      void this.hass.callService("switch", value ? "turn_on" : "turn_off", { entity_id: id });
+    } else {
+      void this.hass.callService("number", "set_value", { entity_id: id, value });
+    }
+    // Optimistic local update so the sheet reflects the change immediately.
+    if (this._audio) {
+      this._audio = {
+        ...this._audio,
+        controls: this._audio.controls.map((c) => (c.id === id ? { ...c, value } : c)),
+      };
+    }
+  };
 
   private _dots(onClick: (e: Event) => void): TemplateResult {
     return html`<button
@@ -318,6 +404,13 @@ export class ChorusEditor extends LitElement {
         @select=${this._onMenuSelect}
         @close=${() => (this._menu = undefined)}
       ></chorus-menu>
+      <chorus-audio
+        .open=${!!this._audio}
+        .heading=${this._audio?.heading ?? ""}
+        .controls=${this._audio?.controls ?? []}
+        @change=${this._onAudioChange}
+        @close=${() => (this._audio = undefined)}
+      ></chorus-audio>
       <chorus-changebar
         .rows=${rows}
         .busy=${this._applying}

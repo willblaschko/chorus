@@ -1,7 +1,13 @@
 // Shared types for the Chorus panel.
 
+export interface HassEntity {
+  state: string;
+  attributes: Record<string, unknown>;
+}
+
 /** The slice of Home Assistant's frontend API the panel uses. */
 export interface HomeAssistant {
+  states: Record<string, HassEntity>;
   connection: {
     sendMessagePromise<T>(msg: Record<string, unknown>): Promise<T>;
   };
