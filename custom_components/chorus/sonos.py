@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 _DP_NS = "urn:schemas-upnp-org:service:DeviceProperties:1"
 _ZGT_NS = "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
 _RC_NS = "urn:schemas-upnp-org:service:RenderingControl:1"
+_AV_NS = "urn:schemas-upnp-org:service:AVTransport:1"
 
 _ENVELOPE = (
     '<?xml version="1.0"?>'
@@ -77,6 +78,16 @@ class SonosBackend:
             ip,
             "/MediaRenderer/RenderingControl/Control",
             _RC_NS,
+            action,
+            f"<InstanceID>0</InstanceID>{inner}",
+        )
+
+    def _av(self, ip: str, action: str, inner: str = "") -> str:
+        # AVTransport actions always carry InstanceID 0.
+        return self._soap(
+            ip,
+            "/MediaRenderer/AVTransport/Control",
+            _AV_NS,
             action,
             f"<InstanceID>0</InstanceID>{inner}",
         )
@@ -280,44 +291,62 @@ class SonosBackend:
 
     # -- identify: play a short clip on ONE speaker ----------------------
     def play_chime(self, ip: str, url: str) -> None:
-        """Play `url` on ONE speaker for Identify, restoring what it was doing. Talks to
-        the speaker directly (soco) — independent of HA's Sonos integration, so it works
-        on a freed speaker HA still lists unavailable.
+        """Play `url` on ONE speaker for Identify, restoring what it was doing. Uses raw
+        AVTransport SOAP (NOT soco.play_uri, whose coordinator gate rejects these freed
+        zones) — so it's independent of HA's Sonos integration and works on a speaker HA
+        still lists unavailable.
 
-        Two cases: a speaker that's a SLAVE in a playback group can't play on its own
-        (soco/Sonos rule), so we unjoin it, chime, then rejoin — the group's coordinator
-        keeps playing the whole time. A standalone/coordinator speaker gets a normal
-        snapshot -> chime -> restore."""
-        import soco
-        from soco.snapshot import Snapshot
-
-        device = soco.SoCo(ip)
-        group = device.group
-        coord = group.coordinator if group else None
-        if coord is not None and coord.uid != device.uid:
-            # Playback-group slave: leave, chime solo, rejoin (coordinator plays on).
-            device.unjoin()
-            time.sleep(0.4)
-            try:
-                device.play_uri(url, title="Chorus Identify")
-                time.sleep(2.0)
-            finally:
-                try:
-                    device.join(coord)
-                except Exception:  # noqa: BLE001 — best-effort rejoin
-                    _LOGGER.warning("Chorus identify: could not rejoin %s to its group", ip)
-            return
-        # Standalone or its own coordinator: snapshot + restore its own playback.
-        snap = Snapshot(device)
-        snap.snapshot()
+        Snapshots the current source + transport state, plays the chime, then restores.
+        If the speaker is a playback-group SLAVE (Sonos rejects transport control on a
+        slave), break it out with BecomeCoordinatorOfStandaloneGroup and retry — the saved
+        `x-rincon:` follow-URI rejoins the group on restore."""
+        # Snapshot (best-effort — a freed speaker is usually idle anyway).
+        cur_uri = cur_meta = ""
+        state = "STOPPED"
         try:
-            device.play_uri(url, title="Chorus Identify")
-            time.sleep(2.0)  # let the ~1s chime finish before we restore
-        finally:
-            try:
-                snap.restore(fade=False)
-            except Exception:  # noqa: BLE001 — best-effort restore; never mask the chime
-                _LOGGER.warning("Chorus identify: could not restore playback on %s", ip)
+            mi = self._av(ip, "GetMediaInfo")
+            cur_uri = self._field(mi, "CurrentURI")
+            m = re.search(r"<CurrentURIMetaData>(.*?)</CurrentURIMetaData>", mi, re.S)
+            cur_meta = m.group(1) if m else ""
+            state = self._field(self._av(ip, "GetTransportInfo"), "CurrentTransportState") or state
+        except SonosSoapError:
+            pass
+
+        def start() -> None:
+            self._av(
+                ip, "SetAVTransportURI",
+                f"<CurrentURI>{html.escape(url)}</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>",
+            )
+            self._av(ip, "Play", "<Speed>1</Speed>")
+
+        try:
+            start()
+        except SonosSoapError as err:
+            if not err.code:  # timeout/unreachable — nothing we can do
+                raise
+            # Coded rejection: the speaker is a group slave. Make it standalone and retry.
+            self._av(ip, "BecomeCoordinatorOfStandaloneGroup")
+            time.sleep(0.4)
+            start()
+
+        time.sleep(2.0)  # let the ~1s chime finish
+
+        # Restore the previous source. A slave's saved URI is `x-rincon:<coord>`, so this
+        # rejoins its group; a standalone's is its own queue/stream.
+        try:
+            if cur_uri:
+                self._av(
+                    ip, "SetAVTransportURI",
+                    f"<CurrentURI>{cur_uri}</CurrentURI><CurrentURIMetaData>{cur_meta}</CurrentURIMetaData>",
+                )
+                if state == "PLAYING":
+                    self._av(ip, "Play", "<Speed>1</Speed>")
+                else:
+                    self._av(ip, "Stop")
+            else:
+                self._av(ip, "Stop")
+        except SonosSoapError:
+            _LOGGER.warning("Chorus identify: could not restore playback on %s", ip)
 
     # -- snapshot / restore of a soundbar's HT map ------------------------
     def snapshot_ht(self, soundbar_ip: str, soundbar_uid: str) -> str:
