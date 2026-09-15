@@ -202,10 +202,13 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         touches: [uid],
         service: {
           domain: "chorus",
+          // World B: a move renames the zone to its room-derived name (`name`) and
+          // reassigns the HA area (`area` = the room). These differ only when the room
+          // already holds another zone (e.g. name "Den 2" in area "Den").
           service: "move",
-          data: { speaker: uid, name: b.room },
+          data: { speaker: uid, name: b.name, area: b.room },
         },
-        summary: `${b.name} — move to ${b.room}`,
+        summary: `${a.name} — move to ${b.room}`,
       });
     }
   }
@@ -286,14 +289,27 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
     }
   }
 
-  // ── rename: a speaker whose staged name differs from its live name ───────────
-  // Covers both a manual rename and the automatic "Room — Position" naming applied
-  // when a speaker is bonded (set in the layout mutations). Pooled subs are excluded
-  // (their room is the sentinel, and their name only carries a fallback).
+  // ── rename: a name-bearing zone whose staged name differs from its live name ──
+  // Only a standalone speaker or a set's COORDINATOR carries a name (a bonded set is
+  // one zone). Satellites are subsumed by the coordinator, so we never rename them —
+  // this is what stops an L/R swap (which flips the coordinator UID) from renaming a
+  // pair to a satellite's stale name. Pooled subs are excluded (sentinel room).
+  // A rename op is only for an IN-PLACE rename (same room, name changed). A room change
+  // is a move, and the move op already renames the zone — so we require a.room === b.room
+  // here to avoid emitting a redundant second rename for a moved speaker.
+  const NAME_BEARING: readonly Role[] = ["solo", "pairL", "CC"];
   for (const uid of allUids) {
     const a = applied[uid];
     const b = working[uid];
-    if (a && b && b.name && a.name !== b.name && a.room !== AVAILABLE_SUBS_KEY) {
+    if (
+      a &&
+      b &&
+      b.name &&
+      a.name !== b.name &&
+      a.room === b.room &&
+      a.room !== AVAILABLE_SUBS_KEY &&
+      NAME_BEARING.indexOf(b.role) !== -1
+    ) {
       ops.push({
         type: "rename",
         touches: [uid],

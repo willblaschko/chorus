@@ -137,8 +137,14 @@ move:
       selector:
         text:
     name:
-      name: New room name
+      name: New zone name
       required: true
+      selector:
+        text:
+    area:
+      name: HA Area
+      description: HA Area to group under. Defaults to the zone name; differs only when the room already holds another zone (e.g. zone "Den 2" in area "Den").
+      required: false
       selector:
         text:
 

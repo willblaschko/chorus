@@ -35,6 +35,7 @@ function mediaRoom(): Room[] {
       sets: [
         {
           id: HT,
+          name: "Media Room",
           primary: spk("BAR", "Media Room", "Sonos Arc"),
           slots: { LR: spk("LR", "Media Room", "Symfonisk Frame") },
         },
@@ -60,7 +61,7 @@ describe("roomsToLayout", () => {
         key: "Bedroom",
         name: "Bedroom",
         area: "Bedroom",
-        sets: [{ id: "PL", primary: spk("PL", "Bedroom"), slots: { RF: spk("PR", "Bedroom") } }],
+        sets: [{ id: "PL", name: "Bedroom", primary: spk("PL", "Bedroom"), slots: { RF: spk("PR", "Bedroom") } }],
         tray: [],
       },
     ];
@@ -149,6 +150,7 @@ function pairRoom(): Room[] {
       sets: [
         {
           id: "PL",
+          name: "Living Room",
           primary: spk("PL", "Living Room", "Sonos Era 100"),
           slots: { RF: spk("PR", "Living Room 2", "Sonos Era 100") },
         },
@@ -187,12 +189,14 @@ describe("location change -> service op (via computeOps)", () => {
     expect(ops[0].service.data).toMatchObject({ soundbar: "BAR", lf: "E1" });
   });
 
-  it("clearing a channel emits one remove_ht (remove_home_theater by channel)", () => {
+  it("clearing a channel emits a remove_ht + renames the freed satellite (World B)", () => {
     const before = mediaRoom();
     const ops = opsFor(before, clearChannel(before, "Media Room", HT, "LR"));
-    expect(ops).toHaveLength(1);
-    expect(ops[0]).toMatchObject({ type: "remove_ht" });
-    expect(ops[0].service.data).toMatchObject({ soundbar: "BAR", channel: "LR" });
+    const remove = ops.find((o) => o.type === "remove_ht")!;
+    expect(remove).toBeTruthy();
+    expect(remove.service.data).toMatchObject({ soundbar: "BAR", channel: "LR" });
+    // The freed satellite becomes its own zone -> a room-derived rename op accompanies it.
+    expect(ops.some((o) => o.type === "rename" && o.service.data.speaker === "LR")).toBe(true);
   });
 
   it("creating a pair emits one create_pair (create_stereo_pair)", () => {
@@ -242,7 +246,7 @@ describe("location change -> service op (via computeOps)", () => {
         key: "Guest Bedroom",
         name: "Guest Bedroom",
         area: "Guest Bedroom",
-        sets: [{ id: "L", primary: spk("L", "Guest Bedroom"), slots: { RF: spk("R", "Guest Bedroom") } }],
+        sets: [{ id: "L", name: "Guest Bedroom", primary: spk("L", "Guest Bedroom"), slots: { RF: spk("R", "Guest Bedroom") } }],
         tray: [],
       },
     ];
@@ -263,13 +267,91 @@ describe("location change -> service op (via computeOps)", () => {
   });
 });
 
+// World B: a zone's Sonos name FOLLOWS its room. The name lives on the SET (one zone,
+// one name), so swapping L/R never changes it; moving/bonding adopts the room name,
+// disambiguated "Room 2/3…"; separating restores the coordinator's name and gives the
+// freed half a room-derived name.
+describe("World B naming — name follows room", () => {
+  const opsFor = (before: Room[], after: Room[]) =>
+    computeOps(roomsToLayout(before), roomsToLayout(after));
+
+  // A pair in "Guest Bedroom" whose RIGHT half still carries a stale, foreign name
+  // ("Front Porch") — the exact shape that used to make a swap rename the whole pair.
+  const stalePair = (): Room[] => [
+    {
+      key: "Guest Bedroom",
+      name: "Guest Bedroom",
+      area: "Guest Bedroom",
+      sets: [
+        {
+          id: "L",
+          name: "Guest Bedroom",
+          primary: spk("L", "Guest Bedroom"),
+          slots: { RF: spk("R", "Front Porch") },
+        },
+      ],
+      tray: [],
+    },
+  ];
+
+  it("swapping L/R keeps the set's name (never adopts the satellite's stale name)", () => {
+    const swapped = swapPair(stalePair(), "Guest Bedroom", "L");
+    const layout = roomsToLayout(swapped);
+    // R is now the coordinator (pairL) but the zone is STILL named after the set/room.
+    expect(layout["R"]).toMatchObject({ role: "pairL", name: "Guest Bedroom" });
+    // And crucially: no op renames the pair to the satellite's old name.
+    const ops = opsFor(stalePair(), swapped);
+    expect(ops.every((o) => o.service.data.name !== "Front Porch")).toBe(true);
+  });
+
+  it("creating a pair adopts the room name, disambiguated when the room has another set", () => {
+    // "Den" already holds a home theater named "Den"; a new pair of two loose speakers
+    // must become "Den 2", not collide on "Den".
+    const before: Room[] = [
+      {
+        key: "Den",
+        name: "Den",
+        area: "Den",
+        sets: [{ id: "BAR", name: "Den", primary: spk("BAR", "Den", "Sonos Arc"), slots: { LR: spk("LR", "Den", "Sonos One") } }],
+        tray: [spk("X", "X"), spk("Y", "Y")],
+      },
+    ];
+    const paired = createPair(before, "Den", "X", "Y");
+    expect(roomsToLayout(paired)["X"]).toMatchObject({ role: "pairL", name: "Den 2" });
+  });
+
+  it("moving a speaker renames its zone to the destination room", () => {
+    const before: Room[] = [{ key: "A", name: "A", area: "A", sets: [], tray: [spk("S1", "A")] }];
+    const moved = moveSpeaker(before, "S1", "Den");
+    const s1 = moved.find((r) => r.name === "Den")!.tray.find((s) => s.uid === "S1")!;
+    expect(s1.name).toBe("Den");
+    // the move op carries the room-derived name
+    const ops = opsFor(before, moved);
+    expect(ops.find((o) => o.type === "move")!.service.data).toMatchObject({ name: "Den" });
+  });
+
+  it("separating a pair keeps the coordinator's name and gives the other half 'Room 2'", () => {
+    const separated = separatePair(stalePair(), "Guest Bedroom", "L");
+    const names = separated.find((r) => r.name === "Guest Bedroom")!.tray.map((s) => s.name).sort();
+    expect(names).toEqual(["Guest Bedroom", "Guest Bedroom 2"]);
+  });
+
+  it("a freed HT satellite takes a room-derived name", () => {
+    // Media Room already holds the Arc HT "Media Room" plus loose "Media Room 2"/"Media
+    // Room 3" in the tray, so the freed Rear-L satellite takes the next free slot.
+    const cleared = clearChannel(mediaRoom(), "Media Room", HT, "LR");
+    const freed = cleared.find((r) => r.name === "Media Room")!.tray.find((s) => s.uid === "LR")!;
+    expect(freed.name).toBe("Media Room 4");
+  });
+});
+
 describe("available subs — one SW path across HTs and pairs", () => {
   const sub = (uid: string, name = "Sub Mini") => spk(uid, name, "Sonos Sub Mini");
   const htRoom = (key: string, sw: EditorSpeaker | null): Room => ({
     key,
     name: key,
     area: key,
-    sets: [{ id: `${key}-BAR`, primary: spk(`${key}-BAR`, key, "Sonos Arc"), slots: sw ? { SW: sw } : {} }],
+    sets: [{ id: `${key}-BAR`, name: key, primary: spk(`${key}-BAR`, key, "Sonos Arc"), slots: sw ? { SW: sw } : {} }],
     tray: [],
   });
   const pool = (...subs: EditorSpeaker[]): Room => ({

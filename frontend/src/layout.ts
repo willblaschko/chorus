@@ -30,21 +30,24 @@ export function roomsToLayout(rooms: Room[]): LayoutMap {
     for (const set of r.sets) {
       const p = set.primary;
       const kind = setKind(set);
+      // The coordinator carries the SET's name (a bonded set is one zone). Satellites
+      // keep their own name in the map but apply.ts never renames a satellite — their
+      // name is subsumed by the coordinator's zone, so it's display-only here.
       if (kind === "home_theater") {
-        map[p.uid] = { room: r.name, role: "CC", anchorUid: p.uid, name: p.name };
+        map[p.uid] = { room: r.name, role: "CC", anchorUid: p.uid, name: set.name };
         for (const ch of CHANNELS) {
           const sp = set.slots[ch];
           if (sp) map[sp.uid] = { room: r.name, role: ch, anchorUid: p.uid, name: sp.name };
         }
       } else if (kind === "stereo_pair") {
-        map[p.uid] = { room: r.name, role: "pairL", anchorUid: p.uid, name: p.name };
+        map[p.uid] = { room: r.name, role: "pairL", anchorUid: p.uid, name: set.name };
         const rf = set.slots.RF;
         if (rf) map[rf.uid] = { room: r.name, role: "pairR", anchorUid: p.uid, name: rf.name };
         const sw = set.slots.SW;
         // A sub bonded to a pair is a real op now (add_pair_sub/remove_pair_sub).
         if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
       } else {
-        map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: p.name };
+        map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: set.name };
         const sw = set.slots.SW;
         // A sub on a lone speaker is a real op now (add_pair_sub with no `right`).
         if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
@@ -97,10 +100,32 @@ function toPool(rooms: Room[], sp: EditorSpeaker): void {
   p.tray.push(sp);
   p.tray.sort(byName);
 }
-/** A freed satellite: a sub is homeless (global pool); anything else goes to the tray. */
+/**
+ * World B naming: a zone's Sonos name follows its ROOM. Returns the room name, or
+ * "<room> 2" / "<room> 3" ... when the base is already taken by another zone in the
+ * same room (a set's name or a tray speaker's name) — Sonos' own de-dupe convention.
+ * `exceptSetId`/`exceptUid` skip a zone that's mid-move (so it doesn't block its own name).
+ */
+function roomZoneName(room: Room, exceptSetId?: string, exceptUid?: string): string {
+  const taken = new Set<string>();
+  for (const set of room.sets) if (set.id !== exceptSetId) taken.add(set.name);
+  for (const s of room.tray) if (s.uid !== exceptUid) taken.add(s.name);
+  const base = room.name;
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const cand = `${base} ${n}`;
+    if (!taken.has(cand)) return cand;
+  }
+}
+
+/** A freed satellite: a sub is homeless (global pool); a real speaker returns to the
+ * tray and (World B) takes a room-derived name, since it's now its own zone again. */
 function release(rooms: Room[], room: Room, ch: Channel, sp: EditorSpeaker): void {
   if (ch === "SW") toPool(rooms, sp);
-  else toTray(room, sp);
+  else {
+    sp.name = roomZoneName(room, undefined, sp.uid);
+    toTray(room, sp);
+  }
 }
 
 // ── assign a surround/front (from the room tray) to a home-theater channel ──────
@@ -206,7 +231,9 @@ export function bondSubToSpeaker(
   }
   if (!sub) return next;
   const [speaker] = room.tray.splice(si, 1);
-  room.sets.push({ id: speaker.uid, primary: speaker, slots: { SW: sub } });
+  // A speaker+sub is fundamentally still that speaker, so it keeps the speaker's name
+  // (not the room name) — a sub is invisible.
+  room.sets.push({ id: speaker.uid, name: speaker.name, primary: speaker, slots: { SW: sub } });
   return prunePool(next);
 }
 
@@ -221,7 +248,10 @@ export function createPair(rooms: Room[], roomKey: string, leftUid: string, righ
   const left = room.tray[li];
   const right = room.tray[ri];
   room.tray = room.tray.filter((s) => s.uid !== leftUid && s.uid !== rightUid);
-  room.sets.push({ id: left.uid, primary: left, slots: { RF: right } });
+  // World B: the new pair's zone name follows the room (both halves are out of the tray
+  // now, so they don't block the base name). The name lives on the SET, so a later L/R
+  // swap never changes it.
+  room.sets.push({ id: left.uid, name: roomZoneName(room), primary: left, slots: { RF: right } });
   return next;
 }
 
@@ -233,8 +263,14 @@ export function separatePair(rooms: Room[], roomKey: string, setId: string): Roo
   const i = room.sets.findIndex((s) => s.id === setId);
   if (i === -1) return next;
   const [set] = room.sets.splice(i, 1);
+  // World B: the coordinator keeps the set's (zone) name; the other half becomes its own
+  // zone and takes the next free room-derived name ("Room 2") to avoid colliding with it.
+  set.primary.name = set.name;
   toTray(room, set.primary);
-  if (set.slots.RF) toTray(room, set.slots.RF);
+  if (set.slots.RF) {
+    set.slots.RF.name = roomZoneName(room, undefined, set.slots.RF.uid);
+    toTray(room, set.slots.RF);
+  }
   if (set.slots.SW) toPool(next, set.slots.SW);
   return prunePool(next);
 }
@@ -268,12 +304,17 @@ export function moveSpeaker(rooms: Room[], speakerUid: string, targetRoom: strin
     target = { key: targetRoom, name: targetRoom, area: targetRoom, sets: [], tray: [] };
     next.push(target);
   }
+  // World B: a moved speaker's zone name follows its new room (disambiguated if taken).
+  moved.name = roomZoneName(target, undefined, moved.uid);
   toTray(target, moved);
   next.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   return next;
 }
 
-// ── stage a manual rename: set a speaker's display name wherever it lives ───────
+// ── stage a manual rename ───────────────────────────────────────────────────────
+// A standalone (tray) speaker renames itself. Renaming ANY member of a bonded set
+// renames the SET's zone (a bonded set is one zone with one name) — never a single
+// member, so the name survives an L/R swap and only the coordinator is renamed on apply.
 export function renameSpeaker(rooms: Room[], uid: string, newName: string): Room[] {
   const next = cloneRooms(rooms);
   for (const r of next) {
@@ -285,13 +326,13 @@ export function renameSpeaker(rooms: Room[], uid: string, newName: string): Room
     }
     for (const set of r.sets) {
       if (set.primary.uid === uid) {
-        set.primary.name = newName;
+        set.name = newName;
         return next;
       }
       for (const ch of CHANNELS) {
         const sp = set.slots[ch];
         if (sp?.uid === uid) {
-          sp.name = newName;
+          set.name = newName;
           return next;
         }
       }
@@ -308,7 +349,7 @@ export function setupHT(rooms: Room[], roomKey: string, barUid: string): Room[] 
   const idx = room.tray.findIndex((s) => s.uid === barUid);
   if (idx === -1) return next;
   const [bar] = room.tray.splice(idx, 1);
-  room.sets.push({ id: bar.uid, primary: bar, slots: {} });
+  room.sets.push({ id: bar.uid, name: bar.name, primary: bar, slots: {} });
   return next;
 }
 

@@ -226,9 +226,13 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
                 raise HomeAssistantError("No Sonos speakers available to query")
             ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
             speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
+        # World B: `name` is the (room-derived, possibly de-duped "Room 2") zone name;
+        # `area` is the HA Area to re-group under. They differ only when the destination
+        # room already holds another zone. `area` defaults to `name` for older callers.
+        area = call.data.get("area", name)
         await run(backend.set_zone_name, speaker["ip"], name)
         # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
-        set_speaker_area(hass, speaker["uid"], name)
+        set_speaker_area(hass, speaker["uid"], area)
         await coordinator.async_request_refresh()
 
     async def rename(call: ServiceCall) -> None:
@@ -297,7 +301,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     )
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE, move,
-        schema=vol.Schema({vol.Required("speaker"): name, vol.Required("name"): name}),
+        schema=vol.Schema(
+            {vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("area"): name}
+        ),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_RENAME, rename,

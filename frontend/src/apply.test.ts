@@ -150,14 +150,16 @@ describe("computeOps — moves", () => {
     };
     const working = clone(applied);
     working[uid].room = "Office";
+    working[uid].name = "Office"; // World B: a moved zone's name follows its room
 
     const ops = computeOps(applied, working);
     expect(ops).toHaveLength(1);
     expect(ops[0].type).toBe("move");
+    // Rename the zone to its room-derived name + reassign the HA area.
     expect(ops[0].service).toEqual({
       domain: "chorus",
       service: "move",
-      data: { speaker: uid, name: "Office" },
+      data: { speaker: uid, name: "Office", area: "Office" },
     });
     expect(ops[0].touches).toEqual([uid]);
     expect(ops[0].summary).toBe("Kitchen Speaker — move to Office");

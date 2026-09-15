@@ -272,7 +272,7 @@ export class ChorusEditor extends LitElement {
       ],
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(set.primary.name, set.primary.uid);
+          this._openAudio(this._setName(set), set.primary.uid);
         } else if (id === "dissolve") {
           this._working = dissolveHT(this._rooms, r.key, set.id);
           this._dirty = true;
@@ -304,9 +304,9 @@ export class ChorusEditor extends LitElement {
       items,
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(set.primary.name, set.primary.uid);
+          this._openAudio(this._setName(set), set.primary.uid);
         } else if (id === "rename") {
-          this._renameFor = { uid: set.primary.uid, current: this._name(set.primary) };
+          this._renameFor = { uid: set.primary.uid, current: this._setName(set) };
         } else if (id === "addsub") {
           if (this._availableSubs().length) this._picker = { roomKey: r.key, setId: set.id, ch: "SW" };
           else this._toast("No available sub");
@@ -350,7 +350,7 @@ export class ChorusEditor extends LitElement {
 
   private _openSpeakerSetMenu(r: Room, set: BondedSet): void {
     this._menu = {
-      heading: this._name(set.primary),
+      heading: this._setName(set),
       items: [{ id: "removesub", label: "Remove sub" }],
       onSelect: (id) => {
         if (id === "removesub") {
@@ -666,6 +666,13 @@ export class ChorusEditor extends LitElement {
     return sp.name && !/^RINCON_/i.test(sp.name) ? sp.name : shortModel(sp.model) || "Speaker";
   }
 
+  // A bonded set is ONE zone with ONE name (set.name), independent of which member is
+  // currently primary — so a header/rename reads set.name, never the primary's own name
+  // (that's what stops an L/R swap from flipping the displayed name).
+  private _setName(set: BondedSet): string {
+    return set.name && !/^RINCON_/i.test(set.name) ? set.name : this._name(set.primary);
+  }
+
   public override render(): TemplateResult {
     const rooms = this._rooms.filter((r) => r.key !== AVAILABLE_SUBS_KEY);
     if (!rooms.length) {
@@ -731,7 +738,7 @@ export class ChorusEditor extends LitElement {
       <div class="paircard">
         <span class="badge orb t-front">${iconFor(set.primary.model)}</span>
         <div class="pc-meta">
-          <b>${this._name(set.primary)}</b>
+          <b>${this._setName(set)}</b>
           <span>${shortModel(set.primary.model)}${sub ? " · with sub" : ""}</span>
         </div>
         ${sub
@@ -955,7 +962,7 @@ export class ChorusEditor extends LitElement {
           ${this._pcSlot("R", R)}
         </div>
         <div class="pc-meta">
-          <b>${this._name(L)}</b>
+          <b>${this._setName(set)}</b>
           <span>${shortModel(L.model ?? R?.model)} · stereo pair</span>
         </div>
         ${sub

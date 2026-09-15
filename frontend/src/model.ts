@@ -58,7 +58,8 @@ export function positionAccepts(ch: Channel, model?: string | null): boolean {
 
 export interface EditorSpeaker {
   uid: string;
-  name: string;
+  name: string; // the speaker's OWN name; a member keeps this through bonding, so
+  // separating a set restores each half's standalone name automatically.
   model: string;
   ip: string | null;
 }
@@ -74,6 +75,12 @@ export interface EditorSpeaker {
  */
 export interface BondedSet {
   id: string; // stable id = the primary speaker's uid
+  // The set's ONE zone name (a bonded set is a single Sonos zone). This is the
+  // source of truth for the coordinator's name — NOT derived from whichever member
+  // is currently primary, so swapping L/R never changes the name. Defaults to the
+  // room name when a set is created in the editor; from hardware it's the primary's
+  // (coordinator's) live zone name.
+  name: string;
   primary: EditorSpeaker; // visible anchor: soundbar / pair-left / lone speaker
   slots: Partial<Record<Channel, EditorSpeaker>>; // bonded satellites by channel
 }
@@ -136,7 +143,7 @@ function htSet(u: BondUnit): BondedSet {
     }
   }
   const primary = bar ?? speakerOf(u.members[0]);
-  return { id: primary.uid, primary, slots };
+  return { id: primary.uid, name: primary.name, primary, slots };
 }
 
 // A stereo-pair unit -> a set whose primary is the left/visible half; the right
@@ -152,7 +159,7 @@ function pairSet(u: BondUnit): BondedSet {
   const slots: Partial<Record<Channel, EditorSpeaker>> = {};
   if (right) slots.RF = speakerOf(right);
   if (sub) slots.SW = speakerOf(sub);
-  return { id: primary.uid, primary, slots };
+  return { id: primary.uid, name: primary.name, primary, slots };
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
