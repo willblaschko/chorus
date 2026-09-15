@@ -1647,6 +1647,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       align-items: center;
       gap: 9px;
       flex-basis: 100%;
+      max-width: 320px;
       min-width: 0;
       color: var(--secondary-text-color);
     }

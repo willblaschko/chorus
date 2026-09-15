@@ -1623,6 +1623,7 @@ export class ChorusEditor extends LitElement {
       align-items: center;
       gap: 9px;
       flex-basis: 100%;
+      max-width: 320px;
       min-width: 0;
       color: var(--secondary-text-color);
     }
