@@ -59,8 +59,8 @@ exposed it. Chorus does, entirely on your LAN:
 - **No cloud, no Sonos account** — everything stays on your network.
 - **Layouts the Sonos app won't build** — dedicated front surrounds, mixed-model
   satellites (e.g. Era 300s or Symfonisks as an Arc's rears *or* fronts).
-- **Reversible** — snapshot before every change; restore to exactly where you
-  were.
+- **Staged, not surprising** — the panel stages your changes locally; nothing is
+  written to your speakers until you review and **Apply**.
 
 ---
 
@@ -85,7 +85,7 @@ exposed it. Chorus does, entirely on your LAN:
   surrounds**, with mixed-model satellites (Era 300s, Symfonisks) as fronts *or*
   rears.
 - **Subs** — bond a sub to a soundbar, a **stereo pair**, or a **lone speaker**.
-- **Swap L/R, separate, dissolve** — every operation is reversible.
+- **Swap L/R, separate, dissolve** — take a layout apart as easily as you built it.
 
 ### Rooms & naming
 
@@ -103,7 +103,9 @@ exposed it. Chorus does, entirely on your LAN:
 - **Audio settings, surfaced not reinvented** — EQ (bass/treble/loudness), sub /
   surround levels, night sound, speech enhancement already exist as HA entities;
   Chorus shows them in the room view. It owns the one thing HA can't: **bonding**.
-- **Snapshot & restore** — captured before every change; roll back exactly.
+- **Home-theater snapshot & restore** — building a home theater snapshots the
+  soundbar's layout first (a mid-sequence failure is recoverable), and
+  `chorus.snapshot` / `chorus.restore` save and re-apply an HT layout on demand.
 
 ### Safety
 
@@ -204,15 +206,6 @@ gotchas are documented in **[`docs/SPIKE_FINDINGS.md`](docs/SPIKE_FINDINGS.md)**
 
 ---
 
-## Design
-
-- **`design/ui-prototype.html`** — the original interactive prototype the shipped
-  panel is built from: the spatial home-theater stage, drag-and-drop +
-  tap-to-assign, multiple stereo pairs per room, and staged changes with Apply.
-- **`design/icons.html`** — the line-icon set for the Sonos + Symfonisk range.
-
----
-
 ## What's next
 
 - Submit to the **HACS default store** and add a brand icon via
@@ -227,8 +220,10 @@ gotchas are documented in **[`docs/SPIKE_FINDINGS.md`](docs/SPIKE_FINDINGS.md)**
 - **Undocumented API.** These calls use Sonos's local UPnP/SOAP interface; a
   future firmware or app change could alter or remove them. There's no
   compatibility matrix — treat it as best-effort.
-- **Snapshot before writes.** Chorus captures the current layout before changing
-  it, and every operation is reversible.
+- **Staged, but no global undo.** The editor stages changes locally — nothing
+  reaches your speakers until you Apply. Building a home theater snapshots the
+  soundbar's layout first, and `snapshot`/`restore` cover HT layouts — but there's
+  no one-click undo for every operation, so review the summary before you Apply.
 - **Trueplay / tuning.** Custom layouts (mixed-model satellites, dedicated
   fronts) are ones the Sonos app won't build itself, so some of its tuning (like
   Trueplay) may not fully apply. Everything else works normally.
