@@ -22,7 +22,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Brands check requires the integration to be listed in the
-          # home-assistant/brands repo (or ship local brand assets); not
-          # published there yet, so skip this one check.
-          ignore: brands
