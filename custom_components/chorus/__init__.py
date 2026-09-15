@@ -109,13 +109,11 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             return await hass.async_add_executor_job(fn, *args)
         except SonosSoapError as err:
             if err.code == ERR_PRIMARY_NOT_SOUNDBAR:
-                raise HomeAssistantError(
-                    "That operation must target a soundbar (Arc, Beam, Ray)."
-                ) from err
-            raise HomeAssistantError(
-                f"Sonos rejected the change (code {err.code or '?'}). "
-                "It may not have settled — try again in a moment."
-            ) from err
+                raise HomeAssistantError("Must target a soundbar (Arc, Beam, Ray).") from err
+            # A code-less error is a timeout / unreachable speaker, not a real rejection.
+            if err.code:
+                raise HomeAssistantError(f"Sonos rejected it (code {err.code}).") from err
+            raise HomeAssistantError("Couldn't reach the speaker — try again.") from err
 
     # --- stereo pair ------------------------------------------------------
     async def create_stereo_pair(call: ServiceCall) -> None:

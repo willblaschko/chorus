@@ -513,12 +513,12 @@ export class ChorusEditor extends LitElement {
   // required — and matches the Sonos app's own "which speaker is this?" behaviour.
   private _identify(s: EditorSpeaker): void {
     if (!this._canIdentify(s.uid)) {
-      this._toast("Can't identify yet — this speaker isn't a standalone player (still bonded to another set, or offline). Apply your changes first.");
+      this._toast("Can't identify — still bonded or offline. Apply changes first.");
       return;
     }
     const entity = this._mediaPlayerFor(s.uid);
     if (!entity) {
-      this._toast("Can't identify — no media player resolved for this speaker.");
+      this._toast("Can't identify — no player for this speaker.");
       return;
     }
     void this.hass.callService("media_player", "play_media", {

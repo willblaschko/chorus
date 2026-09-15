@@ -401,7 +401,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       gap: 9px;
       max-width: min(90vw, 420px);
       padding: 12px 20px;
-      border-radius: 980px;
+      border-radius: 18px;
       background: var(--card-background-color, var(--ha-card-background));
       border: 1px solid var(--divider-color);
       box-shadow: var(--ha-card-box-shadow, 0 18px 44px -14px rgba(0, 0, 0, 0.4));
@@ -430,9 +430,12 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
     }
     .msg {
       min-width: 0;
+      /* Wrap up to 3 lines instead of truncating a long message to one ellipsized line. */
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     @media (prefers-reduced-motion: reduce) {
       .toast {
@@ -948,7 +951,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
           </button>
         </div>
       </div>
-    `}_hassReg(){return this.hass}_deviceIdFor(e){if(!e)return;const{devices:t}=this._hassReg();for(const[r,o]of Object.entries(t??{}))if(o.identifiers?.some(t=>"sonos"===t[0]&&t[1]===e))return r}_speakerEntityIds(e,t){const{entities:r,states:o}=this._hassReg(),s=this._deviceIdFor(e);if(s&&r)return Object.entries(r).filter(([,e])=>e.device_id===s).map(([e])=>e);const i=(e=>e.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""))(t);return Object.keys(o??{}).filter(e=>e.includes(`.${i}_`))}_mediaPlayerFor(e){const t=this._deviceIdFor(e),{entities:r}=this._hassReg();if(t&&r)return Object.keys(r).find(e=>e.startsWith("media_player.")&&r[e].device_id===t)}_chimeUrl(){const e="/chorus_static/chime.mp3",t=this.hass;return t.hassUrl?t.hassUrl(e):`${location.origin}${e}`}_canIdentify(e){const t=this._mediaPlayerFor(e),r=t?this.hass?.states?.[t]?.state:void 0;return!!t&&"unavailable"!==r&&"unknown"!==r&&null!=r}_identify(e){if(!this._canIdentify(e.uid))return void this._toast("Can't identify yet — this speaker isn't a standalone player (still bonded to another set, or offline). Apply your changes first.");const t=this._mediaPlayerFor(e.uid);t?(this.hass.callService("media_player","play_media",{entity_id:t,media_content_id:this._chimeUrl(),media_content_type:"music",announce:!0}),this._toast(`Identifying ${this._name(e)}`)):this._toast("Can't identify — no media player resolved for this speaker.")}async _openAudio(e,t){const r=this._speakerEntityIds(t,e),o=[];for(const e of vt){const t=e.toggle?"switch":"number",s=r.find(r=>r.startsWith(`${t}.`)&&r.endsWith(`_${e.key}`)),i=s?this.hass?.states?.[s]:void 0;if(i&&s&&"unavailable"!==i.state&&"unknown"!==i.state)if(e.toggle)o.push({id:s,kind:"toggle",label:e.label,group:e.group,value:"on"===i.state});else{const t=i.attributes;o.push({id:s,kind:"slider",label:e.label,group:e.group,value:Number(i.state),min:t.min??0,max:t.max??100,step:t.step??1})}}if(t)try{const e=await this.hass.connection.sendMessagePromise({type:"chorus/output_fixed",speaker:t});e?.supported&&o.push({id:`${xt}:${t}`,kind:"toggle",label:"Fixed line-out volume",group:"Output",value:!!e.fixed})}catch{}o.length?this._audio={heading:`${e} · Audio`,controls:o}:this._toast("No audio settings available for this speaker")}_dots(e){return B`<button
+    `}_hassReg(){return this.hass}_deviceIdFor(e){if(!e)return;const{devices:t}=this._hassReg();for(const[r,o]of Object.entries(t??{}))if(o.identifiers?.some(t=>"sonos"===t[0]&&t[1]===e))return r}_speakerEntityIds(e,t){const{entities:r,states:o}=this._hassReg(),s=this._deviceIdFor(e);if(s&&r)return Object.entries(r).filter(([,e])=>e.device_id===s).map(([e])=>e);const i=(e=>e.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""))(t);return Object.keys(o??{}).filter(e=>e.includes(`.${i}_`))}_mediaPlayerFor(e){const t=this._deviceIdFor(e),{entities:r}=this._hassReg();if(t&&r)return Object.keys(r).find(e=>e.startsWith("media_player.")&&r[e].device_id===t)}_chimeUrl(){const e="/chorus_static/chime.mp3",t=this.hass;return t.hassUrl?t.hassUrl(e):`${location.origin}${e}`}_canIdentify(e){const t=this._mediaPlayerFor(e),r=t?this.hass?.states?.[t]?.state:void 0;return!!t&&"unavailable"!==r&&"unknown"!==r&&null!=r}_identify(e){if(!this._canIdentify(e.uid))return void this._toast("Can't identify — still bonded or offline. Apply changes first.");const t=this._mediaPlayerFor(e.uid);t?(this.hass.callService("media_player","play_media",{entity_id:t,media_content_id:this._chimeUrl(),media_content_type:"music",announce:!0}),this._toast(`Identifying ${this._name(e)}`)):this._toast("Can't identify — no player for this speaker.")}async _openAudio(e,t){const r=this._speakerEntityIds(t,e),o=[];for(const e of vt){const t=e.toggle?"switch":"number",s=r.find(r=>r.startsWith(`${t}.`)&&r.endsWith(`_${e.key}`)),i=s?this.hass?.states?.[s]:void 0;if(i&&s&&"unavailable"!==i.state&&"unknown"!==i.state)if(e.toggle)o.push({id:s,kind:"toggle",label:e.label,group:e.group,value:"on"===i.state});else{const t=i.attributes;o.push({id:s,kind:"slider",label:e.label,group:e.group,value:Number(i.state),min:t.min??0,max:t.max??100,step:t.step??1})}}if(t)try{const e=await this.hass.connection.sendMessagePromise({type:"chorus/output_fixed",speaker:t});e?.supported&&o.push({id:`${xt}:${t}`,kind:"toggle",label:"Fixed line-out volume",group:"Output",value:!!e.fixed})}catch{}o.length?this._audio={heading:`${e} · Audio`,controls:o}:this._toast("No audio settings available for this speaker")}_dots(e){return B`<button
       type="button"
       class="dots"
       title="Options"

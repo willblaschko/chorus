@@ -91,7 +91,7 @@ export class ChorusToast extends LitElement {
       gap: 9px;
       max-width: min(90vw, 420px);
       padding: 12px 20px;
-      border-radius: 980px;
+      border-radius: 18px;
       background: var(--card-background-color, var(--ha-card-background));
       border: 1px solid var(--divider-color);
       box-shadow: var(--ha-card-box-shadow, 0 18px 44px -14px rgba(0, 0, 0, 0.4));
@@ -120,9 +120,12 @@ export class ChorusToast extends LitElement {
     }
     .msg {
       min-width: 0;
+      /* Wrap up to 3 lines instead of truncating a long message to one ellipsized line. */
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     @media (prefers-reduced-motion: reduce) {
       .toast {
