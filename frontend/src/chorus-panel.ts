@@ -1,16 +1,29 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BondGraph, BondUnit, BondMember, HomeAssistant } from "./types.js";
+import type { BondGraph, HomeAssistant } from "./types.js";
+import {
+  buildRooms,
+  setKind,
+  CHANNELS,
+  AVAILABLE_SUBS_KEY,
+  type Room,
+  type BondedSet,
+  type EditorSpeaker,
+} from "./model.js";
+import { iconFor, shortModel } from "./icons.js";
 import "./chorus-editor.js";
 import "./chorus-help.js";
 
 type View = "editor" | "overview";
 
-const KIND_LABEL: Record<string, string> = {
-  home_theater: "Home theater",
-  stereo_pair: "Stereo pair",
-  standalone: "Standalone",
-};
+// One flattened "who lives here" row in a room card's contents: a channel label
+// (or null for a lone speaker) plus the speaker to name. Derived from the room's
+// bonded sets + tray, so the card mirrors the editor's model, not the raw units.
+interface RoomEntry {
+  ch: string | null;
+  name: string;
+  model: string;
+}
 
 const CHANNEL_LABEL: Record<string, string> = {
   CC: "Center",
@@ -28,12 +41,6 @@ const CHANNEL_TINT: Record<string, string> = {
   LR: "var(--chorus-rear)",
   RR: "var(--chorus-rear)",
   SW: "var(--chorus-sub)",
-};
-
-const KIND_ORDER: Record<string, number> = {
-  home_theater: 0,
-  stereo_pair: 1,
-  standalone: 2,
 };
 
 @customElement("chorus-panel")
@@ -145,8 +152,25 @@ export class ChorusPanel extends LitElement {
         ${this._view === "overview" && units
           ? html`<span class="count">${units} unit${units === 1 ? "" : "s"}</span>`
           : nothing}
-        <button class="refresh" @click=${() => this._load(true)}>Refresh</button>
-        <button class="refresh" title="How it works" @click=${() => (this._help = true)}>?</button>
+        <button class="refresh" title="Refresh" aria-label="Refresh" @click=${() => this._load(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"
+            />
+          </svg>
+        </button>
+        <button
+          class="refresh"
+          title="How it works"
+          aria-label="How it works"
+          @click=${() => (this._help = true)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 18h2v-2h-2v2zm1-16A10 10 0 1 0 22 12 10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm0-14a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z"
+            />
+          </svg>
+        </button>
       </header>
     `;
   }
@@ -178,43 +202,123 @@ export class ChorusPanel extends LitElement {
     if (this._error) {
       return html`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;
     }
-    const units = this._graph?.units ?? [];
-    if (!units.length) {
+    // Same grouping the editor uses: bond graph → rooms by HA Area, minus the
+    // global pool of unbonded subs (a pseudo-room, never a real place).
+    const rooms = buildRooms(this._graph).filter((r) => r.key !== AVAILABLE_SUBS_KEY);
+    if (!rooms.length) {
       return html`<div class="msg">No Sonos speakers discovered yet.</div>`;
     }
-    const sorted = [...units].sort(
+    // Home theaters first, then rooms with stereo pairs, then the rest; alpha within
+    // each tier (numeric-aware so "Bedroom 2" sorts after "Bedroom 10" sanely).
+    const sorted = [...rooms].sort(
       (a, b) =>
-        (KIND_ORDER[a.kind] ?? 9) - (KIND_ORDER[b.kind] ?? 9) ||
-        (a.name ?? "").localeCompare(b.name ?? "")
+        this._roomRank(a) - this._roomRank(b) ||
+        a.name.localeCompare(b.name, undefined, { numeric: true })
     );
-    return html`<div class="grid">${sorted.map((u) => this._card(u))}</div>`;
+    return html`<div class="grid">${sorted.map((r) => this._roomCard(r))}</div>`;
   }
 
-  // Room key for a unit, mirroring model.ts buildRooms(): group by the HA Area
-  // of the unit's primary member, falling back to the zone name when it has no
-  // area. Must match so <chorus-editor>.selectRoom lands on the same room.
-  private _roomKey(unit: BondUnit): string {
-    const primary = unit.members.find((m) => m.is_primary) ?? unit.members[0];
-    return primary?.area ?? unit.name;
+  // ---- room derivations (mirror chorus-editor's private helpers) -------
+  private _htSet(r: Room): BondedSet | undefined {
+    return r.sets.find((s) => setKind(s) === "home_theater");
+  }
+  private _pairSets(r: Room): BondedSet[] {
+    return r.sets.filter((s) => setKind(s) === "stereo_pair");
   }
 
-  private _openInEditor(unit: BondUnit): void {
-    this._editRoom = this._roomKey(unit);
+  private _roomRank(r: Room): number {
+    if (this._htSet(r)) return 0;
+    if (this._pairSets(r).length) return 1;
+    return 2;
+  }
+
+  // The glyph model for the room's icon: prefer the soundbar, else the first bonded
+  // set's anchor, else the first loose speaker (mirrors the editor's _roomGlyphModel).
+  private _roomGlyphModel(r: Room): string {
+    return this._htSet(r)?.primary.model ?? r.sets[0]?.primary.model ?? r.tray[0]?.model ?? "";
+  }
+
+  // Tint the round room icon by what's in the room: a home theater gets the center
+  // ("bar") tint, a room with stereo pairs the front tint, otherwise neutral. Uses
+  // the panel's own --chorus-* vars (see :host) so light/dark both theme correctly.
+  private _roomTint(r: Room): string {
+    if (this._htSet(r)) return "t-bar";
+    if (this._pairSets(r).length) return "t-front";
+    return "t-neutral";
+  }
+
+  // The muted subline under the room name — same phrasing as chorus-editor's
+  // _roomSummary: "Home theater · N.M", "Stereo pair"/"K pairs", "1 speaker"/…
+  private _roomSummary(r: Room): string {
+    const parts: string[] = [];
+    const ht = this._htSet(r);
+    if (ht) {
+      const n = CHANNELS.filter((c) => c !== "SW" && ht.slots[c]).length;
+      parts.push(`Home theater · ${n}.${ht.slots.SW ? "1" : "0"}`);
+    }
+    const pairs = this._pairSets(r).length;
+    if (pairs) parts.push(pairs === 1 ? "Stereo pair" : `${pairs} pairs`);
+    const solo = r.tray.length;
+    if (solo && !ht) parts.push(solo === 1 ? "1 speaker" : `${solo} speakers`);
+    return parts.join(" · ") || "No speakers";
+  }
+
+  // Never surface a raw "RINCON_…" uid: fall back to the model while a name resolves
+  // (mirrors chorus-editor's _name).
+  private _spName(sp: EditorSpeaker): string {
+    return sp.name && !/^RINCON_/i.test(sp.name) ? sp.name : shortModel(sp.model) || "Speaker";
+  }
+
+  // Flatten a room's bonded sets + loose speakers into labelled contents rows.
+  private _roomEntries(r: Room): RoomEntry[] {
+    const out: RoomEntry[] = [];
+    const push = (ch: string | null, sp: EditorSpeaker): void =>
+      void out.push({ ch, name: this._spName(sp), model: sp.model });
+    for (const set of r.sets) {
+      const kind = setKind(set);
+      if (kind === "home_theater") {
+        push("CC", set.primary);
+        for (const ch of CHANNELS) {
+          const sp = set.slots[ch];
+          if (sp) push(ch, sp);
+        }
+      } else if (kind === "stereo_pair") {
+        push("LF", set.primary);
+        if (set.slots.RF) push("RF", set.slots.RF);
+        if (set.slots.SW) push("SW", set.slots.SW);
+      } else {
+        push(null, set.primary);
+        if (set.slots.SW) push("SW", set.slots.SW);
+      }
+    }
+    for (const sp of r.tray) push(null, sp);
+    return out;
+  }
+
+  private _openInEditor(r: Room): void {
+    // buildRooms keys rooms the same way <chorus-editor>.selectRoom matches, so the
+    // editor lands on this exact room.
+    this._editRoom = r.key;
     this._view = "editor";
   }
 
-  private _card(unit: BondUnit): TemplateResult {
-    const title = unit.name || unit.primary_uid;
+  private _roomCard(r: Room): TemplateResult {
+    const entries = this._roomEntries(r);
     return html`
       <div class="card">
-        <h2>
-          <span class="title">${title}</span>
-          <span class="kind">${KIND_LABEL[unit.kind] ?? unit.kind}</span>
+        <div class="rhead">
+          <span class="ric ${this._roomTint(r)}" aria-hidden="true"
+            >${iconFor(this._roomGlyphModel(r))}</span
+          >
+          <div class="rmeta">
+            <h2 class="rname">${r.name}</h2>
+            <span class="rsum">${this._roomSummary(r)}</span>
+          </div>
           <button
             class="edit"
             title="Edit in editor"
-            aria-label=${`Edit ${title} in the editor`}
-            @click=${() => this._openInEditor(unit)}
+            aria-label=${`Edit ${r.name} in the editor`}
+            @click=${() => this._openInEditor(r)}
           >
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
               <path
@@ -223,28 +327,27 @@ export class ChorusPanel extends LitElement {
               />
             </svg>
           </button>
-        </h2>
-        <div class="members">${unit.members.map((m) => this._member(m))}</div>
+        </div>
+        ${entries.length
+          ? html`<div class="members">${entries.map((e) => this._entryRow(e))}</div>`
+          : nothing}
       </div>
     `;
   }
 
-  private _member(m: BondMember): TemplateResult {
-    const label = m.channel ? CHANNEL_LABEL[m.channel] ?? m.channel : "Speaker";
-    const tint = m.channel ? CHANNEL_TINT[m.channel] ?? "var(--chorus-cc)" : "";
-    const sub = [m.model, m.ip].filter(Boolean).join(" · ");
+  private _entryRow(e: RoomEntry): TemplateResult {
+    const label = e.ch ? CHANNEL_LABEL[e.ch] ?? e.ch : "Speaker";
+    const tint = e.ch ? CHANNEL_TINT[e.ch] ?? "var(--chorus-cc)" : "";
+    const sub = shortModel(e.model);
     return html`
       <div class="member">
-        <span
-          class="chip ${m.channel ? "" : "solo"}"
-          style=${tint ? `background:${tint}` : nothing}
+        <span class="chip ${e.ch ? "" : "solo"}" style=${tint ? `background:${tint}` : nothing}
           >${label}</span
         >
         <span class="m-main">
-          <span class="m-name">${m.name || m.uid}</span>
+          <span class="m-name">${e.name}</span>
           ${sub ? html`<span class="m-sub">${sub}</span>` : nothing}
         </span>
-        ${m.invisible ? html`<span class="inv">bonded</span>` : nothing}
       </div>
     `;
   }
@@ -319,14 +422,27 @@ export class ChorusPanel extends LitElement {
     button.refresh {
       border: 1px solid var(--divider-color);
       background: var(--card-background-color);
-      color: var(--primary-text-color);
-      border-radius: 20px;
-      padding: 6px 14px;
-      font-size: 13px;
+      color: var(--secondary-text-color);
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
       cursor: pointer;
+    }
+    button.refresh svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
     }
     button.refresh:hover {
       background: var(--secondary-background-color);
+      color: var(--primary-color);
+    }
+    button.refresh:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     .grid {
       display: grid;
@@ -340,34 +456,66 @@ export class ChorusPanel extends LitElement {
       padding: 14px 16px;
       box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
     }
-    .card h2 {
-      font-size: 16px;
-      font-weight: 600;
-      margin: 0;
+    /* Room-card header: tinted round icon + name/summary + edit pencil, echoing
+       the editor's room-list row (.ric / .rmeta) but scaled up for the page. */
+    .rhead {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 13px;
     }
-    .card h2 .title {
+    .ric {
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+      flex: none;
+      display: grid;
+      place-items: center;
+    }
+    .ric svg {
+      width: 26px;
+      height: 26px;
+    }
+    /* Icon tints — mirror the editor's t-* classes, but keyed to this panel's own
+       --chorus-* vars. color-mix over the card surface keeps them legible in both
+       light and dark themes. */
+    .t-front {
+      background: color-mix(in srgb, var(--chorus-front) 16%, var(--card-background-color));
+      color: var(--chorus-front);
+    }
+    .t-bar {
+      /* Home theaters get the accent (matches the editor's room list), not the muted
+         center-channel grey — so the marquee kind pops. */
+      background: color-mix(in srgb, var(--primary-color) 20%, var(--card-background-color));
+      color: var(--primary-color);
+    }
+    .t-neutral {
+      background: var(--secondary-background-color);
+      color: var(--secondary-text-color);
+    }
+    .rmeta {
+      flex: 1;
       min-width: 0;
+    }
+    .rname {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      letter-spacing: 0.1px;
     }
-    .kind {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .rsum {
+      display: block;
+      font-size: 12px;
       color: var(--secondary-text-color);
-      border: 1px solid var(--divider-color);
-      border-radius: 10px;
-      padding: 1px 7px;
-      font-weight: 600;
-      flex: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .card h2 .edit {
-      margin-left: auto;
+    .edit {
       flex: none;
+      align-self: flex-start;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -380,19 +528,21 @@ export class ChorusPanel extends LitElement {
       color: var(--secondary-text-color);
       cursor: pointer;
     }
-    .card h2 .edit:hover {
+    .edit:hover {
       color: var(--primary-color);
       background: var(--secondary-background-color);
     }
-    .card h2 .edit:focus-visible {
+    .edit:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
     }
-    .card h2 .edit svg {
+    .edit svg {
       display: block;
     }
     .members {
-      margin-top: 12px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--divider-color);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -431,14 +581,6 @@ export class ChorusPanel extends LitElement {
     .m-sub {
       font-size: 12px;
       color: var(--secondary-text-color);
-    }
-    .inv {
-      font-size: 11px;
-      color: var(--secondary-text-color);
-      border: 1px solid var(--divider-color);
-      border-radius: 8px;
-      padding: 0 6px;
-      margin-left: auto;
     }
     .msg {
       padding: 40px 8px;
