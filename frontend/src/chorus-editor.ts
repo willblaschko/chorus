@@ -272,7 +272,7 @@ export class ChorusEditor extends LitElement {
       ],
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(set.primary.name);
+          this._openAudio(set.primary.name, set.primary.uid);
         } else if (id === "dissolve") {
           this._working = dissolveHT(this._rooms, r.key, set.id);
           this._dirty = true;
@@ -304,7 +304,7 @@ export class ChorusEditor extends LitElement {
       items,
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(set.primary.name);
+          this._openAudio(set.primary.name, set.primary.uid);
         } else if (id === "rename") {
           this._renameFor = { uid: set.primary.uid, current: this._name(set.primary) };
         } else if (id === "addsub") {
@@ -437,13 +437,41 @@ export class ChorusEditor extends LitElement {
     `;
   }
 
-  private _openAudio(name: string): void {
+  // The number.<slug>_<key> / switch.<slug>_<key> entity ids for a speaker. Prefer the
+  // HA device registry (keyed by the Sonos RINCON uid) — exact, and it survives zone
+  // renames and works for stereo pairs; fall back to guessing from the name slug.
+  private _speakerEntityIds(uid: string | undefined, name: string): string[] {
+    const hass = this.hass as unknown as {
+      devices?: Record<string, { identifiers?: [string, string][] }>;
+      entities?: Record<string, { device_id?: string | null }>;
+      states?: Record<string, unknown>;
+    };
+    let deviceId: string | undefined;
+    if (uid && hass.devices) {
+      for (const [id, dev] of Object.entries(hass.devices)) {
+        if (dev.identifiers?.some((i) => i[0] === "sonos" && i[1] === uid)) {
+          deviceId = id;
+          break;
+        }
+      }
+    }
+    if (deviceId && hass.entities) {
+      return Object.entries(hass.entities)
+        .filter(([, e]) => e.device_id === deviceId)
+        .map(([eid]) => eid);
+    }
     const slug = slugify(name);
+    return Object.keys(hass.states ?? {}).filter((id) => id.includes(`.${slug}_`));
+  }
+
+  private _openAudio(name: string, uid?: string): void {
+    const ids = this._speakerEntityIds(uid, name);
     const controls: AudioControl[] = [];
     for (const spec of AUDIO_SPEC) {
-      const eid = `${spec.toggle ? "switch" : "number"}.${slug}_${spec.key}`;
-      const ent = this.hass?.states?.[eid];
-      if (!ent || ent.state === "unavailable" || ent.state === "unknown") continue;
+      const domain = spec.toggle ? "switch" : "number";
+      const eid = ids.find((id) => id.startsWith(`${domain}.`) && id.endsWith(`_${spec.key}`));
+      const ent = eid ? this.hass?.states?.[eid] : undefined;
+      if (!ent || !eid || ent.state === "unavailable" || ent.state === "unknown") continue;
       if (spec.toggle) {
         controls.push({
           id: eid,
