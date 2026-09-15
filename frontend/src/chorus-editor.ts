@@ -334,7 +334,7 @@ export class ChorusEditor extends LitElement {
       heading: this._name(s),
       items,
       onSelect: (id) => {
-        if (id === "identify") this._toast(`Chiming on ${this._name(s)}`);
+        if (id === "identify") this._identify(s);
         else if (id === "addsub") {
           const sub = this._availableSubs()[0];
           if (sub) {
@@ -440,28 +440,66 @@ export class ChorusEditor extends LitElement {
   // The number.<slug>_<key> / switch.<slug>_<key> entity ids for a speaker. Prefer the
   // HA device registry (keyed by the Sonos RINCON uid) — exact, and it survives zone
   // renames and works for stereo pairs; fall back to guessing from the name slug.
-  private _speakerEntityIds(uid: string | undefined, name: string): string[] {
-    const hass = this.hass as unknown as {
+  private _hassReg() {
+    return this.hass as unknown as {
       devices?: Record<string, { identifiers?: [string, string][] }>;
       entities?: Record<string, { device_id?: string | null }>;
       states?: Record<string, unknown>;
     };
-    let deviceId: string | undefined;
-    if (uid && hass.devices) {
-      for (const [id, dev] of Object.entries(hass.devices)) {
-        if (dev.identifiers?.some((i) => i[0] === "sonos" && i[1] === uid)) {
-          deviceId = id;
-          break;
-        }
-      }
+  }
+
+  /** HA device id for a Sonos speaker, matched by its RINCON uid. */
+  private _deviceIdFor(uid: string | undefined): string | undefined {
+    if (!uid) return undefined;
+    const { devices } = this._hassReg();
+    for (const [id, dev] of Object.entries(devices ?? {})) {
+      if (dev.identifiers?.some((i) => i[0] === "sonos" && i[1] === uid)) return id;
     }
-    if (deviceId && hass.entities) {
-      return Object.entries(hass.entities)
+    return undefined;
+  }
+
+  private _speakerEntityIds(uid: string | undefined, name: string): string[] {
+    const { entities, states } = this._hassReg();
+    const deviceId = this._deviceIdFor(uid);
+    if (deviceId && entities) {
+      return Object.entries(entities)
         .filter(([, e]) => e.device_id === deviceId)
         .map(([eid]) => eid);
     }
     const slug = slugify(name);
-    return Object.keys(hass.states ?? {}).filter((id) => id.includes(`.${slug}_`));
+    return Object.keys(states ?? {}).filter((id) => id.includes(`.${slug}_`));
+  }
+
+  /** The media_player entity for a speaker (via its device) — for identify/announce. */
+  private _mediaPlayerFor(uid: string): string | undefined {
+    const deviceId = this._deviceIdFor(uid);
+    const { entities } = this._hassReg();
+    if (!deviceId || !entities) return undefined;
+    return Object.keys(entities).find(
+      (eid) => eid.startsWith("media_player.") && entities[eid].device_id === deviceId
+    );
+  }
+
+  private _ttsEngine(): string | undefined {
+    return Object.keys(this.hass?.states ?? {}).find((e) => e.startsWith("tts."));
+  }
+
+  // Identify a speaker by announcing its name on it (snapshots + restores playback via
+  // announce:true) — a chirp SOAP returned success but no audio, so we use HA's TTS.
+  private _identify(s: EditorSpeaker): void {
+    const entity = this._mediaPlayerFor(s.uid);
+    const tts = this._ttsEngine();
+    if (!entity || !tts) {
+      this._toast("Can't identify this speaker (no media player / TTS)");
+      return;
+    }
+    void this.hass.callService("media_player", "play_media", {
+      entity_id: entity,
+      media_content_id: `media-source://tts/${tts}?message=This is ${this._name(s)}`,
+      media_content_type: "music",
+      announce: true,
+    });
+    this._toast(`Identifying ${this._name(s)}`);
   }
 
   private _openAudio(name: string, uid?: string): void {
