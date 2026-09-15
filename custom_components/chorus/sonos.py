@@ -280,14 +280,34 @@ class SonosBackend:
 
     # -- identify: play a short clip on ONE speaker ----------------------
     def play_chime(self, ip: str, url: str) -> None:
-        """Play `url` on the speaker at `ip`, snapshotting and restoring whatever it was
-        doing. Used by Identify. Talks to the speaker directly (via soco's robust
-        Snapshot) — deliberately independent of HA's Sonos integration, so it works on a
-        freed speaker that HA still lists as unavailable."""
+        """Play `url` on ONE speaker for Identify, restoring what it was doing. Talks to
+        the speaker directly (soco) — independent of HA's Sonos integration, so it works
+        on a freed speaker HA still lists unavailable.
+
+        Two cases: a speaker that's a SLAVE in a playback group can't play on its own
+        (soco/Sonos rule), so we unjoin it, chime, then rejoin — the group's coordinator
+        keeps playing the whole time. A standalone/coordinator speaker gets a normal
+        snapshot -> chime -> restore."""
         import soco
         from soco.snapshot import Snapshot
 
         device = soco.SoCo(ip)
+        group = device.group
+        coord = group.coordinator if group else None
+        if coord is not None and coord.uid != device.uid:
+            # Playback-group slave: leave, chime solo, rejoin (coordinator plays on).
+            device.unjoin()
+            time.sleep(0.4)
+            try:
+                device.play_uri(url, title="Chorus Identify")
+                time.sleep(2.0)
+            finally:
+                try:
+                    device.join(coord)
+                except Exception:  # noqa: BLE001 — best-effort rejoin
+                    _LOGGER.warning("Chorus identify: could not rejoin %s to its group", ip)
+            return
+        # Standalone or its own coordinator: snapshot + restore its own playback.
         snap = Snapshot(device)
         snap.snapshot()
         try:
