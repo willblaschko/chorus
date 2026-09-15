@@ -1,6 +1,6 @@
 # Chorus
 
-*A Sonos speaker manager for Home Assistant.*
+*Sonos bonding for Home Assistant — stereo pairs, home theaters, and surrounds the app won't build.*
 
 > **TL;DR** — Chorus is a **Home Assistant integration** that **configures Sonos
 > bonding over your local network** (no cloud, no Sonos account): create and
@@ -11,32 +11,36 @@
 > **Integration** → **Download** → **restart Home Assistant** → **Settings →
 > Devices & Services → Add Integration → Chorus**.
 >
-> **Maturity:** today Chorus ships the bonding operations as Home Assistant
-> **services** (**Developer Tools → Actions**), validated on real hardware. A
-> **sidebar panel** is in progress — a live status/overview view now, with a
-> drag-and-drop editor being built.
+> **Maturity:** Chorus ships a **native sidebar panel** — a drag-and-drop /
+> tap-to-assign **editor** for building pairs and home theaters, plus a live
+> **Overview** — all backed by Home Assistant **services** you can also call from
+> **Developer Tools → Actions**. Validated on real hardware.
 
 Chorus is a Home Assistant integration for **configuring Sonos bonding** — stereo
 pairs and home-theater surrounds, including **dedicated front surrounds and
 mixed-model satellites the official Sonos app refuses to create**. It talks to
-your speakers over the local network only (no cloud, no account), and is heading
-toward a visual, room-by-room drag-and-drop panel for building layouts by hand.
+your speakers over the local network only (no cloud, no account), through a
+visual, room-by-room drag-and-drop panel for building layouts by hand.
 
 ---
 
 ## Status
 
-**v0.1 — services.** Installed and running on real Home Assistant.
+**v0.2 — editor panel.** Installed and running on real Home Assistant.
 
-- ✅ **Read / topology path validated end-to-end on hardware** — discovery →
-  name resolution → local SOAP → parsing the live bond map.
-- ✅ **Write path implemented** and proven in the Phase-0 hardware spike
-  (`docs/SPIKE_FINDINGS.md`): create/dissolve stereo pairs, add/remove
-  home-theater satellites, snapshot & restore.
-- 🚧 **In progress:** a coordinator enhancement to parse *bonded / invisible*
-  satellites out of `ZoneGroupState` so they resolve by name (today discovery
-  only sees standalone zones, so removing a bonded satellite by name needs this).
-- 🔜 **v0.2:** the drag-and-drop / tap-to-assign panel, wired to these services.
+- ✅ **Bonding on hardware** — create/dissolve stereo pairs, add/remove
+  home-theater satellites (rears *and* front surrounds), bond a sub to a pair or
+  a lone speaker, snapshot & restore. Topology parsed live from `ZoneGroupState`,
+  including bonded/invisible members, so everything resolves by name or UID.
+- ✅ **Native editor panel** — drag-and-drop (desktop) / tap-to-assign (mobile)
+  for building layouts, a live **Overview**, and a settle-progress bar that names
+  each speaker as it reconnects.
+- ✅ **Zone names follow the room** — a bonded set is one zone with one name;
+  swapping L/R never renames it, moving/creating adopts the room name.
+- ✅ **Identify** — chime one speaker to find it, played directly over SOAP (no
+  dependency on HA's Sonos integration, so it works on freshly-freed speakers).
+- ✅ **Fixed line-out volume** toggle for a Connect / Port / Amp / Five.
+- 🔜 **Next:** HACS default-store submission + a brand icon.
 
 ---
 
@@ -209,6 +213,11 @@ gotchas are documented in **[`docs/SPIKE_FINDINGS.md`](docs/SPIKE_FINDINGS.md)**
 - **Trueplay / tuning.** Custom layouts (mixed-model satellites, dedicated
   fronts) are ones the Sonos app won't build itself, so some of its tuning (like
   Trueplay) may not fully apply. Everything else works normally.
+- **"Needs attention" in the Sonos app.** A room Chorus configures may briefly
+  show "needs attention" in the Sonos app. The bond is correct and works — verified
+  byte-identical to an app-made pair; the flag is a cloud-side "was this set up
+  through our app?" marker Chorus can't set (it's local-only, no account). It
+  clears on its own over time, or immediately if you re-pair once in the app.
 
 ---
 
