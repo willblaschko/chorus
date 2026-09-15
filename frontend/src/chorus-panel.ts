@@ -137,7 +137,7 @@ export class ChorusPanel extends LitElement {
       <header>
         <img class="mark" src="/chorus_static/chorus-icon.png" alt="" />
         <h1>Chorus</h1>
-        <span class="tag">Set up your Sonos speakers, right here in Home Assistant.</span>
+        <span class="tag">Pair. Surround. Bond.</span>
         <span class="spacer"></span>
         <div class="seg" role="tablist">
           <button
@@ -452,6 +452,27 @@ export class ChorusPanel extends LitElement {
     .count {
       color: var(--secondary-text-color);
       font-size: 13px;
+    }
+    /* Phones: keep the whole header on one row (logo + tabs + buttons). The tagline is
+       decorative, so drop it here to reclaim the vertical space. */
+    @media (max-width: 520px) {
+      header {
+        gap: 8px;
+        margin: 6px 2px 14px;
+      }
+      .tag {
+        display: none;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      .seg button {
+        padding: 4px 11px;
+        font-size: 12.5px;
+      }
+      .count {
+        display: none;
+      }
     }
     button.refresh {
       border: 1px solid var(--divider-color);
