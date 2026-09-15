@@ -214,4 +214,16 @@ gotchas are documented in **[`docs/SPIKE_FINDINGS.md`](docs/SPIKE_FINDINGS.md)**
 
 ## License
 
-[MIT](LICENSE)
+Chorus is **dual-licensed**:
+
+- **Open source:** [GNU AGPL-3.0](LICENSE) — free to use, study, modify, and
+  share. Note the AGPL's strong copyleft: ship it (or run a modified version as a
+  network service) and you must release your complete corresponding source under
+  the AGPL too. For home and hobby use this changes nothing.
+- **Commercial:** if you want to build on Chorus **without** the AGPL's
+  source-disclosure obligations — e.g. inside a closed-source product, appliance,
+  or hosted service — a separate paid commercial license is available. See
+  [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md).
+
+Contributions are welcome under the terms in [`CLA.md`](CLA.md), which keeps this
+dual-licensing possible. © 2026 Will Blaschko.
