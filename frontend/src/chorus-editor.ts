@@ -289,10 +289,12 @@ export class ChorusEditor extends LitElement {
     const items: MenuItem[] = hasSub
       ? [
           { id: "audio", label: "Audio settings" },
+          { id: "rename", label: "Rename" },
           { id: "removesub", label: "Remove sub" },
         ]
       : [
           { id: "audio", label: "Audio settings" },
+          { id: "rename", label: "Rename" },
           { id: "addsub", label: "Add a sub" },
           { id: "swap", label: "Swap L / R" },
           { id: "separate", label: "Separate pair", danger: true },
@@ -303,6 +305,8 @@ export class ChorusEditor extends LitElement {
       onSelect: (id) => {
         if (id === "audio") {
           this._openAudio(set.primary.name);
+        } else if (id === "rename") {
+          this._renameFor = { uid: set.primary.uid, current: this._name(set.primary) };
         } else if (id === "addsub") {
           if (this._availableSubs().length) this._picker = { roomKey: r.key, setId: set.id, ch: "SW" };
           else this._toast("No available sub");
@@ -1173,6 +1177,10 @@ export class ChorusEditor extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
+      /* The stage can never be wider than its column — rows shrink + truncate
+         instead of spilling and forcing horizontal scroll on mobile. */
+      max-width: 100%;
+      overflow-x: hidden;
     }
     .tv {
       display: flex;
@@ -1183,8 +1191,10 @@ export class ChorusEditor extends LitElement {
       margin-bottom: 24px;
     }
     .tv-art {
-      width: 210px;
-      max-width: 60%;
+      /* ~20% wider than the couch (150px) so the TV reads as the larger object,
+         while max-width lets it shrink on mobile. */
+      width: 180px;
+      max-width: 70%;
     }
     .tv svg {
       width: 100%;
@@ -1207,15 +1217,26 @@ export class ChorusEditor extends LitElement {
       justify-content: center;
       flex-wrap: nowrap; /* L/R must never stack — shrink + truncate instead */
       margin-top: 12px;
+      max-width: 100%; /* row can't be wider than the stage */
     }
     /* In a row, the two tiles share the width and shrink (min-width:0 lets the
-       subtitle truncate) rather than wrapping to a stack. */
+       subtitle truncate) rather than wrapping to a stack. The 50% cap + overflow
+       hidden guarantee neither tile can spill and force sideways scroll. */
     .prow .postile {
       flex: 1 1 0;
       min-width: 0;
+      max-width: 50%;
+      overflow: hidden;
     }
     .psub {
       margin-top: 12px;
+      max-width: 100%;
+    }
+    /* The lone sub tile must also stay inside the stage on narrow widths. */
+    .psub .postile {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
     }
     .lp {
       display: flex;
@@ -1638,11 +1659,15 @@ export class ChorusEditor extends LitElement {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.32);
-      display: grid;
-      place-items: center;
       z-index: 50;
     }
     .sheet {
+      /* Centre under the editor content (var set by chorus-editor), not the raw
+         viewport — otherwise HA's sidebar shifts the modal left of the content. */
+      position: absolute;
+      left: var(--chorus-bar-left, 50%);
+      top: 50%;
+      transform: translate(-50%, -50%);
       background: var(--card-background-color, #fff);
       border-radius: 18px;
       box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.5);
@@ -1745,6 +1770,11 @@ export class ChorusEditor extends LitElement {
       }
       .grid[data-detail="on"] .col-list {
         display: none;
+      }
+      /* Tighter row gap on mobile so the two channel tiles have more room before
+         their text has to truncate. */
+      .prow {
+        gap: 12px;
       }
     }
   `;
