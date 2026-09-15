@@ -176,6 +176,17 @@ rename:
       selector:
         text:
 
+identify:
+  name: Identify speaker
+  description: Play a short chime on one speaker (with playback snapshot/restore) so you can tell which physical unit it is. Only works on a standalone zone.
+  fields:
+    speaker:
+      name: Speaker
+      description: Sonos room/speaker name or RINCON UID.
+      required: true
+      selector:
+        text:
+
 set_fixed_output:
   name: Fixed line-out volume
   description: Toggle a speaker's fixed line-out level (RenderingControl SetOutputFixed) — for a Connect/Port/Amp/Five feeding an external amplifier.

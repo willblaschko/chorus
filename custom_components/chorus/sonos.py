@@ -278,6 +278,27 @@ class SonosBackend:
             ip, "SetOutputFixed", f"<DesiredFixed>{'1' if fixed else '0'}</DesiredFixed>"
         )
 
+    # -- identify: play a short clip on ONE speaker ----------------------
+    def play_chime(self, ip: str, url: str) -> None:
+        """Play `url` on the speaker at `ip`, snapshotting and restoring whatever it was
+        doing. Used by Identify. Talks to the speaker directly (via soco's robust
+        Snapshot) — deliberately independent of HA's Sonos integration, so it works on a
+        freed speaker that HA still lists as unavailable."""
+        import soco
+        from soco.snapshot import Snapshot
+
+        device = soco.SoCo(ip)
+        snap = Snapshot(device)
+        snap.snapshot()
+        try:
+            device.play_uri(url, title="Chorus Identify")
+            time.sleep(2.0)  # let the ~1s chime finish before we restore
+        finally:
+            try:
+                snap.restore(fade=False)
+            except Exception:  # noqa: BLE001 — best-effort restore; never mask the chime
+                _LOGGER.warning("Chorus identify: could not restore playback on %s", ip)
+
     # -- snapshot / restore of a soundbar's HT map ------------------------
     def snapshot_ht(self, soundbar_ip: str, soundbar_uid: str) -> str:
         return self.ht_sat_map(soundbar_ip, soundbar_uid)

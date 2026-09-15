@@ -342,7 +342,7 @@ export class ChorusEditor extends LitElement {
       heading: this._name(s),
       items,
       onSelect: (id) => {
-        if (id === "identify") this._identify(s);
+        if (id === "identify") void this._identify(s);
         else if (id === "audio") void this._openAudio(this._name(s), s.uid);
         else if (id === "addsub") {
           const sub = this._availableSubs()[0];
@@ -479,55 +479,18 @@ export class ChorusEditor extends LitElement {
     return Object.keys(states ?? {}).filter((id) => id.includes(`.${slug}_`));
   }
 
-  /** The media_player entity for a speaker (via its device) — for identify/announce. */
-  private _mediaPlayerFor(uid: string): string | undefined {
-    const deviceId = this._deviceIdFor(uid);
-    const { entities } = this._hassReg();
-    if (!deviceId || !entities) return undefined;
-    return Object.keys(entities).find(
-      (eid) => eid.startsWith("media_player.") && entities[eid].device_id === deviceId
-    );
-  }
-
-  // Absolute URL of the bundled identify chime, served from the integration's static
-  // path. `hassUrl` builds the correct base for the current connection; fall back to the
-  // page origin (the panel runs at the HA origin, which the Sonos speakers can reach).
-  private _chimeUrl(): string {
-    const path = "/chorus_static/chime.mp3";
-    const h = this.hass as unknown as { hassUrl?: (p: string) => string };
-    return h.hassUrl ? h.hassUrl(path) : `${location.origin}${path}`;
-  }
-
-  // A speaker only has its OWN media_player when it's a standalone zone. A bonded
-  // satellite (or one whose un-bond hasn't been applied to hardware yet) has no player of
-  // its own — HA reports it `unavailable` and routes playback to the group coordinator, so
-  // an announce would chirp the WRONG speaker. Gate on a live, available player.
-  private _canIdentify(uid: string): boolean {
-    const entity = this._mediaPlayerFor(uid);
-    const st = entity ? this.hass?.states?.[entity]?.state : undefined;
-    return !!entity && st !== "unavailable" && st !== "unknown" && st != null;
-  }
-
-  // Identify a speaker by playing a short chime on just it (announce:true snapshots +
-  // restores current playback). A bundled MP3 is more reliable than TTS — no TTS engine
-  // required — and matches the Sonos app's own "which speaker is this?" behaviour.
-  private _identify(s: EditorSpeaker): void {
-    if (!this._canIdentify(s.uid)) {
-      this._toast("Can't identify — still bonded or offline. Apply changes first.");
-      return;
+  // Identify a speaker by playing a chime on just it, via the chorus.identify backend
+  // service. Deliberately NOT through HA's media_player: Chorus talks to the speaker
+  // directly (soco snapshot/play/restore), so it works on a freed speaker that HA still
+  // lists unavailable, and the standalone-vs-bonded gate uses Chorus's own live topology.
+  private async _identify(s: EditorSpeaker): Promise<void> {
+    try {
+      await this.hass.callService("chorus", "identify", { speaker: s.uid });
+      this._toast(`Identifying ${this._name(s)}`);
+    } catch (e) {
+      const msg = (e as { message?: string })?.message;
+      this._toast(msg || "Couldn't identify this speaker — try again.");
     }
-    const entity = this._mediaPlayerFor(s.uid);
-    if (!entity) {
-      this._toast("Can't identify — no player for this speaker.");
-      return;
-    }
-    void this.hass.callService("media_player", "play_media", {
-      entity_id: entity,
-      media_content_id: this._chimeUrl(),
-      media_content_type: "music",
-      announce: true,
-    });
-    this._toast(`Identifying ${this._name(s)}`);
   }
 
   private async _openAudio(name: string, uid?: string): Promise<void> {

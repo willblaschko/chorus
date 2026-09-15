@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import (
     CHANNELS,
@@ -25,6 +26,7 @@ from .const import (
     SERVICE_RENAME,
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_RESTORE,
+    SERVICE_IDENTIFY,
     SERVICE_SEPARATE,
     SERVICE_SET_FIXED_OUTPUT,
     SERVICE_SET_HOME_THEATER,
@@ -50,6 +52,7 @@ _ALL_SERVICES = (
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_MOVE,
     SERVICE_RENAME,
+    SERVICE_IDENTIFY,
     SERVICE_SET_FIXED_OUTPUT,
     SERVICE_SNAPSHOT,
     SERVICE_RESTORE,
@@ -257,6 +260,36 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await run(backend.set_output_fixed, speaker["ip"], bool(call.data["enabled"]))
         await coordinator.async_request_refresh()
 
+    async def identify(call: ServiceCall) -> None:
+        # Play a chime on ONE speaker so the user can tell which physical unit it is.
+        # Fully independent of HA's Sonos integration: resolve the IP from Chorus's own
+        # fresh topology (so it works on a freed speaker HA still lists unavailable),
+        # gate on that topology, and play the clip directly via soco.
+        ident = call.data["speaker"]
+        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
+        if not speaker:
+            seed = next(iter(coordinator.players.values()), None)
+            if not seed:
+                raise HomeAssistantError("No Sonos speakers available to query")
+            ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
+            speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
+        # Only a visible, standalone zone can be chirped in isolation — a bonded satellite
+        # has no independent playback (Sonos routes its audio through the coordinator).
+        units = await hass.async_add_executor_job(
+            lambda: backend.parse_bond_graph(backend.zone_group_state(speaker["ip"]))
+        )
+        for u in units:
+            for m in u["members"]:
+                if m["uid"] == speaker["uid"] and (m.get("invisible") or u.get("kind") != "standalone"):
+                    raise HomeAssistantError(
+                        "This speaker is still bonded — apply your changes first, then identify it."
+                    )
+        try:
+            base = get_url(hass, prefer_external=False, allow_internal=True)
+        except NoURLAvailableError as err:
+            raise HomeAssistantError("No local Home Assistant URL available for the chime.") from err
+        await run(backend.play_chime, speaker["ip"], f"{base}/chorus_static/chime.mp3")
+
     # --- snapshot / restore of a soundbar's HT layout ---------------------
     async def snapshot(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
@@ -322,6 +355,10 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     hass.services.async_register(
         DOMAIN, SERVICE_SET_FIXED_OUTPUT, set_fixed_output,
         schema=vol.Schema({vol.Required("speaker"): name, vol.Required("enabled"): cv.boolean}),
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_IDENTIFY, identify,
+        schema=vol.Schema({vol.Required("speaker"): name}),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SNAPSHOT, snapshot,

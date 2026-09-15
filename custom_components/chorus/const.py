@@ -23,6 +23,7 @@ SERVICE_REMOVE_HOME_THEATER = "remove_home_theater"
 SERVICE_MOVE = "move"  # SetZoneAttributes rename + HA Area reassign == move rooms
 SERVICE_RENAME = "rename"  # SetZoneAttributes rename only (keep the room)
 SERVICE_SET_FIXED_OUTPUT = "set_fixed_output"  # line-out fixed volume (RenderingControl)
+SERVICE_IDENTIFY = "identify"  # play a chime on one speaker (soco snapshot/restore)
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
 
