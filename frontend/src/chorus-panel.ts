@@ -16,17 +16,25 @@ import "./chorus-help.js";
 
 type View = "editor" | "overview";
 
-// One flattened "who lives here" row in a room card's contents: a channel label
-// (or null for a lone speaker) plus the speaker to name. Derived from the room's
-// bonded sets + tray, so the card mirrors the editor's model, not the raw units.
+// One "who lives here" row in a room card's contents: a channel label (or null
+// for a lone speaker) plus the speaker to name. Derived from the room's bonded
+// sets + tray, so the card mirrors the editor's model, not the raw units.
 interface RoomEntry {
   ch: string | null;
   name: string;
   model: string;
 }
 
+// A visually-boxed group of member rows in a room card — one per bonded SET
+// (home theater / stereo pair / speaker + sub), plus one for the room's loose
+// tray speakers. The caption is the group's kind label (see _roomGroups).
+interface RoomGroup {
+  label: string;
+  entries: RoomEntry[];
+}
+
 const CHANNEL_LABEL: Record<string, string> = {
-  CC: "Center",
+  CC: "Soundbar",
   LF: "Front L",
   RF: "Front R",
   LR: "Rear L",
@@ -269,30 +277,46 @@ export class ChorusPanel extends LitElement {
     return sp.name && !/^RINCON_/i.test(sp.name) ? sp.name : shortModel(sp.model) || "Speaker";
   }
 
-  // Flatten a room's bonded sets + loose speakers into labelled contents rows.
-  private _roomEntries(r: Room): RoomEntry[] {
-    const out: RoomEntry[] = [];
-    const push = (ch: string | null, sp: EditorSpeaker): void =>
-      void out.push({ ch, name: this._spName(sp), model: sp.model });
+  // Group a room's contents by bonded SET: each home theater / stereo pair /
+  // speaker+sub becomes its own captioned group of member rows, so a room with
+  // (say) one theater AND one pair renders as two clearly separate boxes. Loose
+  // tray speakers get their own trailing group. Labels mirror the editor's
+  // section wording (_detail): "Home theater" / "Stereo pair" / "Speaker + sub".
+  private _roomGroups(r: Room): RoomGroup[] {
+    const groups: RoomGroup[] = [];
+    const entry = (ch: string | null, sp: EditorSpeaker): RoomEntry => ({
+      ch,
+      name: this._spName(sp),
+      model: sp.model,
+    });
     for (const set of r.sets) {
       const kind = setKind(set);
+      const entries: RoomEntry[] = [];
       if (kind === "home_theater") {
-        push("CC", set.primary);
+        entries.push(entry("CC", set.primary));
         for (const ch of CHANNELS) {
           const sp = set.slots[ch];
-          if (sp) push(ch, sp);
+          if (sp) entries.push(entry(ch, sp));
         }
+        groups.push({ label: "Home theater", entries });
       } else if (kind === "stereo_pair") {
-        push("LF", set.primary);
-        if (set.slots.RF) push("RF", set.slots.RF);
-        if (set.slots.SW) push("SW", set.slots.SW);
+        entries.push(entry("LF", set.primary));
+        if (set.slots.RF) entries.push(entry("RF", set.slots.RF));
+        if (set.slots.SW) entries.push(entry("SW", set.slots.SW));
+        groups.push({ label: "Stereo pair", entries });
       } else {
-        push(null, set.primary);
-        if (set.slots.SW) push("SW", set.slots.SW);
+        entries.push(entry(null, set.primary));
+        if (set.slots.SW) entries.push(entry("SW", set.slots.SW));
+        groups.push({ label: "Speaker + sub", entries });
       }
     }
-    for (const sp of r.tray) push(null, sp);
-    return out;
+    if (r.tray.length) {
+      groups.push({
+        label: r.sets.length ? "Other speakers" : "Speakers",
+        entries: r.tray.map((sp) => entry(null, sp)),
+      });
+    }
+    return groups;
   }
 
   private _openInEditor(r: Room): void {
@@ -303,7 +327,7 @@ export class ChorusPanel extends LitElement {
   }
 
   private _roomCard(r: Room): TemplateResult {
-    const entries = this._roomEntries(r);
+    const groups = this._roomGroups(r);
     return html`
       <div class="card">
         <div class="rhead">
@@ -328,9 +352,19 @@ export class ChorusPanel extends LitElement {
             </svg>
           </button>
         </div>
-        ${entries.length
-          ? html`<div class="members">${entries.map((e) => this._entryRow(e))}</div>`
+        ${groups.length
+          ? html`<div class="groups">${groups.map((g) => this._groupBox(g))}</div>`
           : nothing}
+      </div>
+    `;
+  }
+
+  // One bordered, captioned box for a single bonded set (or the tray group).
+  private _groupBox(g: RoomGroup): TemplateResult {
+    return html`
+      <div class="group" role="group" aria-label=${g.label}>
+        <div class="gcap">${g.label}</div>
+        <div class="members">${g.entries.map((e) => this._entryRow(e))}</div>
       </div>
     `;
   }
@@ -539,10 +573,29 @@ export class ChorusPanel extends LitElement {
     .edit svg {
       display: block;
     }
-    .members {
+    /* Grouped contents: each bonded set (home theater / stereo pair / speaker +
+       sub) and the loose tray get their own bordered box, stacked with a small
+       gap, so multiple groups in one room read as visually separate. */
+    .groups {
       margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--divider-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .group {
+      border: 1px solid var(--divider-color);
+      border-radius: 11px;
+      padding: 9px 11px 11px;
+    }
+    .gcap {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--secondary-text-color);
+      margin-bottom: 8px;
+    }
+    .members {
       display: flex;
       flex-direction: column;
       gap: 8px;
