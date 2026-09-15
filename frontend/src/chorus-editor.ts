@@ -1573,6 +1573,70 @@ export class ChorusEditor extends LitElement {
       }
     }
 
+    /* Phones: stack each HT tile vertically (icon over title) so the front/rear pairs
+       stay side-by-side but shrink to fit — no sideways scroll. */
+    @media (max-width: 520px) {
+      .stage {
+        padding: 6px 0 14px;
+      }
+      .prow {
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .postile {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 6px;
+        min-width: 0;
+        min-height: 0;
+        padding: 9px 7px;
+      }
+      .postile.bar {
+        min-width: 0;
+        max-width: 100%;
+      }
+      .badge {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+      }
+      .badge svg {
+        width: 20px;
+        height: 20px;
+      }
+      .pmeta {
+        width: 100%;
+      }
+      /* Names can wrap (centered, up to 2 lines) instead of being cut off. */
+      .pmeta b {
+        font-size: 12.5px;
+        line-height: 1.15;
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+      .pmeta span {
+        font-size: 11px;
+      }
+      /* the × no longer needs a reserved side gutter in the centered layout */
+      .postile.filled .pmeta {
+        padding-right: 0;
+      }
+      .x {
+        top: 3px;
+        right: 4px;
+      }
+      .tv-art {
+        width: 190px;
+      }
+      .lp .couch {
+        width: 118px;
+      }
+    }
+
     .paircards {
       display: flex;
       flex-direction: column;
