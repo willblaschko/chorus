@@ -489,41 +489,41 @@ export class ChorusEditor extends LitElement {
     );
   }
 
-  private _ttsEngine(): string | undefined {
-    return Object.keys(this.hass?.states ?? {}).find((e) => e.startsWith("tts."));
+  // Absolute URL of the bundled identify chime, served from the integration's static
+  // path. `hassUrl` builds the correct base for the current connection; fall back to the
+  // page origin (the panel runs at the HA origin, which the Sonos speakers can reach).
+  private _chimeUrl(): string {
+    const path = "/chorus_static/chime.mp3";
+    const h = this.hass as unknown as { hassUrl?: (p: string) => string };
+    return h.hassUrl ? h.hassUrl(path) : `${location.origin}${path}`;
   }
 
-  // Identify a speaker by announcing its name on it (snapshots + restores playback via
-  // announce:true) — a chirp SOAP returned success but no audio, so we use HA's TTS.
   // A speaker only has its OWN media_player when it's a standalone zone. A bonded
-  // satellite (or one whose un-bond hasn't been applied to hardware yet) has no player
-  // of its own — HA reports it `unavailable` and routes playback to the group
-  // coordinator, so an announce would chirp the WRONG speaker. Gate on a live, available
-  // player and tell the user to apply first rather than mis-identify.
+  // satellite (or one whose un-bond hasn't been applied to hardware yet) has no player of
+  // its own — HA reports it `unavailable` and routes playback to the group coordinator, so
+  // an announce would chirp the WRONG speaker. Gate on a live, available player.
   private _canIdentify(uid: string): boolean {
     const entity = this._mediaPlayerFor(uid);
     const st = entity ? this.hass?.states?.[entity]?.state : undefined;
     return !!entity && st !== "unavailable" && st !== "unknown" && st != null;
   }
 
+  // Identify a speaker by playing a short chime on just it (announce:true snapshots +
+  // restores current playback). A bundled MP3 is more reliable than TTS — no TTS engine
+  // required — and matches the Sonos app's own "which speaker is this?" behaviour.
   private _identify(s: EditorSpeaker): void {
     if (!this._canIdentify(s.uid)) {
       this._toast("Can't identify yet — this speaker isn't a standalone player (still bonded to another set, or offline). Apply your changes first.");
       return;
     }
     const entity = this._mediaPlayerFor(s.uid);
-    const tts = this._ttsEngine();
-    if (!tts) {
-      this._toast("Can't identify — no TTS engine configured in Home Assistant.");
-      return;
-    }
     if (!entity) {
       this._toast("Can't identify — no media player resolved for this speaker.");
       return;
     }
     void this.hass.callService("media_player", "play_media", {
       entity_id: entity,
-      media_content_id: `media-source://tts/${tts}?message=This is ${this._name(s)}`,
+      media_content_id: this._chimeUrl(),
       media_content_type: "music",
       announce: true,
     });
