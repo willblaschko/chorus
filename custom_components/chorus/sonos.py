@@ -329,7 +329,7 @@ class SonosBackend:
             time.sleep(0.4)
             start()
 
-        time.sleep(2.0)  # let the ~1s chime finish
+        time.sleep(3.2)  # let the ~2.5s chime finish
 
         # Restore the previous source. A slave's saved URI is `x-rincon:<coord>`, so this
         # rejoins its group; a standalone's is its own queue/stream.
