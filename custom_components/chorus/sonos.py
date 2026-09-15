@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _DP_NS = "urn:schemas-upnp-org:service:DeviceProperties:1"
 _ZGT_NS = "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
+_RC_NS = "urn:schemas-upnp-org:service:RenderingControl:1"
 
 _ENVELOPE = (
     '<?xml version="1.0"?>'
@@ -69,6 +70,21 @@ class SonosBackend:
 
     def _dp(self, ip: str, action: str, body: str = "") -> str:
         return self._soap(ip, "/DeviceProperties/Control", _DP_NS, action, body)
+
+    def _rc(self, ip: str, action: str, inner: str = "") -> str:
+        # RenderingControl actions always carry InstanceID 0.
+        return self._soap(
+            ip,
+            "/MediaRenderer/RenderingControl/Control",
+            _RC_NS,
+            action,
+            f"<InstanceID>0</InstanceID>{inner}",
+        )
+
+    @staticmethod
+    def _field(xml: str, tag: str) -> str:
+        m = re.search(rf"<{tag}>([^<]*)</{tag}>", xml)
+        return m.group(1) if m else ""
 
     # -- topology (the source of truth) -----------------------------------
     def zone_group_state(self, ip: str) -> str:
@@ -240,12 +256,27 @@ class SonosBackend:
         return result
 
     # -- move / rename (SetZoneAttributes) --------------------------------
-    def set_zone_name(self, ip: str, name: str) -> str:
+    def set_zone_name(self, ip: str, name: str, icon: str | None = None) -> str:
+        # DesiredIcon token is a lowercase room key like "office"/"living_room" (verified
+        # on hardware); empty leaves the icon unchanged behaviour to Sonos' default.
         body = (
             f"<DesiredZoneName>{html.escape(name)}</DesiredZoneName>"
-            "<DesiredIcon></DesiredIcon><DesiredConfiguration></DesiredConfiguration>"
+            f"<DesiredIcon>{html.escape(icon) if icon else ''}</DesiredIcon>"
+            "<DesiredConfiguration></DesiredConfiguration>"
         )
         return self._dp(ip, "SetZoneAttributes", body)
+
+    # -- fixed line-out volume (Port / Connect / Amp / Five) ---------------
+    def supports_output_fixed(self, ip: str) -> bool:
+        return self._field(self._rc(ip, "GetSupportsOutputFixed"), "CurrentSupportsFixed") == "1"
+
+    def output_fixed(self, ip: str) -> bool:
+        return self._field(self._rc(ip, "GetOutputFixed"), "CurrentFixed") == "1"
+
+    def set_output_fixed(self, ip: str, fixed: bool) -> str:
+        return self._rc(
+            ip, "SetOutputFixed", f"<DesiredFixed>{'1' if fixed else '0'}</DesiredFixed>"
+        )
 
     # -- snapshot / restore of a soundbar's HT map ------------------------
     def snapshot_ht(self, soundbar_ip: str, soundbar_uid: str) -> str:

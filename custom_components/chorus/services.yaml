@@ -147,6 +147,12 @@ move:
       required: false
       selector:
         text:
+    icon:
+      name: Room icon
+      description: Optional Sonos room-icon token (a lowercase room name like "office" or "living_room").
+      required: false
+      selector:
+        text:
 
 rename:
   name: Rename speaker
@@ -163,6 +169,29 @@ rename:
       required: true
       selector:
         text:
+    icon:
+      name: Room icon
+      description: Optional Sonos room-icon token (a lowercase room name like "office" or "living_room").
+      required: false
+      selector:
+        text:
+
+set_fixed_output:
+  name: Fixed line-out volume
+  description: Toggle a speaker's fixed line-out level (RenderingControl SetOutputFixed) — for a Connect/Port/Amp/Five feeding an external amplifier.
+  fields:
+    speaker:
+      name: Speaker
+      description: Sonos room/speaker name or RINCON UID.
+      required: true
+      selector:
+        text:
+    enabled:
+      name: Fixed output
+      description: On = fixed line-out level (control volume on the amp); Off = Sonos controls the level.
+      required: true
+      selector:
+        boolean:
 
 snapshot:
   name: Snapshot home theater

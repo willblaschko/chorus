@@ -66,6 +66,11 @@ const AUDIO_SPEC: Array<{ key: string; label: string; group: string; toggle?: bo
   { key: "balance", label: "Balance", group: "Playback" },
 ];
 
+// Sentinel id prefix for the Fixed line-out toggle. It's a Chorus SOAP setting (not an
+// HA entity), so the audio sheet routes its change to chorus.set_fixed_output instead of
+// switch.turn_on. The speaker uid is appended: `chorus:fixed_output:<uid>`.
+const FIXED_OUTPUT_ID = "chorus:fixed_output";
+
 const slugify = (name: string): string =>
   name
     .toLowerCase()
@@ -272,7 +277,7 @@ export class ChorusEditor extends LitElement {
       ],
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(this._setName(set), set.primary.uid);
+          void this._openAudio(this._setName(set), set.primary.uid);
         } else if (id === "dissolve") {
           this._working = dissolveHT(this._rooms, r.key, set.id);
           this._dirty = true;
@@ -304,7 +309,7 @@ export class ChorusEditor extends LitElement {
       items,
       onSelect: (id) => {
         if (id === "audio") {
-          this._openAudio(this._setName(set), set.primary.uid);
+          void this._openAudio(this._setName(set), set.primary.uid);
         } else if (id === "rename") {
           this._renameFor = { uid: set.primary.uid, current: this._setName(set) };
         } else if (id === "addsub") {
@@ -327,7 +332,10 @@ export class ChorusEditor extends LitElement {
 
   private _openSpeakerMenu(s: EditorSpeaker, roomKey: string): void {
     const canAddSub = !isBar(s.model) && this._availableSubs().length > 0;
-    const items: MenuItem[] = [{ id: "identify", label: "Identify" }];
+    const items: MenuItem[] = [
+      { id: "identify", label: "Identify" },
+      { id: "audio", label: "Audio settings" },
+    ];
     if (canAddSub) items.push({ id: "addsub", label: "Add a sub" });
     items.push({ id: "rename", label: "Rename" }, { id: "move", label: "Move to another room" });
     this._menu = {
@@ -335,6 +343,7 @@ export class ChorusEditor extends LitElement {
       items,
       onSelect: (id) => {
         if (id === "identify") this._identify(s);
+        else if (id === "audio") void this._openAudio(this._name(s), s.uid);
         else if (id === "addsub") {
           const sub = this._availableSubs()[0];
           if (sub) {
@@ -521,7 +530,7 @@ export class ChorusEditor extends LitElement {
     this._toast(`Identifying ${this._name(s)}`);
   }
 
-  private _openAudio(name: string, uid?: string): void {
+  private async _openAudio(name: string, uid?: string): Promise<void> {
     const ids = this._speakerEntityIds(uid, name);
     const controls: AudioControl[] = [];
     for (const spec of AUDIO_SPEC) {
@@ -551,6 +560,27 @@ export class ChorusEditor extends LitElement {
         });
       }
     }
+    // Fixed line-out volume (Connect/Port/Amp/Five) is a Chorus SOAP setting, not an HA
+    // entity — query it over the websocket and add a toggle only if the device supports it.
+    if (uid) {
+      try {
+        const fx = await this.hass.connection.sendMessagePromise<{
+          supported: boolean;
+          fixed: boolean;
+        }>({ type: "chorus/output_fixed", speaker: uid });
+        if (fx?.supported) {
+          controls.push({
+            id: `${FIXED_OUTPUT_ID}:${uid}`,
+            kind: "toggle",
+            label: "Fixed line-out volume",
+            group: "Output",
+            value: !!fx.fixed,
+          });
+        }
+      } catch {
+        /* offline / unsupported — just omit the toggle */
+      }
+    }
     if (!controls.length) {
       this._toast("No audio settings available for this speaker");
       return;
@@ -560,7 +590,10 @@ export class ChorusEditor extends LitElement {
 
   private _onAudioChange = (e: Event): void => {
     const { id, value } = (e as CustomEvent).detail as { id: string; value: number | boolean };
-    if (typeof value === "boolean") {
+    if (id.startsWith(`${FIXED_OUTPUT_ID}:`)) {
+      const uid = id.slice(FIXED_OUTPUT_ID.length + 1);
+      void this.hass.callService("chorus", "set_fixed_output", { speaker: uid, enabled: !!value });
+    } else if (typeof value === "boolean") {
       void this.hass.callService("switch", value ? "turn_on" : "turn_off", { entity_id: id });
     } else {
       void this.hass.callService("number", "set_value", { entity_id: id, value });

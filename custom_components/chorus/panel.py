@@ -10,6 +10,7 @@ import hashlib
 import logging
 import os
 
+import voluptuous as vol
 from homeassistant.components import frontend, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant, callback
@@ -50,6 +51,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     if not ui.get("ws"):
         websocket_api.async_register_command(hass, ws_bond_graph)
         websocket_api.async_register_command(hass, ws_refresh)
+        websocket_api.async_register_command(hass, ws_output_fixed)
         ui["ws"] = True
 
     frontend.async_register_built_in_panel(
@@ -121,6 +123,35 @@ async def ws_refresh(hass: HomeAssistant, connection, msg) -> None:
     if coordinator is not None:
         await coordinator.async_request_refresh()
     connection.send_result(msg["id"], _graph_payload(hass, coordinator))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "chorus/output_fixed", vol.Required("speaker"): str}
+)
+@websocket_api.async_response
+async def ws_output_fixed(hass: HomeAssistant, connection, msg) -> None:
+    """Report whether a speaker supports a fixed line-out level (Port/Connect/Amp/Five),
+    and its current on/off state. Queried when the audio sheet opens so the toggle only
+    shows for capable devices. Any SOAP/offline error -> reported as unsupported."""
+    fallback = {"supported": False, "fixed": False}
+    coordinator = _first_coordinator(hass)
+    player = coordinator.players.get(msg["speaker"]) if coordinator else None
+    if not player:
+        connection.send_result(msg["id"], fallback)
+        return
+    backend = coordinator.backend
+    ip = player["ip"]
+
+    def read() -> dict:
+        if not backend.supports_output_fixed(ip):
+            return fallback
+        return {"supported": True, "fixed": backend.output_fixed(ip)}
+
+    try:
+        result = await hass.async_add_executor_job(read)
+    except Exception:  # noqa: BLE001 — offline/SOAP error: degrade to "unsupported"
+        result = fallback
+    connection.send_result(msg["id"], result)
 
 
 def _first_coordinator(hass: HomeAssistant):

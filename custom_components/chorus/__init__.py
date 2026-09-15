@@ -26,6 +26,7 @@ from .const import (
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_RESTORE,
     SERVICE_SEPARATE,
+    SERVICE_SET_FIXED_OUTPUT,
     SERVICE_SET_HOME_THEATER,
     SERVICE_SNAPSHOT,
     can_pair,
@@ -49,6 +50,7 @@ _ALL_SERVICES = (
     SERVICE_REMOVE_HOME_THEATER,
     SERVICE_MOVE,
     SERVICE_RENAME,
+    SERVICE_SET_FIXED_OUTPUT,
     SERVICE_SNAPSHOT,
     SERVICE_RESTORE,
 )
@@ -230,7 +232,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         # `area` is the HA Area to re-group under. They differ only when the destination
         # room already holds another zone. `area` defaults to `name` for older callers.
         area = call.data.get("area", name)
-        await run(backend.set_zone_name, speaker["ip"], name)
+        await run(backend.set_zone_name, speaker["ip"], name, call.data.get("icon"))
         # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
         set_speaker_area(hass, speaker["uid"], area)
         await coordinator.async_request_refresh()
@@ -247,7 +249,14 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
                 raise HomeAssistantError("No Sonos speakers available to query")
             ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
             speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
-        await run(backend.set_zone_name, speaker["ip"], call.data["name"])
+        # Optional room icon (a lowercase token like "office"/"living_room") set alongside.
+        await run(backend.set_zone_name, speaker["ip"], call.data["name"], call.data.get("icon"))
+        await coordinator.async_request_refresh()
+
+    async def set_fixed_output(call: ServiceCall) -> None:
+        # Toggle a speaker's fixed line-out level (Port/Connect/Amp/Five) via RenderingControl.
+        speaker = resolve(call.data["speaker"])
+        await run(backend.set_output_fixed, speaker["ip"], bool(call.data["enabled"]))
         await coordinator.async_request_refresh()
 
     # --- snapshot / restore of a soundbar's HT layout ---------------------
@@ -301,13 +310,20 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     )
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE, move,
-        schema=vol.Schema(
-            {vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("area"): name}
-        ),
+        schema=vol.Schema({
+            vol.Required("speaker"): name, vol.Required("name"): name,
+            vol.Optional("area"): name, vol.Optional("icon"): name,
+        }),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_RENAME, rename,
-        schema=vol.Schema({vol.Required("speaker"): name, vol.Required("name"): name}),
+        schema=vol.Schema({
+            vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("icon"): name,
+        }),
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_FIXED_OUTPUT, set_fixed_output,
+        schema=vol.Schema({vol.Required("speaker"): name, vol.Required("enabled"): cv.boolean}),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SNAPSHOT, snapshot,
