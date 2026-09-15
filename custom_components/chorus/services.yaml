@@ -164,6 +164,24 @@ rename:
       selector:
         text:
 
+set_volume:
+  name: Set volume
+  description: Set a zone's volume (RenderingControl, 0–100) on its coordinator.
+  fields:
+    speaker:
+      name: Speaker
+      description: Sonos room/speaker name or RINCON UID.
+      required: true
+      selector:
+        text:
+    level:
+      name: Volume
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+
 identify:
   name: Identify speaker
   description: Play a short chime on one speaker (with playback snapshot/restore) so you can tell which physical unit it is. Only works on a standalone zone.

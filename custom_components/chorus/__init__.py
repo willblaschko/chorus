@@ -30,6 +30,7 @@ from .const import (
     SERVICE_SEPARATE,
     SERVICE_SET_FIXED_OUTPUT,
     SERVICE_SET_HOME_THEATER,
+    SERVICE_SET_VOLUME,
     SERVICE_SNAPSHOT,
     can_pair,
     can_surround,
@@ -54,6 +55,7 @@ _ALL_SERVICES = (
     SERVICE_RENAME,
     SERVICE_IDENTIFY,
     SERVICE_SET_FIXED_OUTPUT,
+    SERVICE_SET_VOLUME,
     SERVICE_SNAPSHOT,
     SERVICE_RESTORE,
 )
@@ -289,6 +291,12 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             raise HomeAssistantError("No local Home Assistant URL available for the chime.") from err
         await run(backend.play_chime, speaker["ip"], f"{base}/chorus_static/chime.mp3")
 
+    async def set_volume(call: ServiceCall) -> None:
+        # Set a zone's volume (RenderingControl Master channel on its coordinator).
+        speaker = resolve(call.data["speaker"])
+        await run(backend.set_volume, speaker["ip"], int(call.data["level"]))
+        await coordinator.async_request_refresh()
+
     # --- snapshot / restore of a soundbar's HT layout ---------------------
     async def snapshot(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
@@ -355,6 +363,13 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     hass.services.async_register(
         DOMAIN, SERVICE_IDENTIFY, identify,
         schema=vol.Schema({vol.Required("speaker"): name}),
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_VOLUME, set_volume,
+        schema=vol.Schema({
+            vol.Required("speaker"): name,
+            vol.Required("level"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        }),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SNAPSHOT, snapshot,

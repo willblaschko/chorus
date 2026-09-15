@@ -233,7 +233,7 @@ export function bondSubToSpeaker(
   const [speaker] = room.tray.splice(si, 1);
   // A speaker+sub is fundamentally still that speaker, so it keeps the speaker's name
   // (not the room name) — a sub is invisible.
-  room.sets.push({ id: speaker.uid, name: speaker.name, primary: speaker, slots: { SW: sub } });
+  room.sets.push({ id: speaker.uid, name: speaker.name, volume: speaker.volume ?? null, primary: speaker, slots: { SW: sub } });
   return prunePool(next);
 }
 
@@ -251,7 +251,7 @@ export function createPair(rooms: Room[], roomKey: string, leftUid: string, righ
   // World B: the new pair's zone name follows the room (both halves are out of the tray
   // now, so they don't block the base name). The name lives on the SET, so a later L/R
   // swap never changes it.
-  room.sets.push({ id: left.uid, name: roomZoneName(room), primary: left, slots: { RF: right } });
+  room.sets.push({ id: left.uid, name: roomZoneName(room), volume: left.volume ?? null, primary: left, slots: { RF: right } });
   return next;
 }
 
@@ -349,7 +349,7 @@ export function setupHT(rooms: Room[], roomKey: string, barUid: string): Room[] 
   const idx = room.tray.findIndex((s) => s.uid === barUid);
   if (idx === -1) return next;
   const [bar] = room.tray.splice(idx, 1);
-  room.sets.push({ id: bar.uid, name: bar.name, primary: bar, slots: {} });
+  room.sets.push({ id: bar.uid, name: bar.name, volume: bar.volume ?? null, primary: bar, slots: {} });
   return next;
 }
 

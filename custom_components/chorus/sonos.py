@@ -286,6 +286,17 @@ class SonosBackend:
             ip, "SetOutputFixed", f"<DesiredFixed>{'1' if fixed else '0'}</DesiredFixed>"
         )
 
+    # -- zone volume (RenderingControl Master channel) --------------------
+    def get_volume(self, ip: str) -> int:
+        v = self._field(self._rc(ip, "GetVolume", "<Channel>Master</Channel>"), "CurrentVolume")
+        return int(v) if v.isdigit() else 0
+
+    def set_volume(self, ip: str, level: int) -> str:
+        level = max(0, min(100, int(level)))
+        return self._rc(
+            ip, "SetVolume", f"<Channel>Master</Channel><DesiredVolume>{level}</DesiredVolume>"
+        )
+
     # -- identify: play a short clip on ONE speaker ----------------------
     def play_chime(self, ip: str, url: str) -> None:
         """Play `url` on ONE speaker for Identify, restoring what it was doing. Uses raw

@@ -70,6 +70,8 @@ const AUDIO_SPEC: Array<{ key: string; label: string; group: string; toggle?: bo
 // HA entity), so the audio sheet routes its change to chorus.set_fixed_output instead of
 // switch.turn_on. The speaker uid is appended: `chorus:fixed_output:<uid>`.
 const FIXED_OUTPUT_ID = "chorus:fixed_output";
+// Sentinel id prefix for the Volume slider in the audio sheet (routed to chorus.set_volume).
+const VOLUME_ID = "chorus:volume";
 
 const slugify = (name: string): string =>
   name
@@ -115,6 +117,9 @@ export class ChorusEditor extends LitElement {
   @state() private _audio?: { heading: string; controls: AudioControl[] };
   @state() private _movePick?: string; // uid of the speaker being moved
   @state() private _renameFor?: { uid: string; current: string };
+  // Optimistic volume by coordinator uid (0-100) for immediate slider feedback; cleared
+  // when a fresh graph arrives. Volume is an IMMEDIATE action, never a staged edit.
+  @state() private _vol: Record<string, number> = {};
   private _ro?: ResizeObserver;
 
   public override connectedCallback(): void {
@@ -146,6 +151,8 @@ export class ChorusEditor extends LitElement {
     if ((changed.has("graph") && !this._dirty) || this._working === undefined) {
       this._working = structuredClone(buildRooms(this.graph));
     }
+    // A fresh graph carries the true volumes — drop optimistic overrides.
+    if (changed.has("graph")) this._vol = {};
     // Host asked to open a specific room (e.g. the Overview edit pencil).
     if (changed.has("selectRoom") && this.selectRoom) {
       this._selected = this.selectRoom;
@@ -493,6 +500,39 @@ export class ChorusEditor extends LitElement {
     }
   }
 
+  // Set a zone's volume immediately (not staged) via chorus.set_volume, with an optimistic
+  // override so the slider tracks the drag before the graph refreshes.
+  private _setVolume(uid: string, level: number): void {
+    const v = Math.max(0, Math.min(100, Math.round(level)));
+    this._vol = { ...this._vol, [uid]: v };
+    void this.hass.callService("chorus", "set_volume", { speaker: uid, level: v });
+  }
+
+  // Inline volume slider for a zone (a bonded set's coordinator, or a lone speaker).
+  private _volumeSlider(uid: string, current: number | null | undefined): TemplateResult {
+    const val = this._vol[uid] ?? current ?? 0;
+    return html`
+      <label class="vol" title="Volume" @click=${(e: Event) => e.stopPropagation()}>
+        <span class="vol-ic">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"
+            ></path>
+          </svg>
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          .value=${String(val)}
+          @change=${(e: Event) => this._setVolume(uid, Number((e.target as HTMLInputElement).value))}
+        />
+        <span class="vol-num">${val}</span>
+      </label>
+    `;
+  }
+
   private async _openAudio(name: string, uid?: string): Promise<void> {
     const ids = this._speakerEntityIds(uid, name);
     const controls: AudioControl[] = [];
@@ -544,6 +584,19 @@ export class ChorusEditor extends LitElement {
         /* offline / unsupported — just omit the toggle */
       }
     }
+    // Volume — a Chorus SOAP setting (RenderingControl), shown at the top.
+    if (uid) {
+      controls.unshift({
+        id: `${VOLUME_ID}:${uid}`,
+        kind: "slider",
+        label: "Volume",
+        group: "Volume",
+        value: this._vol[uid] ?? this._committedVolume(uid) ?? 0,
+        min: 0,
+        max: 100,
+        step: 1,
+      });
+    }
     if (!controls.length) {
       this._toast("No audio settings available for this speaker");
       return;
@@ -551,9 +604,16 @@ export class ChorusEditor extends LitElement {
     this._audio = { heading: `${name} · Audio`, controls };
   }
 
+  private _committedVolume(uid: string): number | null {
+    const u = this.graph?.units?.find((x) => x.primary_uid === uid);
+    return u?.volume ?? null;
+  }
+
   private _onAudioChange = (e: Event): void => {
     const { id, value } = (e as CustomEvent).detail as { id: string; value: number | boolean };
-    if (id.startsWith(`${FIXED_OUTPUT_ID}:`)) {
+    if (id.startsWith(`${VOLUME_ID}:`)) {
+      this._setVolume(id.slice(VOLUME_ID.length + 1), Number(value));
+    } else if (id.startsWith(`${FIXED_OUTPUT_ID}:`)) {
       const uid = id.slice(FIXED_OUTPUT_ID.length + 1);
       void this.hass.callService("chorus", "set_fixed_output", { speaker: uid, enabled: !!value });
     } else if (typeof value === "boolean") {
@@ -761,6 +821,7 @@ export class ChorusEditor extends LitElement {
           : nothing}
         <span class="grow"></span>
         ${sub ? this._dots(() => this._openSpeakerSetMenu(r, set)) : nothing}
+        ${this._volumeSlider(set.primary.uid, set.volume)}
       </div>
     `;
   }
@@ -823,6 +884,7 @@ export class ChorusEditor extends LitElement {
       ${this._availableSubsStrip(r)}
       ${ht ? html`<div class="sec">Home theater</div>` : nothing}
       ${ht ? this._htStage(r, ht) : this._setupCta(r)}
+      ${ht ? html`<div class="volrow">${this._volumeSlider(ht.primary.uid, ht.volume)}</div>` : nothing}
       ${pairs.length
         ? html`<div class="sec">${pairs.length === 1 ? "Stereo pair" : "Stereo pairs"}</div>
             <div class="paircards">${pairs.map((set) => this._pairCard(r, set))}</div>`
@@ -985,6 +1047,7 @@ export class ChorusEditor extends LitElement {
           : nothing}
         <span class="grow"></span>
         ${this._dots(() => this._openPairMenu(r, set))}
+        ${this._volumeSlider(set.primary.uid, set.volume)}
       </div>
     `;
   }
@@ -1042,6 +1105,7 @@ export class ChorusEditor extends LitElement {
         <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
         <span class="grow"></span>
         ${this._dots(() => this._openSpeakerMenu(s, roomKey))}
+        ${roomKey === AVAILABLE_SUBS_KEY ? nothing : this._volumeSlider(s.uid, s.volume)}
       </div>
     `;
   }
@@ -1551,6 +1615,40 @@ export class ChorusEditor extends LitElement {
       box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
       flex-wrap: wrap;
     }
+    .volrow {
+      padding: 2px 2px 4px;
+    }
+    .vol {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-basis: 100%;
+      min-width: 0;
+      color: var(--secondary-text-color);
+    }
+    .vol-ic {
+      display: flex;
+      flex: none;
+    }
+    .vol-ic svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+    .vol input[type="range"] {
+      flex: 1;
+      min-width: 0;
+      accent-color: var(--primary-color);
+      height: 4px;
+      cursor: pointer;
+    }
+    .vol-num {
+      flex: none;
+      width: 2.4em;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+    }
     .pc-orbs {
       display: flex;
       align-items: center;
@@ -1635,6 +1733,7 @@ export class ChorusEditor extends LitElement {
       align-items: center;
       gap: 12px;
       padding: 10px 13px;
+      flex-wrap: wrap;
     }
     .row + .row {
       border-top: 1px solid var(--divider-color);

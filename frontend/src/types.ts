@@ -40,6 +40,7 @@ export interface BondUnit {
   name: string;
   kind: UnitKind;
   members: BondMember[];
+  volume?: number | null; // 0-100, read from the zone's coordinator (null if unavailable)
 }
 
 export interface BondPlayer {

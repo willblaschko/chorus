@@ -62,6 +62,7 @@ export interface EditorSpeaker {
   // separating a set restores each half's standalone name automatically.
   model: string;
   ip: string | null;
+  volume?: number | null; // 0-100 for a standalone speaker's zone; display-only
 }
 
 /**
@@ -81,6 +82,7 @@ export interface BondedSet {
   // room name when a set is created in the editor; from hardware it's the primary's
   // (coordinator's) live zone name.
   name: string;
+  volume?: number | null; // 0-100 for the whole bonded zone; display-only
   primary: EditorSpeaker; // visible anchor: soundbar / pair-left / lone speaker
   slots: Partial<Record<Channel, EditorSpeaker>>; // bonded satellites by channel
 }
@@ -143,7 +145,7 @@ function htSet(u: BondUnit): BondedSet {
     }
   }
   const primary = bar ?? speakerOf(u.members[0]);
-  return { id: primary.uid, name: primary.name, primary, slots };
+  return { id: primary.uid, name: primary.name, volume: u.volume ?? null, primary, slots };
 }
 
 // A stereo-pair unit -> a set whose primary is the left/visible half; the right
@@ -159,7 +161,7 @@ function pairSet(u: BondUnit): BondedSet {
   const slots: Partial<Record<Channel, EditorSpeaker>> = {};
   if (right) slots.RF = speakerOf(right);
   if (sub) slots.SW = speakerOf(sub);
-  return { id: primary.uid, name: primary.name, primary, slots };
+  return { id: primary.uid, name: primary.name, volume: u.volume ?? null, primary, slots };
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -209,14 +211,14 @@ export function buildRooms(graph: BondGraph | undefined): Room[] {
       // one) is NOT a set: route its members loose (a bar -> tray for the setup CTA,
       // a sub -> the unassigned pool).
       if (isSub(bar?.model) || u.members.length <= 1) {
-        for (const m of u.members) routeLoose(room, speakerOf(m));
+        for (const m of u.members) routeLoose(room, { ...speakerOf(m), volume: u.volume ?? null });
       } else {
         room.sets.push(htSet(u));
       }
     } else if (u.kind === "stereo_pair") {
       room.sets.push(pairSet(u));
     } else {
-      for (const m of u.members) routeLoose(room, speakerOf(m));
+      for (const m of u.members) routeLoose(room, { ...speakerOf(m), volume: u.volume ?? null });
     }
   }
 

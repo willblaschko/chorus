@@ -63,6 +63,16 @@ class ChorusCoordinator(DataUpdateCoordinator):
         for unit in graph:
             for member in unit["members"]:
                 member["model"] = self._model_for(member["uid"], member.get("ip"))
+            # The zone's volume, read from its coordinator (the visible/primary member).
+            primary = next((m for m in unit["members"] if m.get("is_primary")), None) or (
+                unit["members"][0] if unit["members"] else None
+            )
+            unit["volume"] = None
+            if primary and primary.get("ip"):
+                try:
+                    unit["volume"] = self.backend.get_volume(primary["ip"])
+                except Exception:  # noqa: BLE001 — volume is non-critical
+                    pass
         return graph
 
     def _model_for(self, uid: str, ip: str | None) -> str:
