@@ -233,7 +233,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         # `area` is the HA Area to re-group under. They differ only when the destination
         # room already holds another zone. `area` defaults to `name` for older callers.
         area = call.data.get("area", name)
-        await run(backend.set_zone_name, speaker["ip"], name, call.data.get("icon"))
+        await run(backend.set_zone_name, speaker["ip"], name)
         # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
         set_speaker_area(hass, speaker["uid"], area)
         await coordinator.async_request_refresh()
@@ -250,8 +250,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
                 raise HomeAssistantError("No Sonos speakers available to query")
             ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
             speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
-        # Optional room icon (a lowercase token like "office"/"living_room") set alongside.
-        await run(backend.set_zone_name, speaker["ip"], call.data["name"], call.data.get("icon"))
+        await run(backend.set_zone_name, speaker["ip"], call.data["name"])
         await coordinator.async_request_refresh()
 
     async def set_fixed_output(call: ServiceCall) -> None:
@@ -342,15 +341,12 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE, move,
         schema=vol.Schema({
-            vol.Required("speaker"): name, vol.Required("name"): name,
-            vol.Optional("area"): name, vol.Optional("icon"): name,
+            vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("area"): name,
         }),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_RENAME, rename,
-        schema=vol.Schema({
-            vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("icon"): name,
-        }),
+        schema=vol.Schema({vol.Required("speaker"): name, vol.Required("name"): name}),
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SET_FIXED_OUTPUT, set_fixed_output,

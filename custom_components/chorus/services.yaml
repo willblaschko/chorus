@@ -147,12 +147,6 @@ move:
       required: false
       selector:
         text:
-    icon:
-      name: Room icon
-      description: Optional Sonos room-icon token (a lowercase room name like "office" or "living_room").
-      required: false
-      selector:
-        text:
 
 rename:
   name: Rename speaker
@@ -167,12 +161,6 @@ rename:
     name:
       name: New name
       required: true
-      selector:
-        text:
-    icon:
-      name: Room icon
-      description: Optional Sonos room-icon token (a lowercase room name like "office" or "living_room").
-      required: false
       selector:
         text:
 

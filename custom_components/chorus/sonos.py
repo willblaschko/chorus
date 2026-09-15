@@ -267,13 +267,10 @@ class SonosBackend:
         return result
 
     # -- move / rename (SetZoneAttributes) --------------------------------
-    def set_zone_name(self, ip: str, name: str, icon: str | None = None) -> str:
-        # DesiredIcon token is a lowercase room key like "office"/"living_room" (verified
-        # on hardware); empty leaves the icon unchanged behaviour to Sonos' default.
+    def set_zone_name(self, ip: str, name: str) -> str:
         body = (
             f"<DesiredZoneName>{html.escape(name)}</DesiredZoneName>"
-            f"<DesiredIcon>{html.escape(icon) if icon else ''}</DesiredIcon>"
-            "<DesiredConfiguration></DesiredConfiguration>"
+            "<DesiredIcon></DesiredIcon><DesiredConfiguration></DesiredConfiguration>"
         )
         return self._dp(ip, "SetZoneAttributes", body)
 
