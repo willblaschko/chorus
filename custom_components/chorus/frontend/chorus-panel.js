@@ -948,7 +948,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
           </button>
         </div>
       </div>
-    `}_hassReg(){return this.hass}_deviceIdFor(e){if(!e)return;const{devices:t}=this._hassReg();for(const[r,o]of Object.entries(t??{}))if(o.identifiers?.some(t=>"sonos"===t[0]&&t[1]===e))return r}_speakerEntityIds(e,t){const{entities:r,states:o}=this._hassReg(),s=this._deviceIdFor(e);if(s&&r)return Object.entries(r).filter(([,e])=>e.device_id===s).map(([e])=>e);const i=(e=>e.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""))(t);return Object.keys(o??{}).filter(e=>e.includes(`.${i}_`))}_mediaPlayerFor(e){const t=this._deviceIdFor(e),{entities:r}=this._hassReg();if(t&&r)return Object.keys(r).find(e=>e.startsWith("media_player.")&&r[e].device_id===t)}_ttsEngine(){return Object.keys(this.hass?.states??{}).find(e=>e.startsWith("tts."))}_identify(e){const t=this._mediaPlayerFor(e.uid),r=this._ttsEngine();t&&r?(this.hass.callService("media_player","play_media",{entity_id:t,media_content_id:`media-source://tts/${r}?message=This is ${this._name(e)}`,media_content_type:"music",announce:!0}),this._toast(`Identifying ${this._name(e)}`)):this._toast("Can't identify this speaker (no media player / TTS)")}_openAudio(e,t){const r=this._speakerEntityIds(t,e),o=[];for(const e of vt){const t=e.toggle?"switch":"number",s=r.find(r=>r.startsWith(`${t}.`)&&r.endsWith(`_${e.key}`)),i=s?this.hass?.states?.[s]:void 0;if(i&&s&&"unavailable"!==i.state&&"unknown"!==i.state)if(e.toggle)o.push({id:s,kind:"toggle",label:e.label,group:e.group,value:"on"===i.state});else{const t=i.attributes;o.push({id:s,kind:"slider",label:e.label,group:e.group,value:Number(i.state),min:t.min??0,max:t.max??100,step:t.step??1})}}o.length?this._audio={heading:`${e} · Audio`,controls:o}:this._toast("No audio settings available for this speaker")}_dots(e){return B`<button
+    `}_hassReg(){return this.hass}_deviceIdFor(e){if(!e)return;const{devices:t}=this._hassReg();for(const[r,o]of Object.entries(t??{}))if(o.identifiers?.some(t=>"sonos"===t[0]&&t[1]===e))return r}_speakerEntityIds(e,t){const{entities:r,states:o}=this._hassReg(),s=this._deviceIdFor(e);if(s&&r)return Object.entries(r).filter(([,e])=>e.device_id===s).map(([e])=>e);const i=(e=>e.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""))(t);return Object.keys(o??{}).filter(e=>e.includes(`.${i}_`))}_mediaPlayerFor(e){const t=this._deviceIdFor(e),{entities:r}=this._hassReg();if(t&&r)return Object.keys(r).find(e=>e.startsWith("media_player.")&&r[e].device_id===t)}_ttsEngine(){return Object.keys(this.hass?.states??{}).find(e=>e.startsWith("tts."))}_canIdentify(e){const t=this._mediaPlayerFor(e),r=t?this.hass?.states?.[t]?.state:void 0;return!!t&&"unavailable"!==r&&"unknown"!==r&&null!=r}_identify(e){if(!this._canIdentify(e.uid))return void this._toast("Can't identify yet — this speaker isn't a standalone player (still bonded to another set, or offline). Apply your changes first.");const t=this._mediaPlayerFor(e.uid),r=this._ttsEngine();r?t?(this.hass.callService("media_player","play_media",{entity_id:t,media_content_id:`media-source://tts/${r}?message=This is ${this._name(e)}`,media_content_type:"music",announce:!0}),this._toast(`Identifying ${this._name(e)}`)):this._toast("Can't identify — no media player resolved for this speaker."):this._toast("Can't identify — no TTS engine configured in Home Assistant.")}_openAudio(e,t){const r=this._speakerEntityIds(t,e),o=[];for(const e of vt){const t=e.toggle?"switch":"number",s=r.find(r=>r.startsWith(`${t}.`)&&r.endsWith(`_${e.key}`)),i=s?this.hass?.states?.[s]:void 0;if(i&&s&&"unavailable"!==i.state&&"unknown"!==i.state)if(e.toggle)o.push({id:s,kind:"toggle",label:e.label,group:e.group,value:"on"===i.state});else{const t=i.attributes;o.push({id:s,kind:"slider",label:e.label,group:e.group,value:Number(i.state),min:t.min??0,max:t.max??100,step:t.step??1})}}o.length?this._audio={heading:`${e} · Audio`,controls:o}:this._toast("No audio settings available for this speaker")}_dots(e){return B`<button
       type="button"
       class="dots"
       title="Options"
@@ -1341,10 +1341,10 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       margin-bottom: 24px;
     }
     .tv-art {
-      /* ~20% wider than the couch (150px) so the TV reads as the larger object,
-         while max-width lets it shrink on mobile. */
-      width: 180px;
-      max-width: 70%;
+      /* The TV is the anchor of the stage, so it reads clearly larger than the couch
+         (150px). max-width still lets it shrink on a narrow column. */
+      width: 234px;
+      max-width: 80%;
     }
     .tv svg {
       width: 100%;

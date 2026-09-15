@@ -486,11 +486,30 @@ export class ChorusEditor extends LitElement {
 
   // Identify a speaker by announcing its name on it (snapshots + restores playback via
   // announce:true) — a chirp SOAP returned success but no audio, so we use HA's TTS.
+  // A speaker only has its OWN media_player when it's a standalone zone. A bonded
+  // satellite (or one whose un-bond hasn't been applied to hardware yet) has no player
+  // of its own — HA reports it `unavailable` and routes playback to the group
+  // coordinator, so an announce would chirp the WRONG speaker. Gate on a live, available
+  // player and tell the user to apply first rather than mis-identify.
+  private _canIdentify(uid: string): boolean {
+    const entity = this._mediaPlayerFor(uid);
+    const st = entity ? this.hass?.states?.[entity]?.state : undefined;
+    return !!entity && st !== "unavailable" && st !== "unknown" && st != null;
+  }
+
   private _identify(s: EditorSpeaker): void {
+    if (!this._canIdentify(s.uid)) {
+      this._toast("Can't identify yet — this speaker isn't a standalone player (still bonded to another set, or offline). Apply your changes first.");
+      return;
+    }
     const entity = this._mediaPlayerFor(s.uid);
     const tts = this._ttsEngine();
-    if (!entity || !tts) {
-      this._toast("Can't identify this speaker (no media player / TTS)");
+    if (!tts) {
+      this._toast("Can't identify — no TTS engine configured in Home Assistant.");
+      return;
+    }
+    if (!entity) {
+      this._toast("Can't identify — no media player resolved for this speaker.");
       return;
     }
     void this.hass.callService("media_player", "play_media", {
@@ -1264,10 +1283,10 @@ export class ChorusEditor extends LitElement {
       margin-bottom: 24px;
     }
     .tv-art {
-      /* ~20% wider than the couch (150px) so the TV reads as the larger object,
-         while max-width lets it shrink on mobile. */
-      width: 180px;
-      max-width: 70%;
+      /* The TV is the anchor of the stage, so it reads clearly larger than the couch
+         (150px). max-width still lets it shrink on a narrow column. */
+      width: 234px;
+      max-width: 80%;
     }
     .tv svg {
       width: 100%;
