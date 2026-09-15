@@ -2,9 +2,8 @@
 // parallelizable list of Home Assistant service calls.
 //
 // NO DOM, NO Lit, NO Home Assistant objects — just typed functions over plain
-// data, so the whole thing is unit-testable. Ported from the ui-prototype's
-// computeOps / planLanes (design/ui-prototype.html): every edit is staged
-// locally against the last-applied state, and the pending work is simply the
+// data, so the whole thing is unit-testable. Every edit is staged locally
+// against the last-applied state, and the pending work is simply the
 // diff between the two layouts. Each op is tagged with the device UIDs it
 // touches; a union-find over those touch-sets falls straight out as the apply
 // plan (ops sharing a device serialise, disjoint ops run in parallel).
