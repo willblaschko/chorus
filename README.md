@@ -26,7 +26,7 @@ visual, room-by-room drag-and-drop panel for building layouts by hand.
 
 ## Status
 
-**v0.2 — editor panel.** Installed and running on real Home Assistant.
+**Working and installed on real Home Assistant.**
 
 - ✅ **Bonding on hardware** — create/dissolve stereo pairs, add/remove
   home-theater satellites (rears *and* front surrounds), bond a sub to a pair or
@@ -64,54 +64,74 @@ exposed it. Chorus does, entirely on your LAN:
 
 ---
 
-## End goals / vision
+## Features
 
-The destination is a visual bonding manager anyone can install from HACS and use
-without touching YAML:
+### The editor panel
 
-- **Rooms = Home Assistant Areas.** Moving or creating a room syncs the HA area
-  and renames the Sonos zone.
-- **Desktop drag-and-drop + mobile tap-to-assign** — the same operations, two
-  input models, so it's usable on a phone (where native drag doesn't exist).
+- **Drag-and-drop (desktop) / tap-to-assign (mobile)** — build layouts room by
+  room, the same operations in two input models so it works on a phone.
 - **A spatial home-theater stage** — a top-down room with Front / Rear / Sub
   positions around your seat; drop a speaker onto a position to bond it.
-- **Flexible pairs** — multiple stereo pairs per room, and a sub bonded to a
-  pair, not just to a soundbar.
-- **Staged changes with a plain-language Apply** — you arrange freely, see a
-  clear summary of what will change, and commit it in one step (independent
-  changes apply in parallel; dependent ones serialize).
-- **Surface, don't reinvent, audio settings** — EQ (bass/treble/loudness), sub /
-  surround / height levels, night sound, speech/dialog, Trueplay already exist as
-  HA entities; Chorus shows them in the room view rather than reimplementing
-  them. Chorus owns the one thing HA can't do: the **bonding topology**.
+- **Live Overview** — an at-a-glance map of every room and its bonded sets.
+- **Staged changes with a plain-language Apply** — arrange freely, see exactly
+  what will change, and commit in one step (independent changes run in parallel,
+  dependent ones serialize), with a **settle-progress bar** that names each
+  speaker as it reconnects.
 
-The interactive prototype of this panel lives in `design/ui-prototype.html`.
+### Bonding — the thing Home Assistant can't do
+
+- **Stereo pairs**, including **mixed models** the Sonos app refuses to pair.
+- **Home theaters** — add and remove surrounds, **rears *and* dedicated front
+  surrounds**, with mixed-model satellites (Era 300s, Symfonisks) as fronts *or*
+  rears.
+- **Subs** — bond a sub to a soundbar, a **stereo pair**, or a **lone speaker**.
+- **Swap L/R, separate, dissolve** — every operation is reversible.
+
+### Rooms & naming
+
+- **Names follow the room** — a bonded set is one zone with one name; swapping
+  L/R never renames it, and creating or moving a set adopts the room's name
+  (de-duplicated `Room 2` when a room holds more than one zone).
+- **Move between rooms** — reassigns the Home Assistant Area *and* renames the
+  Sonos zone.
+
+### Extras
+
+- **Identify** — chime one speaker to find it, played directly over SOAP (no
+  dependency on HA's Sonos integration, so it works even on a just-freed speaker).
+- **Fixed line-out volume** — a toggle for a Connect / Port / Amp / Five.
+- **Audio settings, surfaced not reinvented** — EQ (bass/treble/loudness), sub /
+  surround levels, night sound, speech enhancement already exist as HA entities;
+  Chorus shows them in the room view. It owns the one thing HA can't: **bonding**.
+- **Snapshot & restore** — captured before every change; roll back exactly.
+
+### Safety
+
+- **Capability validation** — won't use a non-soundbar as a home-theater primary,
+  pair an unpairable speaker, or drop a non-sub into the sub slot.
+- **Friendly errors** — raw SOAP faults are translated (e.g. `401` → "must target
+  a soundbar"; a timeout → "couldn't reach the speaker — try again").
+- **Discovery-driven** — no hardcoded IPs, UIDs, or room names.
 
 ---
 
-## Current features (v0.1 services)
+## Services (for automations)
 
-Available under **Developer Tools → Actions**. Speakers are referenced by their
-Sonos room name.
+Everything the panel does is also a service, under **Developer Tools → Actions** —
+speakers referenced by Sonos room name or RINCON UID.
 
 | Service | What it does |
 | --- | --- |
 | `chorus.create_stereo_pair` | Bond two speakers into a stereo pair (mixed models allowed). |
 | `chorus.separate` | Split a stereo pair back into two standalone speakers. |
-| `chorus.set_home_theater` | Bond surrounds + sub to a soundbar — **snapshots first**, then adds each channel **one satellite at a time** with poll-until-settled + retry. |
-| `chorus.remove_home_theater` | Remove one satellite, or (with none named) **dissolve** the whole home theater. |
-| `chorus.move` | Rename a speaker's Sonos zone (`SetZoneAttributes`) — how you move a speaker between rooms. |
-| `chorus.snapshot` | Save a soundbar's current home-theater layout. |
-| `chorus.restore` | Re-apply the last snapshotted layout, one satellite at a time. |
-
-**Guardrails baked in:**
-
-- **Capability validation** — Chorus won't let you use a non-soundbar as a
-  home-theater primary, pair a speaker that can't be paired, or drop a
-  non-sub into the sub slot.
-- **Friendly errors** — the raw SOAP faults are translated: `401` → "that must
-  target a soundbar," `800` → "it hasn't settled yet — try again in a moment."
-- **Everything is discovery-driven** — no hardcoded IPs, UIDs, or room names.
+| `chorus.set_home_theater` | Bond surrounds + sub to a soundbar — snapshots first, then adds each channel one satellite at a time with poll-until-settled + retry. |
+| `chorus.remove_home_theater` | Remove one satellite, or (none named) dissolve the whole home theater. |
+| `chorus.add_pair_sub` / `chorus.remove_pair_sub` | Bond/unbond a sub to a stereo pair or a lone speaker. |
+| `chorus.move` | Move a speaker to another room (renames its zone + reassigns the HA Area). |
+| `chorus.rename` | Rename a speaker's Sonos zone in place. |
+| `chorus.identify` | Play a chime on one speaker so you can tell which unit it is. |
+| `chorus.set_fixed_output` | Toggle fixed line-out volume (Connect / Port / Amp / Five). |
+| `chorus.snapshot` / `chorus.restore` | Save / re-apply a soundbar's home-theater layout. |
 
 ---
 
@@ -123,7 +143,11 @@ Sonos room name.
 3. **Settings → Devices & Services → Add Integration → Chorus.** (It's local and
    account-free — one click to enable.)
 
-## Use (v0.1 services)
+## Use
+
+Open **Chorus** in the sidebar and build layouts visually — drag or tap speakers
+onto Front / Rear / Sub positions, pair them, review the staged changes, and
+**Apply**. Everything is also scriptable for automations:
 
 ```yaml
 # Build a 5.1 home theater around a soundbar
@@ -182,24 +206,19 @@ gotchas are documented in **[`docs/SPIKE_FINDINGS.md`](docs/SPIKE_FINDINGS.md)**
 
 ## Design
 
-- **`design/ui-prototype.html`** — the interactive prototype of the v0.2 panel: a
-  spatial home-theater stage, drag-and-drop + tap-to-assign, multiple stereo
-  pairs per room, staged changes with a plain-language Apply, and per-room audio
-  settings.
+- **`design/ui-prototype.html`** — the original interactive prototype the shipped
+  panel is built from: the spatial home-theater stage, drag-and-drop +
+  tap-to-assign, multiple stereo pairs per room, and staged changes with Apply.
 - **`design/icons.html`** — the line-icon set for the Sonos + Symfonisk range.
 
 ---
 
-## Roadmap
+## What's next
 
-1. **v0.1 — services** *(shipping)* — HACS-installable component: discovery,
-   coordinator, capability registry, and the bonding services with
-   snapshot/restore safety.
-2. **v0.2 — the panel** — the drag-and-drop / tap-to-assign UI wired to these
-   services, plus live **bond-graph** parsing so the panel reflects reality
-   (current pairs / home theaters, not a guess).
-3. **Later** — submit to the HACS default store and add a brand icon via
-   `home-assistant/brands`.
+- Submit to the **HACS default store** and add a brand icon via
+  `home-assistant/brands`.
+- Broaden device coverage and keep the bonding editor sharp. Bonding stays the
+  core — Chorus is deliberately *not* a general "Sonos everything" app.
 
 ---
 
