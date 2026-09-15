@@ -367,9 +367,13 @@ export class ChorusEditor extends LitElement {
   private _openSpeakerSetMenu(r: Room, set: BondedSet): void {
     this._menu = {
       heading: this._setName(set),
-      items: [{ id: "removesub", label: "Remove sub" }],
+      items: [
+        { id: "audio", label: "Audio settings" },
+        { id: "removesub", label: "Remove sub" },
+      ],
       onSelect: (id) => {
-        if (id === "removesub") {
+        if (id === "audio") void this._openAudio(this._setName(set), set.primary.uid);
+        else if (id === "removesub") {
           // separatePair dissolves the set: speaker back to the tray, sub to the pool.
           this._working = separatePair(this._rooms, r.key, set.id);
           this._dirty = true;
@@ -506,31 +510,6 @@ export class ChorusEditor extends LitElement {
     const v = Math.max(0, Math.min(100, Math.round(level)));
     this._vol = { ...this._vol, [uid]: v };
     void this.hass.callService("chorus", "set_volume", { speaker: uid, level: v });
-  }
-
-  // Inline volume slider for a zone (a bonded set's coordinator, or a lone speaker).
-  private _volumeSlider(uid: string, current: number | null | undefined): TemplateResult {
-    const val = this._vol[uid] ?? current ?? 0;
-    return html`
-      <label class="vol" title="Volume" @click=${(e: Event) => e.stopPropagation()}>
-        <span class="vol-ic">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"
-            ></path>
-          </svg>
-        </span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          .value=${String(val)}
-          @change=${(e: Event) => this._setVolume(uid, Number((e.target as HTMLInputElement).value))}
-        />
-        <span class="vol-num">${val}</span>
-      </label>
-    `;
   }
 
   private async _openAudio(name: string, uid?: string): Promise<void> {
@@ -821,7 +800,6 @@ export class ChorusEditor extends LitElement {
           : nothing}
         <span class="grow"></span>
         ${sub ? this._dots(() => this._openSpeakerSetMenu(r, set)) : nothing}
-        ${this._volumeSlider(set.primary.uid, set.volume)}
       </div>
     `;
   }
@@ -884,7 +862,6 @@ export class ChorusEditor extends LitElement {
       ${this._availableSubsStrip(r)}
       ${ht ? html`<div class="sec">Home theater</div>` : nothing}
       ${ht ? this._htStage(r, ht) : this._setupCta(r)}
-      ${ht ? html`<div class="volrow">${this._volumeSlider(ht.primary.uid, ht.volume)}</div>` : nothing}
       ${pairs.length
         ? html`<div class="sec">${pairs.length === 1 ? "Stereo pair" : "Stereo pairs"}</div>
             <div class="paircards">${pairs.map((set) => this._pairCard(r, set))}</div>`
@@ -1047,7 +1024,6 @@ export class ChorusEditor extends LitElement {
           : nothing}
         <span class="grow"></span>
         ${this._dots(() => this._openPairMenu(r, set))}
-        ${this._volumeSlider(set.primary.uid, set.volume)}
       </div>
     `;
   }
@@ -1105,7 +1081,6 @@ export class ChorusEditor extends LitElement {
         <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
         <span class="grow"></span>
         ${this._dots(() => this._openSpeakerMenu(s, roomKey))}
-        ${roomKey === AVAILABLE_SUBS_KEY ? nothing : this._volumeSlider(s.uid, s.volume)}
       </div>
     `;
   }
@@ -1615,41 +1590,6 @@ export class ChorusEditor extends LitElement {
       box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
       flex-wrap: wrap;
     }
-    .volrow {
-      padding: 2px 2px 4px;
-    }
-    .vol {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      flex-basis: 100%;
-      max-width: 320px;
-      min-width: 0;
-      color: var(--secondary-text-color);
-    }
-    .vol-ic {
-      display: flex;
-      flex: none;
-    }
-    .vol-ic svg {
-      width: 18px;
-      height: 18px;
-      display: block;
-    }
-    .vol input[type="range"] {
-      flex: 1;
-      min-width: 0;
-      accent-color: var(--primary-color);
-      height: 4px;
-      cursor: pointer;
-    }
-    .vol-num {
-      flex: none;
-      width: 2.4em;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      font-size: 12px;
-    }
     .pc-orbs {
       display: flex;
       align-items: center;
@@ -1734,7 +1674,6 @@ export class ChorusEditor extends LitElement {
       align-items: center;
       gap: 12px;
       padding: 10px 13px;
-      flex-wrap: wrap;
     }
     .row + .row {
       border-top: 1px solid var(--divider-color);
