@@ -348,16 +348,32 @@ class SonosBackend:
         return result
 
     # -- move / rename (SetZoneAttributes) --------------------------------
+    def get_zone_name(self, ip: str) -> str:
+        """The zone's current name, per the speaker itself (GetZoneAttributes)."""
+        return html.unescape(self._field(self._dp(ip, "GetZoneAttributes"), "CurrentZoneName"))
+
     def set_zone_name(self, ip: str, name: str) -> str:
         body = (
             f"<DesiredZoneName>{html.escape(name)}</DesiredZoneName>"
             "<DesiredIcon></DesiredIcon><DesiredConfiguration></DesiredConfiguration>"
         )
-        # A rename runs LAST (after the bonds), so the speaker was often just
-        # reconfigured (e.g. freed in an L/R front swap) and is briefly unreachable —
-        # the bare call would fail with a code-less "couldn't reach". Retry through the
-        # settle window; SetZoneAttributes is idempotent, so re-issuing it is safe.
-        return self._apply_with_settle(lambda: self._dp(ip, "SetZoneAttributes", body))
+        # A rename runs LAST (after the bonds), so the speaker was often just reconfigured
+        # (e.g. freed in an L/R front swap): the call can fail with a code-less "couldn't
+        # reach" AND, even when it returns OK, the name can lag or revert while the speaker
+        # is still settling. So issue-then-VERIFY: re-issue until the zone actually reports
+        # the new name, bounded by the settle window. SetZoneAttributes is idempotent, so
+        # re-issuing is safe; we don't fail the whole Apply over a label that just lags.
+        deadline = time.monotonic() + self.settle_timeout
+        while True:
+            self._apply_with_settle(lambda: self._dp(ip, "SetZoneAttributes", body))
+            try:
+                if self.get_zone_name(ip) == name:
+                    return "OK"
+            except SonosSoapError:
+                pass  # transient read mid-settle — try again
+            if time.monotonic() >= deadline:
+                return "OK"
+            time.sleep(2.0)
 
     # -- fixed line-out volume (Port / Connect / Amp / Five) ---------------
     def supports_output_fixed(self, ip: str) -> bool:

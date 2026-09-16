@@ -92,17 +92,41 @@ def test_set_zone_name_retries_a_codeless_unreachable_then_succeeds():
     # out through the settle window rather than failing the whole Apply.
     with _NoSleep():
         b = sonos.SonosBackend()
-        calls = {"n": 0}
+        sets = {"n": 0}
 
         def dp(ip, action, body=""):
-            calls["n"] += 1
-            if calls["n"] < 3:
+            if action == "GetZoneAttributes":
+                return "<CurrentZoneName>Media Room 3</CurrentZoneName>"  # name already took
+            sets["n"] += 1  # SetZoneAttributes
+            if sets["n"] < 3:
                 raise sonos.SonosSoapError(None, "URLError: timed out")
             return "OK"
 
         b._dp = dp
         assert b.set_zone_name("1.2.3.4", "Media Room 3") == "OK"
-        assert calls["n"] == 3
+        assert sets["n"] == 3
+
+
+def test_set_zone_name_reissues_until_the_name_actually_takes():
+    # The SOAP call can return OK while the name lags/reverts during settle. set_zone_name
+    # verifies via GetZoneAttributes and re-issues until the zone reports the new name.
+    with _NoSleep():
+        b = sonos.SonosBackend()
+        sets = {"n": 0}
+        reads = {"n": 0}
+
+        def dp(ip, action, body=""):
+            if action == "GetZoneAttributes":
+                reads["n"] += 1
+                nm = "Media Room 3" if reads["n"] >= 3 else "Old Name"
+                return f"<CurrentZoneName>{nm}</CurrentZoneName>"
+            sets["n"] += 1  # SetZoneAttributes always returns OK
+            return "OK"
+
+        b._dp = dp
+        assert b.set_zone_name("1.2.3.4", "Media Room 3") == "OK"
+        assert sets["n"] == 3  # re-issued until the name reported back
+        assert reads["n"] == 3
 
 
 def test_wait_for_ip_polls_until_the_speaker_reappears():
