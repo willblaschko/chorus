@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 export type RowStatus = "pending" | "running" | "done" | "error" | "skipped";
@@ -36,6 +36,33 @@ export class ChorusChangebar extends LitElement {
 
   /** whether the details list is expanded (collapsed by default) */
   @state() private open = false;
+
+  /** true once the bar has sat with pending changes untouched — pulses the Apply button
+   *  so it doesn't get missed. Resets on every new edit and while applying. */
+  @state() private _nudge = false;
+  private _nudgeTimer?: number;
+  private static readonly NUDGE_DELAY = 5000;
+
+  protected override updated(changed: PropertyValues): void {
+    // Any new/changed row (or an apply starting/finishing) restarts the idle timer.
+    if (changed.has("rows") || changed.has("busy")) this._resetNudge();
+  }
+
+  private _resetNudge(): void {
+    if (this._nudgeTimer) clearTimeout(this._nudgeTimer);
+    this._nudgeTimer = undefined;
+    this._nudge = false;
+    if (!this.busy && this.rows.length > 0) {
+      this._nudgeTimer = window.setTimeout(() => {
+        this._nudge = true;
+      }, ChorusChangebar.NUDGE_DELAY);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (this._nudgeTimer) clearTimeout(this._nudgeTimer);
+  }
 
   private toggle(): void {
     // While applying, the list is force-open to show progress; ignore toggles.
@@ -119,7 +146,7 @@ export class ChorusChangebar extends LitElement {
                 `}
             <button
               type="button"
-              class="apply"
+              class="apply ${this._nudge ? "nudge" : ""}"
               ?disabled=${this.busy}
               @click=${() => this.emit("apply")}
               aria-busy=${this.busy ? "true" : "false"}
@@ -289,6 +316,11 @@ export class ChorusChangebar extends LitElement {
       cursor: default;
       opacity: 0.85;
     }
+    /* Gentle attention pulse once the bar has sat untouched (see NUDGE_DELAY). A fading,
+       expanding ring + faint breathing scale — cheap and hard to miss. */
+    .apply.nudge {
+      animation: applyPulse 1.7s ease-in-out infinite;
+    }
 
     .apply-spin {
       width: 13px;
@@ -428,6 +460,18 @@ export class ChorusChangebar extends LitElement {
       }
     }
 
+    @keyframes applyPulse {
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-color) 50%, transparent);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 0 7px color-mix(in srgb, var(--primary-color) 0%, transparent);
+        transform: scale(1.03);
+      }
+    }
+
     @keyframes cb-sweep {
       0% {
         left: -35%;
@@ -441,6 +485,11 @@ export class ChorusChangebar extends LitElement {
       .apply-spin,
       .state.running {
         animation: none;
+      }
+      /* No pulse animation — a static ring still flags the pending Apply. */
+      .apply.nudge {
+        animation: none;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 30%, transparent);
       }
       /* No sweep: show a static, subtly-filled bar so the strip still reads
          as "in progress" without motion. */
