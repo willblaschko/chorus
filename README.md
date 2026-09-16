@@ -9,6 +9,8 @@ sidebar. Sets take their room's name and land in your Home Assistant **Areas**, 
 stops being a walled garden and simply becomes part of your home. Everything runs
 **locally on your LAN** — no cloud, no Sonos account.
 
+![The Chorus editor — a Media Room home theater laid out on the drag-and-drop stage](docs/screenshots/editor.webp)
+
 - **Home-Assistant-first.** A native drag-and-drop panel, your Areas, your naming. You
   configure Sonos where you already run your home — not in a separate app you juggle.
 - **Layouts the app won't build.** Dedicated front surrounds, mixed-model satellites
@@ -39,10 +41,9 @@ flowchart LR
 
 ## Screenshots
 
-<!-- Drop PNGs into docs/screenshots/ and reference them here, e.g.:
-     ![Editor](docs/screenshots/editor.png) -->
+**Overview** — every room and its bonded sets, at a glance.
 
-_Coming soon — the drag-and-drop editor, the home-theater stage, and the live Overview._
+![Chorus Overview — each room's stereo pairs and home theaters](docs/screenshots/overview.webp)
 
 ---
 
