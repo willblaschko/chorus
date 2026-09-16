@@ -31,6 +31,8 @@ export interface Placement {
   anchorUid: string; // the soundbar UID (for HT) or the pair's left UID (for pairs); self for solo
   height?: boolean; // Atmos height enabled (fronts/rears only)
   name: string; // speaker friendly name (for service calls that take names)
+  model?: string; // short model label, to disambiguate a device in summaries (a bonded
+  // sub's `name` is the inherited room name, so "move to X" alone reads ambiguously)
 }
 
 // speakerUid -> placement. One map for the last-applied state, one for the staged/working state.
@@ -207,7 +209,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "move",
           data: { speaker: uid, name: b.name, area: b.room },
         },
-        summary: `${a.name} — move to ${b.room}`,
+        summary: `${a.name}${a.model ? ` (${a.model})` : ""} — move to ${b.room}`,
       });
     }
   }

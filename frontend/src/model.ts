@@ -3,6 +3,12 @@
 
 import type { BondGraph, BondUnit } from "./types.js";
 
+/** Short model label — drops the "Sonos "/"Symfonisk " brand prefix. Pure string
+ * helper kept here (not in the Lit-based icons.ts) so pure modules can use it. */
+export function shortModel(model: string | null | undefined): string {
+  return (model || "").replace("Sonos ", "").replace("Symfonisk ", "");
+}
+
 export type Channel = "LF" | "RF" | "LR" | "RR" | "SW";
 export const CHANNELS: Channel[] = ["LF", "RF", "LR", "RR", "SW"];
 export const CHANNEL_NAME: Record<Channel, string> = {

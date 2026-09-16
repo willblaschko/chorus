@@ -10,6 +10,7 @@ import {
   CHANNELS,
   AVAILABLE_SUBS_KEY,
   setKind,
+  shortModel,
   type Channel,
   type Room,
   type BondedSet,
@@ -34,30 +35,30 @@ export function roomsToLayout(rooms: Room[]): LayoutMap {
       // keep their own name in the map but apply.ts never renames a satellite — their
       // name is subsumed by the coordinator's zone, so it's display-only here.
       if (kind === "home_theater") {
-        map[p.uid] = { room: r.name, role: "CC", anchorUid: p.uid, name: set.name };
+        map[p.uid] = { room: r.name, role: "CC", anchorUid: p.uid, name: set.name, model: shortModel(p.model) };
         for (const ch of CHANNELS) {
           const sp = set.slots[ch];
-          if (sp) map[sp.uid] = { room: r.name, role: ch, anchorUid: p.uid, name: sp.name };
+          if (sp) map[sp.uid] = { room: r.name, role: ch, anchorUid: p.uid, name: sp.name, model: shortModel(sp.model) };
         }
       } else if (kind === "stereo_pair") {
-        map[p.uid] = { room: r.name, role: "pairL", anchorUid: p.uid, name: set.name };
+        map[p.uid] = { room: r.name, role: "pairL", anchorUid: p.uid, name: set.name, model: shortModel(p.model) };
         const rf = set.slots.RF;
-        if (rf) map[rf.uid] = { room: r.name, role: "pairR", anchorUid: p.uid, name: rf.name };
+        if (rf) map[rf.uid] = { room: r.name, role: "pairR", anchorUid: p.uid, name: rf.name, model: shortModel(rf.model) };
         const sw = set.slots.SW;
         // A sub bonded to a pair is a real op now (add_pair_sub/remove_pair_sub).
-        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
+        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name, model: shortModel(sw.model) };
       } else {
-        map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: set.name };
+        map[p.uid] = { room: r.name, role: "solo", anchorUid: p.uid, name: set.name, model: shortModel(p.model) };
         const sw = set.slots.SW;
         // A sub on a lone speaker is a real op now (add_pair_sub with no `right`).
-        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name };
+        if (sw) map[sw.uid] = { room: r.name, role: "pairSub", anchorUid: p.uid, name: sw.name, model: shortModel(sw.model) };
       }
     }
     // Tag pool subs with the stable key (not the display name) so the diff can tell
     // "unbonded to the pool" apart from a real room move.
     const roomLabel = r.key === AVAILABLE_SUBS_KEY ? AVAILABLE_SUBS_KEY : r.name;
     for (const s of r.tray) {
-      map[s.uid] = { room: roomLabel, role: "solo", anchorUid: s.uid, name: s.name };
+      map[s.uid] = { room: roomLabel, role: "solo", anchorUid: s.uid, name: s.name, model: shortModel(s.model) };
     }
   }
   return map;

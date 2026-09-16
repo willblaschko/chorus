@@ -1,5 +1,7 @@
 import { svg, type SVGTemplateResult } from "lit";
 import { speakerKind } from "./model.js";
+// Re-exported for existing importers; the impl lives in the pure model.ts now.
+export { shortModel } from "./model.js";
 
 // Speaker glyphs — ported verbatim from the prototype's ICON set. Keyed by the
 // capability registry's `icon` field so a model string maps straight to a glyph.
@@ -25,9 +27,4 @@ export const ICONS: Record<string, SVGTemplateResult> = {
 
 export function iconFor(model: string | null | undefined): SVGTemplateResult {
   return ICONS[speakerKind(model).icon] ?? ICONS.driver;
-}
-
-/** Short model label — drops the "Sonos "/"Symfonisk " brand prefix. */
-export function shortModel(model: string | null | undefined): string {
-  return (model || "").replace("Sonos ", "").replace("Symfonisk ", "");
 }
