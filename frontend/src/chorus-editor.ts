@@ -101,6 +101,15 @@ export class ChorusEditor extends LitElement {
   /** Room KEY to select on entry (e.g. clicking a room's edit pencil on the Overview
    * page). The host sets this + switches to the editor view; we select that room. */
   @property({ attribute: false }) public selectRoom?: string;
+  /** A sub the Overview asked to bond, staged on entry: the host sets this while
+   * switching to the editor view, we apply the same mutation a drop would, then emit
+   * `sub-staged` so the host can clear it. Reviewed + Applied like any other edit. */
+  @property({ attribute: false }) public pendingSub?: {
+    subUid: string;
+    roomKey: string;
+    kind: "set" | "speaker";
+    targetId: string;
+  };
 
   @state() private _selected?: string;
   @state() private _working?: Room[]; // staged edits (undefined until synced from graph)
@@ -158,6 +167,18 @@ export class ChorusEditor extends LitElement {
     // this is the round-trip back, so it must not re-emit.)
     if (changed.has("selectRoom")) {
       this._selected = this.selectRoom;
+    }
+    // The Overview staged a sub bond on the way in — apply the same mutation a drop
+    // would (assign to a set's SW, or form a speaker+sub), then tell the host it's done
+    // so it clears the request (guards against re-applying on the next render).
+    if (changed.has("pendingSub") && this.pendingSub) {
+      const { subUid, roomKey, kind, targetId } = this.pendingSub;
+      this._working =
+        kind === "speaker"
+          ? bondSubToSpeaker(this._rooms, roomKey, targetId, subUid)
+          : assignSubToChannel(this._rooms, roomKey, targetId, subUid);
+      this._dirty = true;
+      this.dispatchEvent(new CustomEvent("sub-staged", { bubbles: true, composed: true }));
     }
   }
 

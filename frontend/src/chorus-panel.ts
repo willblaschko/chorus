@@ -14,6 +14,19 @@ import { iconFor, shortModel } from "./icons.js";
 import { parseRoute, buildPath, type View } from "./route.js";
 import "./chorus-editor.js";
 import "./chorus-help.js";
+import "./chorus-menu.js";
+import type { MenuItem } from "./chorus-menu.js";
+
+// A place a free sub can be bonded, offered in the pair picker. `kind` picks the
+// staging mutation (a set's SW slot vs. forming a speaker+sub); `targetId` is the set
+// id or the lone speaker's uid, resolved against `roomKey`.
+interface SubTarget {
+  roomKey: string;
+  roomName: string;
+  kind: "set" | "speaker";
+  kindLabel: string;
+  targetId: string;
+}
 
 // One "who lives here" row in a room card's contents: a channel label (or null
 // for a lone speaker) plus the speaker to name. Derived from the room's bonded
@@ -65,6 +78,17 @@ export class ChorusPanel extends LitElement {
   // Room key to pre-select when the user jumps into the editor via a card's
   // pencil. Fed to <chorus-editor>.selectRoom (see _editor / _openInEditor).
   @state() private _editRoom?: string;
+  // The free sub whose "Pair" picker is open (undefined = closed).
+  @state() private _pairSub?: EditorSpeaker;
+  // A staged sub bond handed to the editor on the way in (cleared on `sub-staged`).
+  @state() private _pendingSub?: {
+    subUid: string;
+    roomKey: string;
+    kind: "set" | "speaker";
+    targetId: string;
+  };
+  // Targets for the currently-open pair picker; indexed by the MenuItem id.
+  private _pairTargets: SubTarget[] = [];
 
   private _pollTimer?: number;
   private _polling = false;
@@ -171,6 +195,14 @@ export class ChorusPanel extends LitElement {
         ${this._view === "overview" ? this._overview() : this._editor()}
       </div>
       <chorus-help .open=${this._help} @close=${() => (this._help = false)}></chorus-help>
+      <chorus-menu
+        .open=${!!this._pairSub}
+        .heading=${this._pairSub ? `Pair ${this._spName(this._pairSub)}` : ""}
+        subheading="Choose a set or speaker to add this sub to"
+        .items=${this._pairMenuItems}
+        @select=${(e: Event) => this._onPairSelect((e as CustomEvent).detail as string)}
+        @close=${() => (this._pairSub = undefined)}
+      ></chorus-menu>
     `;
   }
 
@@ -234,6 +266,8 @@ export class ChorusPanel extends LitElement {
       .graph=${this._graph}
       .narrow=${this.narrow}
       .selectRoom=${this._editRoom}
+      .pendingSub=${this._pendingSub}
+      @sub-staged=${() => (this._pendingSub = undefined)}
       @room-change=${(e: Event) => this._go("editor", (e as CustomEvent).detail || undefined)}
       @chorus-graph=${(e: Event) => {
         this._graph = (e as CustomEvent).detail as BondGraph;
@@ -278,24 +312,95 @@ export class ChorusPanel extends LitElement {
   // A card for subs bonded to nothing — they have no room, so they'd otherwise be
   // invisible on the overview. Sits at the end of the grid, tinted with the sub color.
   private _freeSubsCard(subs: EditorSpeaker[]): TemplateResult {
-    const group: RoomGroup = {
-      label: subs.length === 1 ? "Unbonded sub" : "Unbonded subs",
-      entries: subs.map((sp) => ({ ch: "SW", name: this._spName(sp), model: sp.model })),
-    };
     return html`
       <div class="card">
         <div class="rhead">
           <span class="ric t-sub" aria-hidden="true">${iconFor(subs[0]?.model ?? "Sonos Sub")}</span>
           <div class="rmeta">
-            <h2 class="rname">Unbonded subs</h2>
+            <h2 class="rname">Available subs</h2>
             <span class="rsum"
-              >${subs.length === 1 ? "1 sub" : `${subs.length} subs`} · not bonded to a set</span
+              >${subs.length === 1 ? "1 sub" : `${subs.length} subs`} · free to pair</span
             >
           </div>
         </div>
-        <div class="groups">${this._groupBox(group)}</div>
+        <div class="groups">
+          <div class="group" role="group" aria-label="Subs">
+            <div class="gcap">Subs</div>
+            <div class="members">${subs.map((sp) => this._freeSubRow(sp))}</div>
+          </div>
+        </div>
       </div>
     `;
+  }
+
+  private _freeSubRow(sp: EditorSpeaker): TemplateResult {
+    const model = shortModel(sp.model);
+    return html`
+      <div class="member">
+        <span class="chip" style="background:var(--chorus-sub)">Sub</span>
+        <span class="m-main">
+          <span class="m-name">${this._spName(sp)}</span>
+          ${model ? html`<span class="m-sub">${model}</span>` : nothing}
+        </span>
+        <button
+          class="pair-btn"
+          title=${`Pair ${this._spName(sp)} with a speaker set`}
+          @click=${() => this._openPairMenu(sp)}
+        >
+          Pair<span aria-hidden="true">▾</span>
+        </button>
+      </div>
+    `;
+  }
+
+  // Every set that lacks a sub, plus every lone speaker — the places a free sub can bond.
+  private _computeSubTargets(): SubTarget[] {
+    const rooms = buildRooms(this._graph).filter((r) => r.key !== AVAILABLE_SUBS_KEY);
+    const targets: SubTarget[] = [];
+    for (const r of rooms) {
+      for (const set of r.sets) {
+        if (set.slots.SW) continue; // already has a sub
+        const kind = setKind(set) === "home_theater" ? "home theater" : "stereo pair";
+        targets.push({ roomKey: r.key, roomName: r.name, kind: "set", kindLabel: kind, targetId: set.id });
+      }
+      for (const sp of r.tray) {
+        targets.push({
+          roomKey: r.key,
+          roomName: r.name,
+          kind: "speaker",
+          kindLabel: "speaker",
+          targetId: sp.uid,
+        });
+      }
+    }
+    return targets;
+  }
+
+  private _openPairMenu(sp: EditorSpeaker): void {
+    this._pairTargets = this._computeSubTargets();
+    this._pairSub = sp;
+  }
+
+  private get _pairMenuItems(): MenuItem[] {
+    if (!this._pairTargets.length) {
+      return [{ id: "none", label: "No speakers available to pair with", disabled: true }];
+    }
+    return this._pairTargets.map((t, i) => ({ id: String(i), label: t.roomName, sub: t.kindLabel }));
+  }
+
+  private _onPairSelect(id: string): void {
+    const sub = this._pairSub;
+    const target = this._pairTargets[Number(id)];
+    this._pairSub = undefined;
+    if (!sub || !target) return;
+    // Stage the bond and switch to the editor: its change bar shows it for review + Apply.
+    this._pendingSub = {
+      subUid: sub.uid,
+      roomKey: target.roomKey,
+      kind: target.kind,
+      targetId: target.targetId,
+    };
+    this._go("editor", target.roomKey);
   }
 
   // Chorus is free; if it earned its keep, we point goodwill at wildlife instead of
@@ -753,6 +858,30 @@ export class ChorusPanel extends LitElement {
     }
     .chip.solo {
       background: var(--secondary-text-color);
+    }
+    .pair-btn {
+      margin-left: auto;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--chorus-sub);
+      background: color-mix(in srgb, var(--chorus-sub) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--chorus-sub) 35%, transparent);
+      border-radius: 999px;
+      padding: 4px 11px;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .pair-btn:hover {
+      background: color-mix(in srgb, var(--chorus-sub) 22%, transparent);
+    }
+    .pair-btn:focus-visible {
+      outline: 2px solid var(--chorus-sub);
+      outline-offset: 1px;
     }
     .m-main {
       display: flex;
