@@ -1,6 +1,23 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
+// `@property` at-rules are ignored inside shadow-DOM stylesheets, so declaring
+// --chorus-flame in the component's `static styles` never registers it — and an
+// unregistered custom property can't interpolate, leaving the flame border frozen.
+// Register it globally here instead, so @keyframes can animate the angle smoothly.
+if (typeof CSS !== "undefined" && "registerProperty" in CSS) {
+  try {
+    CSS.registerProperty({
+      name: "--chorus-flame",
+      syntax: "<angle>",
+      inherits: false,
+      initialValue: "0deg",
+    });
+  } catch {
+    // Already registered (a second import / hot reload) — the first one stands.
+  }
+}
+
 export type RowStatus = "pending" | "running" | "done" | "error" | "skipped";
 
 export interface ChangeRow {
@@ -333,14 +350,15 @@ export class ChorusChangebar extends LitElement {
       inset: 0;
       border-radius: inherit;
       padding: 3px;
+      /* A blue→green comet in the app's own palette (--chorus-front/-rear inherit
+         through the shadow boundary; fallbacks keep it working standalone). */
       background: conic-gradient(
         from var(--chorus-flame, 0deg),
         transparent 0deg,
-        #fbbf24 35deg,
-        #f97316 70deg,
-        #ef4444 105deg,
-        #a855f7 145deg,
-        transparent 195deg,
+        var(--chorus-rear, #129d9d) 40deg,
+        var(--chorus-front, #2f6fed) 90deg,
+        #7cc5ff 120deg,
+        transparent 175deg,
         transparent 360deg
       );
       -webkit-mask:
@@ -493,12 +511,8 @@ export class ChorusChangebar extends LitElement {
       }
     }
 
-    /* Registered so the conic-gradient's start angle can be animated smoothly. */
-    @property --chorus-flame {
-      syntax: "<angle>";
-      inherits: false;
-      initial-value: 0deg;
-    }
+    /* --chorus-flame is registered globally via CSS.registerProperty (top of this
+       module) — an @property here would be ignored inside the shadow DOM. */
     @keyframes chorusFlame {
       to {
         --chorus-flame: 360deg;
