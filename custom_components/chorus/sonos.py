@@ -335,7 +335,11 @@ class SonosBackend:
             f"<DesiredZoneName>{html.escape(name)}</DesiredZoneName>"
             "<DesiredIcon></DesiredIcon><DesiredConfiguration></DesiredConfiguration>"
         )
-        return self._dp(ip, "SetZoneAttributes", body)
+        # A rename runs LAST (after the bonds), so the speaker was often just
+        # reconfigured (e.g. freed in an L/R front swap) and is briefly unreachable —
+        # the bare call would fail with a code-less "couldn't reach". Retry through the
+        # settle window; SetZoneAttributes is idempotent, so re-issuing it is safe.
+        return self._apply_with_settle(lambda: self._dp(ip, "SetZoneAttributes", body))
 
     # -- fixed line-out volume (Port / Connect / Amp / Five) ---------------
     def supports_output_fixed(self, ip: str) -> bool:

@@ -1,8 +1,9 @@
 """_apply_with_settle (sonos.py): ride out transient SOAP faults, raise hard ones.
 
 The retry loop is what makes bonding reliable through a device's settle window. It must
-retry the transient codes (800, 1034, code-less resets) and re-raise anything else. We
-neutralize time.sleep so the loop spins fast, and drive it with a fn that fails N times.
+retry the transient codes (800 and code-less resets) and re-raise anything else — NOT
+1034, which is the sub-in-transition fault that retrying only thrashes. We neutralize
+time.sleep so the loop spins fast, and drive it with a fn that fails N times.
 """
 import sonos
 
@@ -83,3 +84,22 @@ def test_gives_up_after_the_deadline():
             assert False, "should have raised"
         except sonos.SonosSoapError as err:
             assert err.code == "800"
+
+
+def test_set_zone_name_retries_a_codeless_unreachable_then_succeeds():
+    # A rename runs after the bonds, so the speaker was often just reconfigured and is
+    # briefly unreachable (code-less). SetZoneAttributes is idempotent, so it rides that
+    # out through the settle window rather than failing the whole Apply.
+    with _NoSleep():
+        b = sonos.SonosBackend()
+        calls = {"n": 0}
+
+        def dp(ip, action, body=""):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise sonos.SonosSoapError(None, "URLError: timed out")
+            return "OK"
+
+        b._dp = dp
+        assert b.set_zone_name("1.2.3.4", "Media Room 3") == "OK"
+        assert calls["n"] == 3
