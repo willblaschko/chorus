@@ -33,10 +33,15 @@ Download → restart Home Assistant → add the **Chorus** integration. Local, a
 ## The idea
 
 ```mermaid
-flowchart LR
-  A["Your Sonos speakers<br/>on the LAN"] -->|Chorus discovers them| B["Drag-and-drop editor<br/>in Home Assistant"]
-  B -->|local SOAP · no cloud| C["Stereo pairs · home theaters<br/>surrounds · sub"]
-  C --> D["Named to your rooms,<br/>placed in HA Areas,<br/>ready to control"]
+flowchart TD
+  S["🔊 Your Sonos speakers<br/>discovered on your LAN"]:::src
+  S -->|local SOAP, no cloud| C["Chorus<br/>drag-and-drop in Home Assistant"]:::hub
+  C --> B["Stereo pairs · home theaters<br/>front surrounds · sub"]:::out
+  C --> N["Named to your rooms,<br/>placed in HA Areas"]:::out
+  C --> V["Group volume · audio settings<br/>· ready for automations"]:::out
+  classDef src fill:#334155,stroke:#64748b,color:#f1f5f9
+  classDef hub fill:#2563eb,stroke:#93c5fd,color:#ffffff,font-weight:bold
+  classDef out fill:#6d28d9,stroke:#c4b5fd,color:#ffffff
 ```
 
 ## Screenshots
