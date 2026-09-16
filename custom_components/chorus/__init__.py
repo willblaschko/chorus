@@ -110,10 +110,11 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         raise HomeAssistantError(f"No Sonos speaker '{ident}' was found")
 
     async def resolve_settling(ident: str) -> dict:
-        # Resolve to {uid, ip} for a rename/move, WAITING for the speaker to (re)appear in
-        # the topology. A speaker reconfigured earlier in the same Apply — e.g. freed in an
-        # L/R front swap — briefly drops out of ZoneGroupState, so a plain resolve fails
-        # "not found" until it comes back (it does; "works on refresh").
+        # Resolve to {uid, ip, name, model}, WAITING for the speaker to (re)appear in the
+        # topology. A speaker reconfigured earlier in the same Apply — e.g. freed as a front
+        # then re-added as a rear — briefly drops out of ZoneGroupState, so a single-shot
+        # resolve fails "not found" until it comes back (it does; "works on refresh"). Used
+        # by rename/move AND the bond paths (which also need the model for the capability check).
         speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
         if speaker:
             return speaker
@@ -123,7 +124,8 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         ip = await hass.async_add_executor_job(backend.wait_for_ip, ident, seed["ip"])
         if not ip:
             raise HomeAssistantError(f"No Sonos speaker '{ident}' was found")
-        return {"uid": ident, "ip": ip}
+        model = await hass.async_add_executor_job(backend.fetch_model, ip)
+        return {"uid": ident, "ip": ip, "name": ident, "model": model}
 
     async def run(fn, *args):
         try:
@@ -142,22 +144,11 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     # --- stereo pair ------------------------------------------------------
     async def create_stereo_pair(call: ServiceCall) -> None:
         left_id, right_id = call.data["left"], call.data["right"]
-        # An L/R swap is separate -> re-create reversed: the re-created "left" is a
-        # speaker that was JUST unbonded, so soco.discover hasn't caught up. Resolve
-        # by UID against a FRESH topology (same fix as set_home_theater's resolve_sat),
-        # seeding the ZGS query from whichever speaker the coordinator can already see.
-        seed = (
-            coordinator.players.get(left_id)
-            or coordinator.players.get(right_id)
-            or coordinator.by_name(left_id)
-            or coordinator.by_name(right_id)
-            or next(iter(coordinator.players.values()), None)
-        )
-        if not seed:
-            raise HomeAssistantError("No Sonos speakers available to query")
-        ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
-        left = await hass.async_add_executor_job(resolve_sat, left_id, ip_map)
-        right = await hass.async_add_executor_job(resolve_sat, right_id, ip_map)
+        # An L/R swap is separate -> re-create reversed: the re-created "left" is a speaker
+        # that was JUST unbonded, so it may have dropped out of the topology. resolve_settling
+        # waits for each half to (re)appear before we pair them.
+        left = await resolve_settling(left_id)
+        right = await resolve_settling(right_id)
         for p in (left, right):
             if not can_pair(p["model"]):
                 raise HomeAssistantError(f"{p['name']} ({p['model']}) can't be stereo-paired")
@@ -194,8 +185,6 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         bar = resolve(call.data["soundbar"])
         if not is_soundbar(bar["model"]):
             raise HomeAssistantError(f"{bar['name']} ({bar['model']}) is not a soundbar")
-        # Fresh topology so satellites resolve by UID even if discovery is stale.
-        ip_map = await hass.async_add_executor_job(backend.speaker_ips, bar["ip"])
         # Snapshot first so a mid-sequence failure is recoverable.
         coordinator.snapshots[bar["uid"]] = {
             "map": await hass.async_add_executor_job(backend.snapshot_ht, bar["ip"], bar["uid"]),
@@ -204,7 +193,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             ident = call.data.get(channel.lower())
             if not ident:
                 continue
-            sat = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
+            # Wait for the satellite to be in the topology — it may have just been freed
+            # from another channel earlier in this Apply and not re-registered yet.
+            sat = await resolve_settling(ident)
             ok = is_sub(sat["model"]) if channel == "SW" else can_surround(sat["model"])
             if not ok:
                 raise HomeAssistantError(
