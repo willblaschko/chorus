@@ -128,21 +128,33 @@ export function dedupeRoomNames(rooms: Room[], roomKey: string): Room[] {
   const room = findRoom(next, roomKey);
   if (!room) return next;
   const base = room.name;
-  const used = new Set<string>();
-  const pick = (current: string): string => {
-    if (!used.has(current)) return current; // already unique — leave it
-    for (let n = 2; ; n++) {
-      const cand = `${base} ${n}`;
-      if (!used.has(cand)) return cand;
+  // Zones in a stable order (sets before tray) — the FIRST holder of a shared name keeps it.
+  const zones: Array<{ get: () => string; set: (n: string) => void }> = [
+    ...[...room.sets]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((s) => ({ get: () => s.name, set: (n: string) => void (s.name = n) })),
+    ...[...room.tray]
+      .sort((a, b) => a.uid.localeCompare(b.uid))
+      .map((s) => ({ get: () => s.name, set: (n: string) => void (s.name = n) })),
+  ];
+  // Every name currently in the room. A bumped duplicate must skip these too — otherwise it
+  // steals a name another zone is keeping and cascades that zone into a rename, and so on.
+  const existing = new Set(zones.map((z) => z.get()));
+  const taken = new Set<string>(); // names locked in as we walk (first holder wins)
+  for (const z of zones) {
+    const name = z.get();
+    if (!taken.has(name)) {
+      taken.add(name); // unique so far — keep it
+      continue;
     }
-  };
-  for (const set of [...room.sets].sort((a, b) => a.id.localeCompare(b.id))) {
-    set.name = pick(set.name);
-    used.add(set.name);
-  }
-  for (const sp of [...room.tray].sort((a, b) => a.uid.localeCompare(b.uid))) {
-    sp.name = pick(sp.name);
-    used.add(sp.name);
+    // Duplicate: take the lowest "<base> N" that's neither already locked nor an existing
+    // name of some OTHER zone. Skipping `existing` is what stops the cascade.
+    let n = 2;
+    while (taken.has(`${base} ${n}`) || existing.has(`${base} ${n}`)) n++;
+    const fresh = `${base} ${n}`;
+    z.set(fresh);
+    existing.add(fresh);
+    taken.add(fresh);
   }
   return next;
 }

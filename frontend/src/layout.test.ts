@@ -496,6 +496,38 @@ describe("dedupeRoomNames", () => {
     expect(room.tray.map((sp: any) => sp.name)).toEqual(["Den", "Den 2"]);
   });
 
+  it("bumps only the duplicate to the first FREE number — no cascade into taken names", () => {
+    // Real case (Media Room): a hidden duplicate "Media Room 2" (a Picture frame AND an Era
+    // 300). The duplicate must jump straight to the first free number (7), NOT steal "6"
+    // from the other Era 300 and cascade it to "7".
+    const rooms: any = [
+      {
+        key: "media_room",
+        name: "Media Room",
+        area: "Media Room",
+        sets: [{ id: "ARC", name: "Media Room", primary: { uid: "ARC" }, slots: {} }],
+        tray: [
+          { uid: "u1", name: "Media Room 2" }, // Picture frame — keeps it
+          { uid: "u2", name: "Media Room 2" }, // Era 300 — the duplicate
+          { uid: "u3", name: "Media Room 3" },
+          { uid: "u4", name: "Media Room 4" },
+          { uid: "u5", name: "Media Room 5" },
+          { uid: "u6", name: "Media Room 6" },
+        ],
+      },
+    ];
+    const room = dedupeRoomNames(rooms, "media_room")[0];
+    const byUid = Object.fromEntries(room.tray.map((s: any) => [s.uid, s.name]));
+    expect(byUid.u1).toBe("Media Room 2"); // first holder keeps it
+    expect(byUid.u2).toBe("Media Room 7"); // duplicate -> first FREE number
+    expect(byUid.u3).toBe("Media Room 3"); // no cascade
+    expect(byUid.u4).toBe("Media Room 4");
+    expect(byUid.u5).toBe("Media Room 5");
+    expect(byUid.u6).toBe("Media Room 6"); // NOT bumped
+    const names = [room.sets[0].name, ...Object.values(byUid)];
+    expect(new Set(names).size).toBe(names.length); // all unique
+  });
+
   it("dedupeAllRooms fixes every room and leaves clean rooms alone", () => {
     const rooms: any = [
       { key: "a", name: "A", area: "A", sets: [], tray: [{ uid: "1", name: "A" }, { uid: "2", name: "A" }] },
