@@ -125,7 +125,7 @@ export class ChorusChangebar extends LitElement {
 
     return html`
       <div
-        class="bar ${expanded ? "open" : ""} ${this.busy ? "busy" : ""}"
+        class="bar ${expanded ? "open" : ""} ${this.busy ? "busy" : ""} ${this._nudge ? "nudge" : ""}"
         role="region"
         aria-label="Pending changes"
       >
@@ -154,7 +154,7 @@ export class ChorusChangebar extends LitElement {
                 `}
             <button
               type="button"
-              class="apply ${this._nudge ? "nudge" : ""}"
+              class="apply"
               ?disabled=${this.busy}
               @click=${() => this.emit("apply")}
               aria-busy=${this.busy ? "true" : "false"}
@@ -324,10 +324,35 @@ export class ChorusChangebar extends LitElement {
       cursor: default;
       opacity: 0.85;
     }
-    /* Gentle attention pulse once the bar has sat untouched (see NUDGE_DELAY). A fading,
-       expanding ring + faint breathing scale — cheap and hard to miss. */
-    .apply.nudge {
-      animation: applyPulse 1.7s ease-in-out infinite;
+    /* Once the bar has sat untouched (see NUDGE_DELAY), a warm "flame" comet chases the
+       border so pending changes don't get missed. A masked conic-gradient keeps it inside
+       the bar's rounded box (which clips overflow). */
+    .bar.nudge::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 3px;
+      background: conic-gradient(
+        from var(--chorus-flame, 0deg),
+        transparent 0deg,
+        #fbbf24 35deg,
+        #f97316 70deg,
+        #ef4444 105deg,
+        #a855f7 145deg,
+        transparent 195deg,
+        transparent 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      animation: chorusFlame 2.4s linear infinite;
+      pointer-events: none;
     }
 
     .apply-spin {
@@ -468,15 +493,15 @@ export class ChorusChangebar extends LitElement {
       }
     }
 
-    @keyframes applyPulse {
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-color) 50%, transparent);
-        transform: scale(1);
-      }
-      50% {
-        box-shadow: 0 0 0 7px color-mix(in srgb, var(--primary-color) 0%, transparent);
-        transform: scale(1.03);
+    /* Registered so the conic-gradient's start angle can be animated smoothly. */
+    @property --chorus-flame {
+      syntax: "<angle>";
+      inherits: false;
+      initial-value: 0deg;
+    }
+    @keyframes chorusFlame {
+      to {
+        --chorus-flame: 360deg;
       }
     }
 
@@ -494,10 +519,9 @@ export class ChorusChangebar extends LitElement {
       .state.running {
         animation: none;
       }
-      /* No pulse animation — a static ring still flags the pending Apply. */
-      .apply.nudge {
+      /* No motion — the static warm border arc still flags the pending Apply. */
+      .bar.nudge::before {
         animation: none;
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 30%, transparent);
       }
       /* No sweep: show a static, subtly-filled bar so the strip still reads
          as "in progress" without motion. */
