@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { BondGraph, HomeAssistant } from "./types.js";
 import {
@@ -55,6 +55,8 @@ const CHANNEL_TINT: Record<string, string> = {
 export class ChorusPanel extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) public narrow = false;
+  // HA passes the URL sub-path under the panel: { prefix: "/chorus", path: "/editor/<room>" }.
+  @property({ attribute: false }) public route?: { prefix?: string; path?: string };
 
   @state() private _view: View = "editor";
   @state() private _graph?: BondGraph;
@@ -78,6 +80,10 @@ export class ChorusPanel extends LitElement {
     // few seconds so speakers appear/disappear as the network changes. Only runs
     // while connected, so it costs nothing when the panel is closed.
     this._pollTimer = window.setInterval(() => void this._poll(), 12000);
+    // Deep links: restore the view/room from the URL, and follow the browser's
+    // back/forward buttons.
+    window.addEventListener("popstate", this._onPop);
+    this._applyPath(this._currentPath());
   }
 
   public override disconnectedCallback(): void {
@@ -86,6 +92,47 @@ export class ChorusPanel extends LitElement {
       window.clearInterval(this._pollTimer);
       this._pollTimer = undefined;
     }
+    window.removeEventListener("popstate", this._onPop);
+  }
+
+  protected override willUpdate(changed: PropertyValues): void {
+    // HA (re)passes `route` on load and navigation — reflect it into view/room.
+    if (changed.has("route")) this._applyPath(this._currentPath());
+  }
+
+  // ---- routing (deep links: /chorus/editor/<room>, /chorus/overview) --
+  private _onPop = (): void => this._applyPath(this._currentPath());
+
+  private _prefix(): string {
+    return this.route?.prefix || "/chorus";
+  }
+
+  /** The panel-relative sub-path, e.g. "/editor/media_room". */
+  private _currentPath(): string {
+    if (this.route?.path != null) return this.route.path;
+    const p = window.location.pathname;
+    const pre = this._prefix();
+    return p.startsWith(pre) ? p.slice(pre.length) : "";
+  }
+
+  private _applyPath(path: string): void {
+    const parts = (path || "").split("/").filter(Boolean);
+    this._view = parts[0] === "overview" ? "overview" : "editor";
+    this._editRoom =
+      parts[0] === "editor" && parts[1] ? decodeURIComponent(parts[1]) : undefined;
+  }
+
+  /** Navigate to a view/room: update the URL (no reload) and the local state. */
+  private _go(view: View, room?: string): void {
+    let path = `/${view}`;
+    if (view === "editor" && room) path += `/${encodeURIComponent(room)}`;
+    const url = this._prefix() + path;
+    if (window.location.pathname !== url) {
+      history.pushState(null, "", url);
+      this.dispatchEvent(new CustomEvent("location-changed", { bubbles: true, composed: true }));
+    }
+    this._view = view;
+    this._editRoom = room;
   }
 
   private async _poll(): Promise<void> {
@@ -144,7 +191,7 @@ export class ChorusPanel extends LitElement {
             class=${this._view === "editor" ? "on" : ""}
             role="tab"
             aria-selected=${this._view === "editor"}
-            @click=${() => (this._view = "editor")}
+            @click=${() => this._go("editor", this._editRoom)}
           >
             Editor
           </button>
@@ -152,7 +199,7 @@ export class ChorusPanel extends LitElement {
             class=${this._view === "overview" ? "on" : ""}
             role="tab"
             aria-selected=${this._view === "overview"}
-            @click=${() => (this._view = "overview")}
+            @click=${() => this._go("overview")}
           >
             Overview
           </button>
@@ -195,6 +242,7 @@ export class ChorusPanel extends LitElement {
       .graph=${this._graph}
       .narrow=${this.narrow}
       .selectRoom=${this._editRoom}
+      @room-change=${(e: Event) => this._go("editor", (e as CustomEvent).detail || undefined)}
       @chorus-graph=${(e: Event) => {
         this._graph = (e as CustomEvent).detail as BondGraph;
         this._loading = false;
@@ -321,9 +369,8 @@ export class ChorusPanel extends LitElement {
 
   private _openInEditor(r: Room): void {
     // buildRooms keys rooms the same way <chorus-editor>.selectRoom matches, so the
-    // editor lands on this exact room.
-    this._editRoom = r.key;
-    this._view = "editor";
+    // editor lands on this exact room (and the URL becomes /editor/<room>).
+    this._go("editor", r.key);
   }
 
   private _roomCard(r: Room): TemplateResult {

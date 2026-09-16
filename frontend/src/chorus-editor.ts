@@ -153,8 +153,10 @@ export class ChorusEditor extends LitElement {
     }
     // A fresh graph carries the true volumes — drop optimistic overrides.
     if (changed.has("graph")) this._vol = {};
-    // Host asked to open a specific room (e.g. the Overview edit pencil).
-    if (changed.has("selectRoom") && this.selectRoom) {
+    // The host (panel) drives the selected room from the URL — reflect it, including
+    // clearing to the room list when the route has no room. (User picks emit room-change;
+    // this is the round-trip back, so it must not re-emit.)
+    if (changed.has("selectRoom")) {
       this._selected = this.selectRoom;
     }
   }
@@ -814,10 +816,18 @@ export class ChorusEditor extends LitElement {
     return "t-neutral";
   }
 
+  // Select a room from a user action and tell the host (panel) so it updates the URL.
+  // The panel round-trips the value back via `selectRoom`, so this must not itself set
+  // `_selected` twice in a way that loops — willUpdate handles the round-trip.
+  private _pickRoom(key?: string): void {
+    this._selected = key;
+    this.dispatchEvent(new CustomEvent("room-change", { detail: key, bubbles: true, composed: true }));
+  }
+
   private _roomButton(r: Room, sel?: Room): TemplateResult {
     const on = sel?.key === r.key;
     return html`
-      <button type="button" class="room ${on ? "sel" : ""}" @click=${() => (this._selected = r.key)}>
+      <button type="button" class="room ${on ? "sel" : ""}" @click=${() => this._pickRoom(r.key)}>
         <span class="ric ${this._roomTint(r)}">${iconFor(this._roomGlyphModel(r))}</span>
         <span class="rmeta">
           <b>${r.name}</b>
@@ -849,7 +859,7 @@ export class ChorusEditor extends LitElement {
     const speakerSets = this._speakerSets(r);
     return html`
       ${this.narrow
-        ? html`<button type="button" class="back" @click=${() => (this._selected = undefined)}>
+        ? html`<button type="button" class="back" @click=${() => this._pickRoom(undefined)}>
             ‹ All rooms
           </button>`
         : nothing}
