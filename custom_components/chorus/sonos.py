@@ -20,6 +20,14 @@ _ZGT_NS = "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
 _RC_NS = "urn:schemas-upnp-org:service:RenderingControl:1"
 _AV_NS = "urn:schemas-upnp-org:service:AVTransport:1"
 
+# SOAP fault codes worth RIDING OUT while a device settles (vs. a hard rejection).
+#   800  — target not settled yet (the classic transient).
+#   1034 — device still in a group/coordinator transition; observed when a sub is
+#          bonded immediately after leaving a home theater (the sub reads as its own
+#          zone via is_free, but isn't fully bondable for another beat).
+#   None — a code-less connection reset/timeout mid-reconfigure.
+_RETRYABLE_CODES = frozenset({"800", "1034", None})
+
 _ENVELOPE = (
     '<?xml version="1.0"?>'
     '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
@@ -190,10 +198,9 @@ class SonosBackend:
             try:
                 return apply_fn()
             except SonosSoapError as err:
-                # Retry the transient states while there's still time: 800 (not
-                # settled) and a code-less error (a connection reset/timeout while the
-                # device is still cycling). Past the deadline it raises -> a clean 400.
-                if err.code in ("800", None) and time.monotonic() < deadline:
+                # Retry the transient states while there's still time (see
+                # _RETRYABLE_CODES). Past the deadline it raises -> a clean 400.
+                if err.code in _RETRYABLE_CODES and time.monotonic() < deadline:
                     time.sleep(2.0)
                     continue
                 raise
