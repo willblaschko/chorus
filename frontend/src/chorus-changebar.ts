@@ -52,6 +52,10 @@ export class ChorusChangebar extends LitElement {
   /** apply progress in [0, 1]; a NEGATIVE value means indeterminate (unknown). */
   @property({ type: Number }) public progress = -1;
 
+  /** error steps from the previous apply; when > 0 the pending rows are the unfinished
+   *  ones and the primary action reads "Retry" instead of "Apply". */
+  @property({ type: Number }) public failed = 0;
+
   /** whether the details list is expanded (collapsed by default) */
   @state() private open = false;
 
@@ -135,7 +139,11 @@ export class ChorusChangebar extends LitElement {
     if (n === 0) return nothing;
 
     const expanded = this.busy || this.open;
-    const countLabel = `${n} pending change${n === 1 ? "" : "s"}`;
+    // After a partial failure the pending rows ARE the unfinished steps — label to retry.
+    const retry = this.failed > 0 && !this.busy;
+    const countLabel = retry
+      ? `${n} step${n === 1 ? "" : "s"} to retry`
+      : `${n} pending change${n === 1 ? "" : "s"}`;
     // While applying, the head reports live status instead of a static count.
     const headLabel = this.busy ? this.statusLabel || "Applying…" : countLabel;
     const determinate = this.progress >= 0;
@@ -179,7 +187,9 @@ export class ChorusChangebar extends LitElement {
             >
               ${this.busy
                 ? html`<span class="apply-spin" aria-hidden="true"></span>Applying…`
-                : "Apply"}
+                : retry
+                  ? "Retry"
+                  : "Apply"}
             </button>
           </div>
         </div>

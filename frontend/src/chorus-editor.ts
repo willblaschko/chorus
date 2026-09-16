@@ -115,6 +115,7 @@ export class ChorusEditor extends LitElement {
   @state() private _working?: Room[]; // staged edits (undefined until synced from graph)
   @state() private _dirty = false;
   @state() private _applying = false;
+  @state() private _lastFailed = 0; // error rows from the previous apply (drives "Retry")
   @state() private _rows: ChangeRow[] = []; // live rows during apply
   @state() private _settleView: SettleView | null = null; // live settle progress
   private _releasedUids: string[] = []; // speakers this apply un-bonds (awaited back)
@@ -650,6 +651,7 @@ export class ChorusEditor extends LitElement {
   private _discard(): void {
     this._working = structuredClone(buildRooms(this.graph));
     this._dirty = false;
+    this._lastFailed = 0;
     this._picker = undefined;
     this._toast("Changes discarded");
   }
@@ -667,6 +669,7 @@ export class ChorusEditor extends LitElement {
     }
     this._releasedUids = released;
     this._settleTimedOut = false;
+    this._lastFailed = 0;
     this._settleView = { label: "Applying changes...", ratio: 0.05 };
     this._applying = true;
     this._rows = plan.rows;
@@ -682,7 +685,10 @@ export class ChorusEditor extends LitElement {
     const fresh = await this._awaitConvergence(intended, intendedMap, budgetMs);
     const failed = this._rows.filter((r) => r.status === "error").length;
     this._applying = false;
-    this._dirty = false;
+    // Keep the intent staged when anything failed, so the recomputed plan shows just the
+    // unfinished steps and the change bar offers "Retry". A clean apply clears it.
+    this._dirty = failed > 0;
+    this._lastFailed = failed;
     if (fresh) {
       // Push the settled graph straight to the panel (no extra round-trip).
       this.dispatchEvent(
@@ -802,6 +808,7 @@ export class ChorusEditor extends LitElement {
       <chorus-changebar
         .rows=${rows}
         .busy=${this._applying}
+        .failed=${this._lastFailed}
         .statusLabel=${this._settleView?.label ?? ""}
         .progress=${this._settleView?.ratio ?? -1}
         @apply=${this._apply}
