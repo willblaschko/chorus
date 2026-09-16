@@ -44,7 +44,7 @@ export function applyPlan(
   onRows: (rows: ChangeRow[]) => void,
 ): Promise<ChangeRow[]> {
   const toRows = (progress: readonly OpProgress[]): ChangeRow[] =>
-    progress.map((p) => ({ summary: p.op.summary, status: p.status }));
+    progress.map((p) => ({ summary: p.op.summary, status: p.status, error: p.error }));
 
   return runApply(hass, plan.lanes, {
     onUpdate: (progress) => onRows(toRows(progress)),

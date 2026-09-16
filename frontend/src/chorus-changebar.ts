@@ -23,6 +23,7 @@ export type RowStatus = "pending" | "running" | "done" | "error" | "skipped";
 export interface ChangeRow {
   summary: string; // plain-language, e.g. "Media Room — add Rear L"
   status: RowStatus;
+  error?: string; // failure detail (e.g. "Sonos rejected it (code 1034).") when status is "error"
 }
 
 /**
@@ -188,7 +189,12 @@ export class ChorusChangebar extends LitElement {
             (row) => html`
               <div class="row ${row.status}">
                 ${this.renderStatus(row.status)}
-                <span class="summary">${row.summary}</span>
+                <span class="summary">
+                  <span class="summary-text">${row.summary}</span>
+                  ${row.status === "error" && row.error
+                    ? html`<span class="row-err">${row.error}</span>`
+                    : nothing}
+                </span>
               </div>
             `,
           )}
@@ -423,8 +429,20 @@ export class ChorusChangebar extends LitElement {
     .summary {
       color: var(--primary-text-color);
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .summary-text {
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    /* Failure detail under a failed row's summary — the code makes an X actionable. */
+    .row-err {
+      color: var(--cb-error);
+      font-size: 11.5px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
     .row.skipped .summary {
       color: var(--secondary-text-color);
