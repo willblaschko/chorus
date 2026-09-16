@@ -52,7 +52,7 @@ export interface Op {
   type: OpType;
   touches: string[]; // device UIDs this op reads/writes (for lane planning)
   service: { domain: "chorus"; service: string; data: Record<string, unknown> };
-  summary: string; // plain-language, e.g. "Media Room — add Rear L"
+  summary: string; // plain-language, e.g. "Office (Era 300) — add as Rear L in Media Room"
 }
 
 // ── Channel vocabulary ────────────────────────────────────────────────────────
@@ -103,6 +103,16 @@ const PHASE: Record<OpType, number> = {
 
 function isHTSat(p: Placement | undefined): p is Placement {
   return !!p && HT_SAT_ROLES.indexOf(p.role) !== -1;
+}
+
+// A device label for change-bar summaries: the speaker's name + its (short) model, so a
+// row says WHICH physical unit, not just a room. `model` is already the short form. Avoids
+// redundancy like "Sub Mini (Sub Mini)".
+function dev(p: { name?: string; model?: string } | undefined): string {
+  const name = p?.name ?? "";
+  const model = p?.model ?? "";
+  if (!model || name === model || name.includes(model)) return name || model || "a speaker";
+  return `${name} (${model})`;
 }
 
 // Two placements describe the same home-theater satellite bond.
@@ -169,7 +179,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         service: "separate",
         data: { left: p.left, right: p.right }, // UIDs — names are ambiguous
       },
-      summary: `${p.room} — separate stereo pair`,
+      summary: `${dev(applied[p.left])} — separate stereo pair in ${p.room}`,
     });
   }
 
@@ -186,7 +196,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "remove_home_theater",
           data: { soundbar: a.anchorUid, channel: a.role },
         },
-        summary: `${a.room} — remove ${CHANNEL_LABEL[a.role] ?? a.role}`,
+        summary: `${dev(a)} — remove as ${CHANNEL_LABEL[a.role] ?? a.role} from ${a.room}`,
       });
     }
   }
@@ -217,7 +227,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "move",
           data: { speaker: uid, name: b.name, area: b.room },
         },
-        summary: `${a.name}${a.model ? ` (${a.model})` : ""} — move to ${b.room}`,
+        summary: `${dev(a)} — move to ${b.room}`,
       });
     }
   }
@@ -234,7 +244,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         service: "create_stereo_pair",
         data: { left: p.left, right: p.right }, // UIDs — names are ambiguous
       },
-      summary: `${p.room} — create stereo pair`,
+      summary: `${dev(working[p.left])} — create stereo pair in ${p.room}`,
     });
   }
 
@@ -252,7 +262,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "set_home_theater",
           data: { soundbar: b.anchorUid, [field]: uid },
         },
-        summary: `${b.room} — add ${CHANNEL_LABEL[b.role] ?? b.role}`,
+        summary: `${dev(b)} — add as ${CHANNEL_LABEL[b.role] ?? b.role} in ${b.room}`,
       });
     }
   }
@@ -280,7 +290,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "add_pair_sub",
           data: right ? { left, right, sub: uid } : { left, sub: uid },
         },
-        summary: `${b.room} — add Sub`,
+        summary: `${dev(b)} — add as Sub in ${b.room}`,
       });
     } else if (wasSub && !isSubNow) {
       const left = a.anchorUid;
@@ -293,7 +303,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           service: "remove_pair_sub",
           data: right ? { left, right, sub: uid } : { left, sub: uid },
         },
-        summary: `${a.room} — remove Sub`,
+        summary: `${dev(a)} — remove as Sub from ${a.room}`,
       });
     }
   }
@@ -323,7 +333,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         type: "rename",
         touches: [uid],
         service: { domain: "chorus", service: "rename", data: { speaker: uid, name: b.name } },
-        summary: `Rename to ${b.name}`,
+        summary: `${dev(a)} — rename to ${b.name}`,
       });
     }
   }

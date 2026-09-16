@@ -59,7 +59,7 @@ describe("computeOps — home theater satellites", () => {
       data: { soundbar: ARC, lr: LR },
     });
     expect(op.touches.sort()).toEqual([ARC, LR].sort());
-    expect(op.summary).toBe("Media Room — add Rear L");
+    expect(op.summary).toBe("Media Room Rear L — add as Rear L in Media Room");
   });
 
   it("removing one satellite -> one remove_ht by channel", () => {
@@ -77,7 +77,7 @@ describe("computeOps — home theater satellites", () => {
       data: { soundbar: ARC, channel: "SW" },
     });
     expect(op.touches.sort()).toEqual([ARC, SW].sort());
-    expect(op.summary).toBe("Media Room — remove Sub");
+    expect(op.summary).toBe("Sub Mini — remove as Sub from Media Room");
   });
 
   it("re-channelling a satellite -> remove old + add new", () => {
