@@ -157,6 +157,7 @@ service**, and the bonding runs over local SOAP on your LAN. Dig in:
   the write strategy, and the model → capability registry.
 - **[Safety & caveats →](docs/ADVANCED.md#safety--caveats)** — undocumented API, no global
   undo, and the Sonos-app "needs attention" flag (all benign, but worth knowing).
+- **[Known issues →](KNOWN_ISSUES.md)** — the short list of rough edges and their workarounds.
 
 ---
 
