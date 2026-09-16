@@ -147,6 +147,16 @@ export function dedupeRoomNames(rooms: Room[], roomKey: string): Room[] {
   return next;
 }
 
+/** Run the collision fix across EVERY room — the opinionated baseline. Chorus insists on
+ * distinct zone names, so the working model is always de-duped: any collision left by a
+ * rename that didn't land shows up as a staged fix instead of a silent duplicate. Idempotent
+ * for already-unique rooms (each pass keeps names that are still free). */
+export function dedupeAllRooms(rooms: Room[]): Room[] {
+  let next = rooms;
+  for (const r of rooms) next = dedupeRoomNames(next, r.key);
+  return next;
+}
+
 /** A freed satellite: a sub is homeless (global pool); a real speaker returns to the
  * tray and (World B) takes a room-derived name, since it's now its own zone again. */
 function release(rooms: Room[], room: Room, ch: Channel, sp: EditorSpeaker): void {

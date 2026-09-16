@@ -13,6 +13,7 @@ import {
   renameSpeaker,
   setupHT,
   dedupeRoomNames,
+  dedupeAllRooms,
 } from "./layout.js";
 import { computeOps, planLanes } from "./apply.js";
 import { AVAILABLE_SUBS_KEY, setKind, type Room, type EditorSpeaker } from "./model.js";
@@ -493,6 +494,18 @@ describe("dedupeRoomNames", () => {
     ];
     const room = dedupeRoomNames(rooms, "den")[0];
     expect(room.tray.map((sp: any) => sp.name)).toEqual(["Den", "Den 2"]);
+  });
+
+  it("dedupeAllRooms fixes every room and leaves clean rooms alone", () => {
+    const rooms: any = [
+      { key: "a", name: "A", area: "A", sets: [], tray: [{ uid: "1", name: "A" }, { uid: "2", name: "A" }] },
+      { key: "b", name: "B", area: "B", sets: [], tray: [{ uid: "3", name: "B" }, { uid: "4", name: "B 2" }] },
+    ];
+    const out = dedupeAllRooms(rooms);
+    const a = out.find((r: any) => r.key === "a")!;
+    const b = out.find((r: any) => r.key === "b")!;
+    expect(a.tray.map((s: any) => s.name)).toEqual(["A", "A 2"]); // collision fixed
+    expect(b.tray.map((s: any) => s.name)).toEqual(["B", "B 2"]); // already unique — untouched
   });
 });
 

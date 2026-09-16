@@ -284,6 +284,30 @@ describe("planLanes", () => {
     expect(idx("move")).toBeLessThan(idx("rename"));
   });
 
+  it("freeing two speakers emits two renames with DISTINCT de-duped names", () => {
+    // Both satellites inherit the set's "Media Room" name. The plan must carry two
+    // different target names (2 and 3) regardless of execution order — so "remove, remove,
+    // rename, rename" can never leave two zones sharing a name. Names come from the working
+    // model, not from replaying ops, so batch-per-phase is safe.
+    const BAR = "RINCON_BARM";
+    const A = "RINCON_AA";
+    const B = "RINCON_BB";
+    const applied: LayoutMap = {
+      [BAR]: { room: "Media Room", role: "CC", anchorUid: BAR, name: "Media Room" },
+      [A]: { room: "Media Room", role: "LR", anchorUid: BAR, name: "Media Room" },
+      [B]: { room: "Media Room", role: "RR", anchorUid: BAR, name: "Media Room" },
+    };
+    const working = clone(applied);
+    working[A] = { room: "Media Room", role: "solo", anchorUid: A, name: "Media Room 2" };
+    working[B] = { room: "Media Room", role: "solo", anchorUid: B, name: "Media Room 3" };
+
+    const names = computeOps(applied, working)
+      .filter((o) => o.type === "rename")
+      .map((o) => (o.service.data as { name: string }).name)
+      .sort();
+    expect(names).toEqual(["Media Room 2", "Media Room 3"]);
+  });
+
   it("no ops -> no lanes", () => {
     expect(planLanes([])).toEqual([]);
   });
