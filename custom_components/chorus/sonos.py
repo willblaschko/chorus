@@ -270,6 +270,13 @@ class SonosBackend:
         height channel (LF -> LF,LTF).
         """
         body = f"<HTSatChanMapSet>{soundbar_uid}:CC;{sat_uid}:{channel}</HTSatChanMapSet>"
+        if (channel or "").upper() == "SW":
+            # A sub is Invisible whether bonded or free, so the is_standalone poll below
+            # never confirms it — it would just burn the full settle_timeout every time.
+            # Wait on is_free instead (via the reachable soundbar's global topology), then
+            # apply with the retry-on-800 backstop. Mirrors add_pair_sub.
+            self._wait_free(soundbar_ip, sat_uid)
+            return self._apply_with_settle(lambda: self._dp(soundbar_ip, "AddHTSatellite", body))
         return self._apply_with_settle(
             lambda: self._dp(soundbar_ip, "AddHTSatellite", body),
             wait_uid=sat_uid,
