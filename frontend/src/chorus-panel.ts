@@ -197,8 +197,8 @@ export class ChorusPanel extends LitElement {
       <chorus-help .open=${this._help} @close=${() => (this._help = false)}></chorus-help>
       <chorus-menu
         .open=${!!this._pairSub}
-        .heading=${this._pairSub ? `Pair ${this._spName(this._pairSub)}` : ""}
-        subheading="Choose a set or speaker to add this sub to"
+        .heading=${this._pairSub ? `Add ${this._spName(this._pairSub)} to…` : ""}
+        subheading="Choose a set or speaker for this sub"
         .items=${this._pairMenuItems}
         @select=${(e: Event) => this._onPairSelect((e as CustomEvent).detail as string)}
         @close=${() => (this._pairSub = undefined)}
@@ -319,7 +319,7 @@ export class ChorusPanel extends LitElement {
           <div class="rmeta">
             <h2 class="rname">Available subs</h2>
             <span class="rsum"
-              >${subs.length === 1 ? "1 sub" : `${subs.length} subs`} · free to pair</span
+              >${subs.length === 1 ? "1 sub" : `${subs.length} subs`} · not in use</span
             >
           </div>
         </div>
@@ -344,10 +344,10 @@ export class ChorusPanel extends LitElement {
         </span>
         <button
           class="pair-btn"
-          title=${`Pair ${this._spName(sp)} with a speaker set`}
+          title=${`Add ${this._spName(sp)} to a speaker set`}
           @click=${() => this._openPairMenu(sp)}
         >
-          Pair<span aria-hidden="true">▾</span>
+          Add<span aria-hidden="true">▾</span>
         </button>
       </div>
     `;
@@ -383,7 +383,7 @@ export class ChorusPanel extends LitElement {
 
   private get _pairMenuItems(): MenuItem[] {
     if (!this._pairTargets.length) {
-      return [{ id: "none", label: "No speakers available to pair with", disabled: true }];
+      return [{ id: "none", label: "No sets or speakers available", disabled: true }];
     }
     return this._pairTargets.map((t, i) => ({ id: String(i), label: t.roomName, sub: t.kindLabel }));
   }

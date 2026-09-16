@@ -2352,8 +2352,8 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       <chorus-help .open=${this._help} @close=${()=>this._help=!1}></chorus-help>
       <chorus-menu
         .open=${!!this._pairSub}
-        .heading=${this._pairSub?`Pair ${this._spName(this._pairSub)}`:""}
-        subheading="Choose a set or speaker to add this sub to"
+        .heading=${this._pairSub?`Add ${this._spName(this._pairSub)} to…`:""}
+        subheading="Choose a set or speaker for this sub"
         .items=${this._pairMenuItems}
         @select=${e=>this._onPairSelect(e.detail)}
         @close=${()=>this._pairSub=void 0}
@@ -2425,7 +2425,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
           <div class="rmeta">
             <h2 class="rname">Available subs</h2>
             <span class="rsum"
-              >${1===e.length?"1 sub":`${e.length} subs`} · free to pair</span
+              >${1===e.length?"1 sub":`${e.length} subs`} · not in use</span
             >
           </div>
         </div>
@@ -2445,13 +2445,13 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
         </span>
         <button
           class="pair-btn"
-          title=${`Pair ${this._spName(e)} with a speaker set`}
+          title=${`Add ${this._spName(e)} to a speaker set`}
           @click=${()=>this._openPairMenu(e)}
         >
-          Pair<span aria-hidden="true">▾</span>
+          Add<span aria-hidden="true">▾</span>
         </button>
       </div>
-    `}_computeSubTargets(){const e=Pe(this._graph).filter(e=>e.key!==Ee),t=[];for(const r of e){for(const e of r.sets){if(e.slots.SW)continue;const o="home_theater"===Se(e)?"home theater":"stereo pair";t.push({roomKey:r.key,roomName:r.name,kind:"set",kindLabel:o,targetId:e.id})}for(const e of r.tray)t.push({roomKey:r.key,roomName:r.name,kind:"speaker",kindLabel:"speaker",targetId:e.uid})}return t}_openPairMenu(e){this._pairTargets=this._computeSubTargets(),this._pairSub=e}get _pairMenuItems(){return this._pairTargets.length?this._pairTargets.map((e,t)=>({id:String(t),label:e.roomName,sub:e.kindLabel})):[{id:"none",label:"No speakers available to pair with",disabled:!0}]}_onPairSelect(e){const t=this._pairSub,r=this._pairTargets[Number(e)];this._pairSub=void 0,t&&r&&(this._pendingSub={subUid:t.uid,roomKey:r.roomKey,kind:r.kind,targetId:r.targetId},this._go("editor",r.roomKey))}_supportNote(){return B`
+    `}_computeSubTargets(){const e=Pe(this._graph).filter(e=>e.key!==Ee),t=[];for(const r of e){for(const e of r.sets){if(e.slots.SW)continue;const o="home_theater"===Se(e)?"home theater":"stereo pair";t.push({roomKey:r.key,roomName:r.name,kind:"set",kindLabel:o,targetId:e.id})}for(const e of r.tray)t.push({roomKey:r.key,roomName:r.name,kind:"speaker",kindLabel:"speaker",targetId:e.uid})}return t}_openPairMenu(e){this._pairTargets=this._computeSubTargets(),this._pairSub=e}get _pairMenuItems(){return this._pairTargets.length?this._pairTargets.map((e,t)=>({id:String(t),label:e.roomName,sub:e.kindLabel})):[{id:"none",label:"No sets or speakers available",disabled:!0}]}_onPairSelect(e){const t=this._pairSub,r=this._pairTargets[Number(e)];this._pairSub=void 0,t&&r&&(this._pendingSub={subUid:t.uid,roomKey:r.roomKey,kind:r.kind,targetId:r.targetId},this._go("editor",r.roomKey))}_supportNote(){return B`
       <a
         class="support"
         href="https://github.com/willblaschko/chorus#how-to-support"
