@@ -1,26 +1,48 @@
 # Chorus
 
-*Sonos bonding for Home Assistant — stereo pairs, home theaters, and surrounds the app won't build.*
+**Pair. Surround. Bond.** — build the Sonos layouts the app won't, right inside Home Assistant.
 
-> **TL;DR** — Chorus is a **Home Assistant integration** that **configures Sonos
-> bonding over your local network** (no cloud, no Sonos account): create and
-> dissolve stereo pairs and home-theater surrounds — including dedicated front
-> surrounds and mixed-model satellites the official Sonos app won't build.
->
-> **Install:** HACS → ⋮ → *Custom repositories* → add this repo with category
-> **Integration** → **Download** → **restart Home Assistant** → **Settings →
-> Devices & Services → Add Integration → Chorus**.
->
-> **Maturity:** Chorus ships a **native sidebar panel** — a drag-and-drop /
-> tap-to-assign **editor** for building pairs and home theaters, plus a live
-> **Overview** — all backed by Home Assistant **services** you can also call from
-> **Developer Tools → Actions**. Validated on real hardware.
+Chorus makes your Sonos a **first-class part of Home Assistant**. Drag speakers around a
+room to build stereo pairs and home theaters — including the dedicated front surrounds and
+mixed-model rigs the Sonos app flatly **refuses** to create — from a native panel in your
+sidebar. Sets take their room's name and land in your Home Assistant **Areas**, so Sonos
+stops being a walled garden and simply becomes part of your home. Everything runs
+**locally on your LAN** — no cloud, no Sonos account.
 
-Chorus is a Home Assistant integration for **configuring Sonos bonding** — stereo
-pairs and home-theater surrounds, including **dedicated front surrounds and
-mixed-model satellites the official Sonos app refuses to create**. It talks to
-your speakers over the local network only (no cloud, no account), through a
-visual, room-by-room drag-and-drop panel for building layouts by hand.
+- **Home-Assistant-first.** A native drag-and-drop panel, your Areas, your naming. You
+  configure Sonos where you already run your home — not in a separate app you juggle.
+- **Layouts the app won't build.** Dedicated front surrounds, mixed-model satellites
+  (Era 300s or Symfonisks as an Arc's rears *or* fronts), and a sub bonded to a stereo
+  pair or a lone speaker — not just to a soundbar.
+- **One zone, one name.** A bonded set is named after its room; swapping L/R never renames
+  it, and moving it to another room renames + re-homes it for you.
+- **Control, not just config.** Group volume and audio settings live in the panel — and
+  every action is also a Home Assistant service, so your speakers drop straight into
+  automations.
+- **Local and private.** It speaks the Sonos LAN API (port 1400) directly. Nothing leaves
+  your network.
+- **Staged, not surprising.** Arrange freely; nothing is written to your speakers until you
+  review the plan and hit **Apply**.
+
+**Install:** HACS → ⋮ → *Custom repositories* → add this repo as an **Integration** →
+Download → restart Home Assistant → add the **Chorus** integration. Local, account-free.
+([full steps ↓](#install-hacs-custom-repository))
+
+## The idea
+
+```mermaid
+flowchart LR
+  A["Your Sonos speakers<br/>on the LAN"] -->|Chorus discovers them| B["Drag-and-drop editor<br/>in Home Assistant"]
+  B -->|local SOAP · no cloud| C["Stereo pairs · home theaters<br/>surrounds · sub"]
+  C --> D["Named to your rooms,<br/>placed in HA Areas,<br/>ready to control"]
+```
+
+## Screenshots
+
+<!-- Drop PNGs into docs/screenshots/ and reference them here, e.g.:
+     ![Editor](docs/screenshots/editor.png) -->
+
+_Coming soon — the drag-and-drop editor, the home-theater stage, and the live Overview._
 
 ---
 
