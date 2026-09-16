@@ -117,3 +117,34 @@ def test_empty_or_garbage_yields_no_units():
     assert SonosBackend.parse_bond_graph("") == []
     assert SonosBackend.parse_bond_graph("<ZoneGroupState></ZoneGroupState>") == []
     assert SonosBackend.parse_bond_graph("not xml at all") == []
+
+
+# --- is_free: readiness of an Invisible sub before it can be re-bonded --------
+# A sub freed from its home theater: now its OWN invisible ZoneGroupMember, not a
+# nested <Satellite>. This is what add_pair_sub waits for (is_standalone can't see it).
+_FREE_SUB = (
+    f'<ZoneGroup Coordinator="{SW}" ID="{SW}:9">'
+    f'<ZoneGroupMember UUID="{SW}" Location="{_loc("10.0.0.6")}" ZoneName="Sub Mini" Invisible="1"/>'
+    f"</ZoneGroup>"
+)
+ZGS_FREE_SUB = f"<ZoneGroupState><ZoneGroups>{_PAIR}{_FREE_SUB}</ZoneGroups></ZoneGroupState>"
+
+
+def _backend_seeing(state):
+    b = SonosBackend()
+    b.zone_group_state = lambda ip: state  # stub the live read with canned ZGS
+    return b
+
+
+def test_is_free_false_while_the_sub_is_a_bonded_satellite():
+    # In ZGS the Sub Mini is a nested <Satellite> of the Media Room bar.
+    assert _backend_seeing(ZGS).is_free("x", SW) is False
+
+
+def test_is_free_true_once_the_sub_is_its_own_invisible_member():
+    # Same sub, now freed to its own <ZoneGroupMember> — even though Invisible.
+    assert _backend_seeing(ZGS_FREE_SUB).is_free("x", SW) is True
+
+
+def test_is_free_false_for_a_uid_absent_from_the_topology():
+    assert _backend_seeing(ZGS).is_free("x", "RINCON_GHOST0000000000001400") is False

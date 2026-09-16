@@ -142,7 +142,32 @@ class SonosBackend:
         attrs = self._member(self.zone_group_state(ip), uid)
         return attrs is not None and attrs.get("Invisible", "0") != "1"
 
+    def is_free(self, ip: str, uid: str) -> bool:
+        """True once `uid` is UNBONDED — the readiness signal for an Invisible sub,
+        where is_standalone (which rejects Invisible members) never returns True.
+
+        A bonded sub is a nested <Satellite> of its set; a freed one becomes its own
+        <ZoneGroupMember>. So: not a Satellite anywhere, but present as a member.
+        """
+        state = self.zone_group_state(ip)
+        if re.search(rf'<Satellite[^>]*UUID="{re.escape(uid)}"', state):
+            return False  # still a satellite of some set
+        return re.search(rf'<ZoneGroupMember[^>]*UUID="{re.escape(uid)}"', state) is not None
+
     # -- settle + retry (the crux of reliable bonding) --------------------
+    def _wait_free(self, ip: str, uid: str) -> None:
+        """Poll (via the reachable `ip`'s global topology) until `uid` is unbonded, or
+        the settle deadline passes. Used before re-bonding a sub that was just freed —
+        an Invisible sub can't be checked with is_standalone, so we watch is_free."""
+        deadline = time.monotonic() + self.settle_timeout
+        while time.monotonic() < deadline:
+            try:
+                if self.is_free(ip, uid):
+                    return
+            except Exception:  # noqa: BLE001 - transient during transition
+                pass
+            time.sleep(1.0)
+
     def _apply_with_settle(self, apply_fn, wait_uid=None, wait_ip=None):
         """Poll-until-standalone (if given) then apply with retry-on-800.
 
@@ -205,9 +230,14 @@ class SonosBackend:
     def add_pair_sub(
         self, primary_ip: str, primary_uid: str, sub_uid: str, right_uid: str | None = None
     ) -> str:
+        # A sub freed from a home theater in the SAME Apply lags the soundbar: the bar
+        # drops it from its map (which remove_ht_satellite waits for) before the sub
+        # itself comes up as its own zone, and CreateStereoPair 800s if it fires first.
+        # is_standalone can't see an Invisible sub, so wait on is_free (via the reachable
+        # primary's global topology) until the sub is genuinely unbonded.
+        self._wait_free(primary_ip, sub_uid)
         body = f"<ChannelMapSet>{self._set_map(primary_uid, sub_uid, right_uid)}</ChannelMapSet>"
-        # The sub is an (invisible) standalone, immediately available; just retry
-        # transients. No wait_uid — a sub is Invisible whether bonded or free.
+        # Belt-and-suspenders: still retry transient 800s while the sub finishes settling.
         return self._apply_with_settle(lambda: self._dp(primary_ip, "CreateStereoPair", body))
 
     def remove_pair_sub(

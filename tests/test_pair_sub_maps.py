@@ -25,6 +25,7 @@ class RecordingDP(sonos.SonosBackend):
     def __init__(self):
         super().__init__()
         self.calls = []  # (action, body)
+        self.freed = []  # uids add_pair_sub waited to become free
 
     def _dp(self, ip, action, body=""):
         self.calls.append((action, body))
@@ -33,6 +34,9 @@ class RecordingDP(sonos.SonosBackend):
     def _apply_with_settle(self, fn, **_kw):
         return fn()  # skip the poll-until-settled loop
 
+    def _wait_free(self, ip, uid):
+        self.freed.append(uid)  # skip the topology poll; just record the wait
+
 
 def test_add_pair_sub_creates_stereo_pair_with_the_sub_map():
     b = RecordingDP()
@@ -40,6 +44,14 @@ def test_add_pair_sub_creates_stereo_pair_with_the_sub_map():
     assert b.calls == [
         ("CreateStereoPair", "<ChannelMapSet>PL:LF,LF;PR:RF,RF;SUB:SW,SW</ChannelMapSet>")
     ]
+
+
+def test_add_pair_sub_waits_for_the_sub_to_be_free_before_bonding():
+    # Regression: a sub freed from an HT in the same Apply must settle before we claim
+    # it, else CreateStereoPair 800s. The wait targets the sub, not the pair speakers.
+    b = RecordingDP()
+    b.add_pair_sub("ip", "PL", "SUB", "PR")
+    assert b.freed == ["SUB"]
 
 
 def test_add_pair_sub_on_lone_speaker_uses_both_fronts():
