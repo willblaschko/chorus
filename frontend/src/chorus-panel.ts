@@ -285,7 +285,7 @@ export class ChorusPanel extends LitElement {
             d="M12 21s-6.7-4.35-9.33-8.24C1.1 10.36 1.62 7.3 3.9 5.9c1.9-1.17 4.2-.6 5.5 1 .3.37.45.6.6.82.15-.22.3-.45.6-.82 1.3-1.6 3.6-2.17 5.5-1 2.28 1.4 2.8 4.46 1.23 6.86C18.7 16.65 12 21 12 21z"
           />
         </svg>
-        Like Chorus? Support wildlife instead →
+        Love Chorus? Donate to wildlife →
       </a>
     `;
   }
