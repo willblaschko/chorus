@@ -150,6 +150,24 @@ class SonosBackend:
             out.setdefault(m.group(1), m.group(2))
         return out
 
+    def wait_for_ip(self, uid: str, seed_ip: str) -> str | None:
+        """Return `uid`'s IP once it appears in the topology, polling (via the reachable
+        `seed_ip`) until the settle deadline; None if it never shows. A speaker just freed
+        from a bond — e.g. an L/R front swap ending in a rename — briefly drops out of
+        ZoneGroupState before re-registering as its own zone, so a single read finds
+        nothing and the rename fails 'not found' until it comes back."""
+        deadline = time.monotonic() + self.settle_timeout
+        while True:
+            try:
+                ip = self.speaker_ips(seed_ip).get(uid)
+            except Exception:  # noqa: BLE001 - transient read during transition
+                ip = None
+            if ip:
+                return ip
+            if time.monotonic() >= deadline:
+                return None
+            time.sleep(1.0)
+
     def _member(self, state: str, uid: str) -> dict | None:
         match = re.search(
             rf"<(?:ZoneGroupMember|Satellite)([^>]*UUID=\"{re.escape(uid)}\"[^>]*)/?>", state

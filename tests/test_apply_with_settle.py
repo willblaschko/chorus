@@ -103,3 +103,28 @@ def test_set_zone_name_retries_a_codeless_unreachable_then_succeeds():
         b._dp = dp
         assert b.set_zone_name("1.2.3.4", "Media Room 3") == "OK"
         assert calls["n"] == 3
+
+
+def test_wait_for_ip_polls_until_the_speaker_reappears():
+    # A speaker freed in an L/R swap briefly drops out of the topology; wait_for_ip polls
+    # until it re-registers rather than failing 'not found' on a single read.
+    with _NoSleep():
+        b = sonos.SonosBackend()
+        calls = {"n": 0}
+
+        def ips(_seed):
+            calls["n"] += 1
+            return {"RINCON_X": "1.2.3.4"} if calls["n"] >= 3 else {}
+
+        b.speaker_ips = ips
+        assert b.wait_for_ip("RINCON_X", "seed") == "1.2.3.4"
+        assert calls["n"] == 3
+
+
+def test_wait_for_ip_gives_up_past_the_deadline():
+    # Bounded by settle_timeout — it does not poll forever.
+    with _NoSleep():
+        b = sonos.SonosBackend()
+        b.settle_timeout = 0.0
+        b.speaker_ips = lambda _seed: {}
+        assert b.wait_for_ip("RINCON_X", "seed") is None

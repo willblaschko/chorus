@@ -109,6 +109,22 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             return player
         raise HomeAssistantError(f"No Sonos speaker '{ident}' was found")
 
+    async def resolve_settling(ident: str) -> dict:
+        # Resolve to {uid, ip} for a rename/move, WAITING for the speaker to (re)appear in
+        # the topology. A speaker reconfigured earlier in the same Apply — e.g. freed in an
+        # L/R front swap — briefly drops out of ZoneGroupState, so a plain resolve fails
+        # "not found" until it comes back (it does; "works on refresh").
+        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
+        if speaker:
+            return speaker
+        seed = next(iter(coordinator.players.values()), None)
+        if not seed:
+            raise HomeAssistantError("No Sonos speakers available to query")
+        ip = await hass.async_add_executor_job(backend.wait_for_ip, ident, seed["ip"])
+        if not ip:
+            raise HomeAssistantError(f"No Sonos speaker '{ident}' was found")
+        return {"uid": ident, "ip": ip}
+
     async def run(fn, *args):
         try:
             return await hass.async_add_executor_job(fn, *args)
@@ -225,15 +241,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
     async def move(call: ServiceCall) -> None:
         ident = call.data["speaker"]
         name = call.data["name"]
-        # A speaker moved right after being separated from a pair/HT may not be in
-        # soco.discover yet — resolve its IP by UID against a fresh topology.
-        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
-        if not speaker:
-            seed = next(iter(coordinator.players.values()), None)
-            if not seed:
-                raise HomeAssistantError("No Sonos speakers available to query")
-            ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
-            speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
+        # A speaker moved right after being separated from a pair/HT may briefly be missing
+        # from the topology — resolve by UID, waiting for it to (re)appear.
+        speaker = await resolve_settling(ident)
         # World B: `name` is the (room-derived, possibly de-duped "Room 2") zone name;
         # `area` is the HA Area to re-group under. They differ only when the destination
         # room already holds another zone. `area` defaults to `name` for older callers.
@@ -244,17 +254,11 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await coordinator.async_request_refresh()
 
     async def rename(call: ServiceCall) -> None:
-        # Rename the speaker's Sonos zone only — keep its room (no Area change).
-        # Resolve by UID against a fresh topology if discovery is stale (a speaker that
-        # was just re-bonded/moved earlier in the same Apply).
+        # Rename the speaker's Sonos zone only — keep its room (no Area change). A speaker
+        # re-bonded/moved earlier in the same Apply may briefly be missing from the
+        # topology, so resolve by UID and wait for it to (re)appear.
         ident = call.data["speaker"]
-        speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
-        if not speaker:
-            seed = next(iter(coordinator.players.values()), None)
-            if not seed:
-                raise HomeAssistantError("No Sonos speakers available to query")
-            ip_map = await hass.async_add_executor_job(backend.speaker_ips, seed["ip"])
-            speaker = await hass.async_add_executor_job(resolve_sat, ident, ip_map)
+        speaker = await resolve_settling(ident)
         await run(backend.set_zone_name, speaker["ip"], call.data["name"])
         await coordinator.async_request_refresh()
 
