@@ -155,6 +155,7 @@ speakers referenced by Sonos room name or RINCON UID.
 | `chorus.move` | Move a speaker to another room (renames its zone + reassigns the HA Area). |
 | `chorus.rename` | Rename a speaker's Sonos zone in place. |
 | `chorus.identify` | Play a chime on one speaker so you can tell which unit it is. |
+| `chorus.set_volume` | Set a zone's volume (0–100). |
 | `chorus.set_fixed_output` | Toggle fixed line-out volume (Connect / Port / Amp / Five). |
 | `chorus.snapshot` / `chorus.restore` | Save / re-apply a soundbar's home-theater layout. |
 
@@ -172,24 +173,30 @@ speakers referenced by Sonos room name or RINCON UID.
 
 Open **Chorus** in the sidebar and build layouts visually — drag or tap speakers
 onto Front / Rear / Sub positions, pair them, review the staged changes, and
-**Apply**. Everything is also scriptable for automations:
+**Apply**. Everything is also scriptable for automations.
+
+Every speaker is referenced by its **Sonos zone name** (what the speaker is
+called now) **or its RINCON UID** — the integration resolves either. UIDs are more
+robust because they survive renames; names are friendlier. Each standalone speaker
+is its own zone with a unique name, so the values below are just examples — use
+your speakers' actual names (or UIDs).
 
 ```yaml
 # Build a 5.1 home theater around a soundbar
 action: chorus.set_home_theater
 data:
-  soundbar: Living Room
-  lf: Front Left
+  soundbar: Media Room       # your Arc/Beam/Ray's zone name
+  lf: Front Left             # or a RINCON UID, e.g. RINCON_542A1B51BBA401400
   rf: Front Right
   lr: Rear Left
   rr: Rear Right
   sw: Sub
 
-# Pair two speakers (mixed models allowed)
+# Pair two standalone speakers into a stereo pair (mixed models allowed)
 action: chorus.create_stereo_pair
 data:
-  left: Living Room
-  right: Living Room (right)
+  left: Bedroom              # becomes the left/primary
+  right: Bedroom 2           # the other speaker's current zone name
 ```
 
 ---
