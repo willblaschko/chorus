@@ -2,6 +2,10 @@
 
 **Pair. Surround. Bond.** — build the Sonos layouts the app won't, right inside Home Assistant.
 
+[![Validate](https://github.com/willblaschko/chorus/actions/workflows/validate.yml/badge.svg)](https://github.com/willblaschko/chorus/actions/workflows/validate.yml)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+[![License: AGPL v3](https://img.shields.io/github/license/willblaschko/chorus)](LICENSE)
+
 Chorus makes your Sonos a **first-class part of Home Assistant**. Drag speakers around a
 room to build stereo pairs and home theaters — including the dedicated front surrounds and
 mixed-model rigs the Sonos app flatly **refuses** to create — from a native panel in your
