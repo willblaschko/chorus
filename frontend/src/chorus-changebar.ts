@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 export type RowStatus = "pending" | "running" | "done" | "error" | "skipped";
@@ -41,11 +41,19 @@ export class ChorusChangebar extends LitElement {
    *  so it doesn't get missed. Resets on every new edit and while applying. */
   @state() private _nudge = false;
   private _nudgeTimer?: number;
+  private _lastSig = "";
   private static readonly NUDGE_DELAY = 5000;
 
-  protected override updated(changed: PropertyValues): void {
-    // Any new/changed row (or an apply starting/finishing) restarts the idle timer.
-    if (changed.has("rows") || changed.has("busy")) this._resetNudge();
+  protected override updated(): void {
+    // The host passes a FRESH rows array on every render, so compare CONTENT, not
+    // reference — otherwise an unrelated re-render would reset the idle timer forever
+    // and the pulse would never fire. Only a real change (new/changed row, or an apply
+    // starting/finishing) restarts it.
+    const sig = `${this.busy}|${this.rows.map((r) => `${r.summary}${r.status}`).join("")}`;
+    if (sig !== this._lastSig) {
+      this._lastSig = sig;
+      this._resetNudge();
+    }
   }
 
   private _resetNudge(): void {
