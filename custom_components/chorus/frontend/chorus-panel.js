@@ -2322,7 +2322,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
         ${"overview"===this._view?this._overview():this._editor()}
       </div>
       <chorus-help .open=${this._help} @close=${()=>this._help=!1}></chorus-help>
-    `}_header(){const e=this._graph?.units?.length??0;return B`
+    `}_header(){return B`
       <header>
         <img class="mark" src="/chorus_static/chorus-icon.png" alt="" />
         <h1>Chorus</h1>
@@ -2346,7 +2346,6 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
             Overview
           </button>
         </div>
-        ${"overview"===this._view&&e?B`<span class="count">${e} unit${1===e?"":"s"}</span>`:q}
         <button class="refresh" title="Refresh" aria-label="Refresh" @click=${()=>this._load(!0)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -2479,10 +2478,6 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       color: var(--primary-color);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
     }
-    .count {
-      color: var(--secondary-text-color);
-      font-size: 13px;
-    }
     /* Phones: keep the whole header on one row (logo + tabs + buttons). The tagline is
        decorative, so drop it here to reclaim the vertical space. */
     @media (max-width: 520px) {
@@ -2499,9 +2494,6 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       .seg button {
         padding: 4px 11px;
         font-size: 12.5px;
-      }
-      .count {
-        display: none;
       }
     }
     button.refresh {

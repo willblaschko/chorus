@@ -179,7 +179,6 @@ export class ChorusPanel extends LitElement {
   }
 
   private _header(): TemplateResult {
-    const units = this._graph?.units?.length ?? 0;
     return html`
       <header>
         <img class="mark" src="/chorus_static/chorus-icon.png" alt="" />
@@ -204,9 +203,6 @@ export class ChorusPanel extends LitElement {
             Overview
           </button>
         </div>
-        ${this._view === "overview" && units
-          ? html`<span class="count">${units} unit${units === 1 ? "" : "s"}</span>`
-          : nothing}
         <button class="refresh" title="Refresh" aria-label="Refresh" @click=${() => this._load(true)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -496,10 +492,6 @@ export class ChorusPanel extends LitElement {
       color: var(--primary-color);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
     }
-    .count {
-      color: var(--secondary-text-color);
-      font-size: 13px;
-    }
     /* Phones: keep the whole header on one row (logo + tabs + buttons). The tagline is
        decorative, so drop it here to reclaim the vertical space. */
     @media (max-width: 520px) {
@@ -516,9 +508,6 @@ export class ChorusPanel extends LitElement {
       .seg button {
         padding: 4px 11px;
         font-size: 12.5px;
-      }
-      .count {
-        display: none;
       }
     }
     button.refresh {
