@@ -514,8 +514,8 @@ describe("moving + naming never collide", () => {
         tray: [{ uid: "SPK", name: "Office", model: "Sonos One" }],
       },
     ];
-    const mr = moveSpeaker(rooms, "SPK", "Media Room").find((r: any) => r.name === "Media Room");
-    const spk = mr.tray.find((s: any) => s.uid === "SPK");
+    const mr = moveSpeaker(rooms, "SPK", "Media Room").find((r: any) => r.name === "Media Room")!;
+    const spk = mr.tray.find((s: any) => s.uid === "SPK")!;
     expect(spk.name).toBe("Media Room 2"); // not "Media Room" — de-duped against the HT
     const names = [...mr.sets.map((s: any) => s.name), ...mr.tray.map((s: any) => s.name)];
     expect(new Set(names).size).toBe(names.length); // no collision in the room
@@ -538,8 +538,8 @@ describe("moving + naming never collide", () => {
         tray: [{ uid: "B", name: "Office" }],
       },
     ];
-    const mr = moveSpeaker(rooms, "B", "Media Room").find((r: any) => r.name === "Media Room");
-    const b = mr.tray.find((s: any) => s.uid === "B");
+    const mr = moveSpeaker(rooms, "B", "Media Room").find((r: any) => r.name === "Media Room")!;
+    const b = mr.tray.find((s: any) => s.uid === "B")!;
     expect(b.name).toBe("Media Room 3"); // "Media Room" + "Media Room 2" taken -> 3
   });
 });
