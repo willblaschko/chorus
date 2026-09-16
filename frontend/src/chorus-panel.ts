@@ -250,10 +250,13 @@ export class ChorusPanel extends LitElement {
     if (this._error) {
       return html`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;
     }
-    // Same grouping the editor uses: bond graph → rooms by HA Area, minus the
-    // global pool of unbonded subs (a pseudo-room, never a real place).
-    const rooms = buildRooms(this._graph).filter((r) => r.key !== AVAILABLE_SUBS_KEY);
-    if (!rooms.length) {
+    // Same grouping the editor uses: bond graph → rooms by HA Area. The unbonded-subs
+    // pool is a pseudo-room (never a real place) — pull it aside for its own card so a
+    // free-floating sub, which belongs to no room, is still visible on the overview.
+    const allRooms = buildRooms(this._graph);
+    const rooms = allRooms.filter((r) => r.key !== AVAILABLE_SUBS_KEY);
+    const freeSubs = allRooms.find((r) => r.key === AVAILABLE_SUBS_KEY)?.tray ?? [];
+    if (!rooms.length && !freeSubs.length) {
       return html`<div class="msg">No Sonos speakers discovered yet.</div>`;
     }
     // Home theaters first, then rooms with stereo pairs, then the rest; alpha within
@@ -264,8 +267,34 @@ export class ChorusPanel extends LitElement {
         a.name.localeCompare(b.name, undefined, { numeric: true })
     );
     return html`
-      <div class="grid">${sorted.map((r) => this._roomCard(r))}</div>
+      <div class="grid">
+        ${sorted.map((r) => this._roomCard(r))}
+        ${freeSubs.length ? this._freeSubsCard(freeSubs) : nothing}
+      </div>
       ${this._supportNote()}
+    `;
+  }
+
+  // A card for subs bonded to nothing — they have no room, so they'd otherwise be
+  // invisible on the overview. Sits at the end of the grid, tinted with the sub color.
+  private _freeSubsCard(subs: EditorSpeaker[]): TemplateResult {
+    const group: RoomGroup = {
+      label: subs.length === 1 ? "Unbonded sub" : "Unbonded subs",
+      entries: subs.map((sp) => ({ ch: "SW", name: this._spName(sp), model: sp.model })),
+    };
+    return html`
+      <div class="card">
+        <div class="rhead">
+          <span class="ric t-sub" aria-hidden="true">${iconFor(subs[0]?.model ?? "Sonos Sub")}</span>
+          <div class="rmeta">
+            <h2 class="rname">Unbonded subs</h2>
+            <span class="rsum"
+              >${subs.length === 1 ? "1 sub" : `${subs.length} subs`} · not bonded to a set</span
+            >
+          </div>
+        </div>
+        <div class="groups">${this._groupBox(group)}</div>
+      </div>
     `;
   }
 
@@ -627,6 +656,10 @@ export class ChorusPanel extends LitElement {
     .t-neutral {
       background: var(--secondary-background-color);
       color: var(--secondary-text-color);
+    }
+    .t-sub {
+      background: color-mix(in srgb, var(--chorus-sub) 18%, var(--card-background-color));
+      color: var(--chorus-sub);
     }
     .rmeta {
       flex: 1;
