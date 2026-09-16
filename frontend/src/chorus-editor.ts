@@ -676,11 +676,16 @@ export class ChorusEditor extends LitElement {
     this._releasedUids = released;
     this._settleTimedOut = false;
     this._lastFailed = 0;
-    this._settleView = { label: "Applying changes...", ratio: 0.05 };
+    this._settleView = { label: `Applying 0 of ${plan.ops.length}…`, ratio: 0 };
     this._applying = true;
     this._rows = plan.rows;
     await applyPlan(this.hass, plan, (rows) => {
       this._rows = [...rows];
+      // Bar = actions completed. Execution fills the first 85%; the last 15% is the
+      // hardware settle (convergence), so the bar keeps moving instead of parking at 100%.
+      const total = rows.length || 1;
+      const done = rows.filter((r) => r.status !== "pending" && r.status !== "running").length;
+      this._settleView = { label: `Applying ${done} of ${total}…`, ratio: 0.85 * (done / total) };
     });
     const failed = this._rows.filter((r) => r.status === "error").length;
     // If everything applied, wait for the live topology to actually converge to what we
@@ -759,9 +764,11 @@ export class ChorusEditor extends LitElement {
       const freshMap = roomsToLayout(buildRooms(fresh));
       const topo = bondSignature(freshMap);
       // Publish live progress for the banner: which released speakers are back yet.
-      this._settleView = settleView(intendedMap, freshMap, this._releasedUids);
+      // Convergence occupies the last 15% of the bar (execution filled the first 85%).
+      const sv = settleView(intendedMap, freshMap, this._releasedUids);
+      this._settleView = { label: sv.label, ratio: 0.85 + 0.15 * sv.ratio };
       if (settled(intended, topo, fresh, prevFull)) return fresh;
-      if (this._settleView.ratio >= FINISHING_RATIO) {
+      if (sv.ratio >= FINISHING_RATIO) {
         finishingSince ??= Date.now();
         if (Date.now() - finishingSince >= FINISH_GRACE_MS) return fresh; // functionally done
       } else {
