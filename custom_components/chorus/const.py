@@ -47,6 +47,11 @@ _KINDS: list[tuple[re.Pattern, dict]] = [
     (re.compile(r"era|one|five|play:1|play:3|play:5", re.I), {"family": "home", "surround": True, "pair": True}),
     (re.compile(r"symfonisk|bookshelf|lamp|frame|picture", re.I), {"family": "home", "surround": True, "pair": True}),
     (re.compile(r"connect|port|amp", re.I), {"family": "component"}),
+    # Move 2+ can act as home-theater surrounds (Sonos "Portable Surrounds"). This is a
+    # MODEL-level fact (like Era 300 getting `height`), not a feature check — we do NOT
+    # track mics/firmware; if a given bar/portable combo can't bond, AddHTSatellite just
+    # errors and the editor reports it. Move 1 / Roam fall through to the generic rule.
+    (re.compile(r"move\s*[2-9]", re.I), {"family": "portable", "surround": True}),
     (re.compile(r"move|roam", re.I), {"family": "portable"}),
 ]
 _FALLBACK = {"family": "home", "surround": True, "pair": True}
