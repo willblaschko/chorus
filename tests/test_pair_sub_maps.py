@@ -26,15 +26,17 @@ class RecordingDP(sonos.SonosBackend):
         super().__init__()
         self.calls = []  # (action, body)
         self.freed = []  # uids add_pair_sub waited to become free
+        self.timeouts = []  # timeout override passed to _apply_with_settle
 
     def _dp(self, ip, action, body=""):
         self.calls.append((action, body))
         return "OK"
 
-    def _apply_with_settle(self, fn, **_kw):
+    def _apply_with_settle(self, fn, **kw):
+        self.timeouts.append(kw.get("timeout"))
         return fn()  # skip the poll-until-settled loop
 
-    def _wait_free(self, ip, uid):
+    def _wait_free(self, ip, uid, **_kw):
         self.freed.append(uid)  # skip the topology poll; just record the wait
 
 
@@ -52,6 +54,14 @@ def test_add_pair_sub_waits_for_the_sub_to_be_free_before_bonding():
     b = RecordingDP()
     b.add_pair_sub("ip", "PL", "SUB", "PR")
     assert b.freed == ["SUB"]
+
+
+def test_add_pair_sub_uses_the_wide_sub_settle_window():
+    # The sub's 1034 window outlasts the general 25s, so the bond retry gets the wider
+    # sub_settle_timeout to ride it out.
+    b = RecordingDP()
+    b.add_pair_sub("ip", "PL", "SUB", "PR")
+    assert b.timeouts == [b.sub_settle_timeout]
 
 
 def test_add_pair_sub_on_lone_speaker_uses_both_fronts():

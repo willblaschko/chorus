@@ -47,9 +47,19 @@ class SonosSoapError(Exception):
 class SonosBackend:
     """Blocking SOAP client for Sonos DeviceProperties + ZoneGroupTopology."""
 
-    def __init__(self, timeout: float = 10.0, settle_timeout: float = 25.0) -> None:
+    def __init__(
+        self,
+        timeout: float = 10.0,
+        settle_timeout: float = 25.0,
+        sub_settle_timeout: float = 90.0,
+    ) -> None:
         self.timeout = timeout
         self.settle_timeout = settle_timeout
+        # A sub freed from a home theater takes much longer to become bondable than a
+        # normal speaker leaving a pair — the editor measures un-bond settle at ~30-54s,
+        # and CreateStereoPair 1034s the whole time. Give the sub-bond retry a wider
+        # window than the general 25s so it rides the 1034 out instead of giving up.
+        self.sub_settle_timeout = sub_settle_timeout
 
     # -- low level ---------------------------------------------------------
     def _soap(self, ip: str, path: str, ns: str, action: str, body: str) -> str:
@@ -176,15 +186,16 @@ class SonosBackend:
                 pass
             time.sleep(1.0)
 
-    def _apply_with_settle(self, apply_fn, wait_uid=None, wait_ip=None):
+    def _apply_with_settle(self, apply_fn, wait_uid=None, wait_ip=None, timeout=None):
         """Poll-until-standalone (if given) then apply with retry-on-800.
 
         After a Remove/Separate both the satellite AND the soundbar pass through a
         transient "limbo" state; re-bonding too soon returns UPnPError 800. So we
         wait for the target to settle, pause for the primary, then retry the op
-        until it takes or the deadline passes.
+        until it takes or the deadline passes. `timeout` overrides settle_timeout for
+        slow paths (e.g. sub bonding, which rides a 1034 for much longer).
         """
-        deadline = time.monotonic() + self.settle_timeout
+        deadline = time.monotonic() + (self.settle_timeout if timeout is None else timeout)
         if wait_uid and wait_ip:
             while time.monotonic() < deadline:
                 try:
@@ -244,8 +255,12 @@ class SonosBackend:
         # primary's global topology) until the sub is genuinely unbonded.
         self._wait_free(primary_ip, sub_uid)
         body = f"<ChannelMapSet>{self._set_map(primary_uid, sub_uid, right_uid)}</ChannelMapSet>"
-        # Belt-and-suspenders: still retry transient 800s while the sub finishes settling.
-        return self._apply_with_settle(lambda: self._dp(primary_ip, "CreateStereoPair", body))
+        # Ride out the transient 800/1034 while the freed sub finishes becoming bondable —
+        # a wider window than general ops, since this settle runs long (see __init__).
+        return self._apply_with_settle(
+            lambda: self._dp(primary_ip, "CreateStereoPair", body),
+            timeout=self.sub_settle_timeout,
+        )
 
     def remove_pair_sub(
         self, primary_ip: str, primary_uid: str, sub_uid: str, right_uid: str | None = None
@@ -283,7 +298,10 @@ class SonosBackend:
             # Wait on is_free instead (via the reachable soundbar's global topology), then
             # apply with the retry-on-800 backstop. Mirrors add_pair_sub.
             self._wait_free(soundbar_ip, sat_uid)
-            return self._apply_with_settle(lambda: self._dp(soundbar_ip, "AddHTSatellite", body))
+            return self._apply_with_settle(
+                lambda: self._dp(soundbar_ip, "AddHTSatellite", body),
+                timeout=self.sub_settle_timeout,
+            )
         return self._apply_with_settle(
             lambda: self._dp(soundbar_ip, "AddHTSatellite", body),
             wait_uid=sat_uid,
