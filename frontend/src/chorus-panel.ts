@@ -11,10 +11,9 @@ import {
   type EditorSpeaker,
 } from "./model.js";
 import { iconFor, shortModel } from "./icons.js";
+import { parseRoute, buildPath, type View } from "./route.js";
 import "./chorus-editor.js";
 import "./chorus-help.js";
-
-type View = "editor" | "overview";
 
 // One "who lives here" row in a room card's contents: a channel label (or null
 // for a lone speaker) plus the speaker to name. Derived from the room's bonded
@@ -116,17 +115,14 @@ export class ChorusPanel extends LitElement {
   }
 
   private _applyPath(path: string): void {
-    const parts = (path || "").split("/").filter(Boolean);
-    this._view = parts[0] === "overview" ? "overview" : "editor";
-    this._editRoom =
-      parts[0] === "editor" && parts[1] ? decodeURIComponent(parts[1]) : undefined;
+    const { view, room } = parseRoute(path);
+    this._view = view;
+    this._editRoom = room;
   }
 
   /** Navigate to a view/room: update the URL (no reload) and the local state. */
   private _go(view: View, room?: string): void {
-    let path = `/${view}`;
-    if (view === "editor" && room) path += `/${encodeURIComponent(room)}`;
-    const url = this._prefix() + path;
+    const url = this._prefix() + buildPath(view, room);
     if (window.location.pathname !== url) {
       history.pushState(null, "", url);
       this.dispatchEvent(new CustomEvent("location-changed", { bubbles: true, composed: true }));

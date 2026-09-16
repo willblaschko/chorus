@@ -240,3 +240,69 @@ describe("buildRooms — unbonded subs go to the global available pool", () => {
     expect(rooms.find((r) => r.name === "Office")!.tray.map((s) => s.uid)).toEqual(["SP"]);
   });
 });
+
+describe("buildRooms — zone volume threads from the unit onto sets and tray speakers", () => {
+  const volGraph: BondGraph = {
+    units: [
+      {
+        primary_uid: "BAR",
+        name: "Media Room",
+        kind: "home_theater",
+        volume: 45,
+        members: [
+          { uid: "BAR", channel: "CC", ip: "10.0.0.1", name: "Media Room", model: "Sonos Arc", area: "Media Room", invisible: false, is_primary: true },
+          { uid: "S_LR", channel: "LR", ip: "10.0.0.2", name: "Media Room", model: "Sonos Era 100", area: "Media Room", invisible: true, is_primary: false },
+        ],
+      },
+      {
+        primary_uid: "PL",
+        name: "Bedroom",
+        kind: "stereo_pair",
+        volume: 22,
+        members: [
+          { uid: "PL", channel: "LF", ip: "10.0.0.4", name: "Bedroom", model: "Sonos One", area: "Bedroom", invisible: false, is_primary: true },
+          { uid: "PR", channel: "RF", ip: "10.0.0.5", name: "Bedroom", model: "Sonos One", area: "Bedroom", invisible: true, is_primary: false },
+        ],
+      },
+      {
+        primary_uid: "SOLO",
+        name: "Kitchen",
+        kind: "standalone",
+        volume: 30,
+        members: [
+          { uid: "SOLO", channel: null, ip: "10.0.0.6", name: "Kitchen", model: "Sonos Era 100", area: "Kitchen", invisible: false, is_primary: true },
+        ],
+      },
+      {
+        primary_uid: "OFF",
+        name: "Office",
+        kind: "standalone",
+        // no volume field -> should surface as null, never undefined
+        members: [
+          { uid: "OFF", channel: null, ip: "10.0.0.7", name: "Office", model: "Sonos Era 100", area: "Office", invisible: false, is_primary: true },
+        ],
+      },
+    ],
+    players: [],
+  };
+
+  const find = (name: string) => buildRooms(volGraph).find((r) => r.name === name)!;
+
+  it("carries the zone volume onto a home-theater set", () => {
+    expect(find("Media Room").sets[0].volume).toBe(45);
+  });
+
+  it("carries the zone volume onto a stereo-pair set", () => {
+    expect(find("Bedroom").sets[0].volume).toBe(22);
+  });
+
+  it("carries the zone volume onto a lone tray speaker", () => {
+    const tray = find("Kitchen").tray;
+    expect(tray).toHaveLength(1);
+    expect(tray[0].volume).toBe(30);
+  });
+
+  it("normalizes a missing volume to null (not undefined)", () => {
+    expect(find("Office").tray[0].volume).toBeNull();
+  });
+});
