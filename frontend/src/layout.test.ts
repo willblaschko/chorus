@@ -12,6 +12,7 @@ import {
   moveSpeaker,
   renameSpeaker,
   setupHT,
+  dedupeRoomNames,
 } from "./layout.js";
 import { computeOps, planLanes } from "./apply.js";
 import { AVAILABLE_SUBS_KEY, setKind, type Room, type EditorSpeaker } from "./model.js";
@@ -450,5 +451,47 @@ describe("available subs — one SW path across HTs and pairs", () => {
     expect(ops[0]).toMatchObject({ type: "remove_pair_sub" });
     expect(ops[0].service.data).toMatchObject({ left: "OFF", sub: "SUB" });
     expect(ops[0].service.data).not.toHaveProperty("right");
+  });
+});
+
+describe("dedupeRoomNames", () => {
+  const mediaRoom = (): any => [
+    {
+      key: "media_room",
+      name: "Media Room",
+      area: "Media Room",
+      sets: [{ id: "BAR", name: "Media Room", primary: { uid: "BAR" }, slots: {} }],
+      tray: [
+        { uid: "A", name: "Media Room 2" },
+        { uid: "B", name: "Media Room 2" }, // collides with A
+      ],
+    },
+  ];
+
+  it("bumps a colliding tray speaker to the next free name, keeping unique ones", () => {
+    const room = dedupeRoomNames(mediaRoom(), "media_room")[0];
+    const names = [...room.sets.map((s: any) => s.name), ...room.tray.map((sp: any) => sp.name)];
+    expect(new Set(names).size).toBe(3); // no more collisions
+    expect(room.sets[0].name).toBe("Media Room"); // the set keeps its name
+    const byUid = Object.fromEntries(room.tray.map((sp: any) => [sp.uid, sp.name]));
+    expect(byUid.A).toBe("Media Room 2"); // first (by uid) keeps it
+    expect(byUid.B).toBe("Media Room 3"); // the duplicate is bumped
+  });
+
+  it("leaves an already-unique room untouched", () => {
+    const rooms: any = [
+      {
+        key: "den",
+        name: "Den",
+        area: "Den",
+        sets: [],
+        tray: [
+          { uid: "A", name: "Den" },
+          { uid: "B", name: "Den 2" },
+        ],
+      },
+    ];
+    const room = dedupeRoomNames(rooms, "den")[0];
+    expect(room.tray.map((sp: any) => sp.name)).toEqual(["Den", "Den 2"]);
   });
 });

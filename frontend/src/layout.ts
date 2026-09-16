@@ -119,6 +119,34 @@ function roomZoneName(room: Room, exceptSetId?: string, exceptUid?: string): str
   }
 }
 
+/** Resolve name collisions in a room: keep every zone's name that's still unique, and
+ * bump each duplicate to the next free "<room> N". Minimal — untouched names stay put, so
+ * the staged plan renames only the colliding zones. Sets are processed before tray
+ * speakers (stable order) so a bonded set keeps the name and a loose speaker moves. */
+export function dedupeRoomNames(rooms: Room[], roomKey: string): Room[] {
+  const next = cloneRooms(rooms);
+  const room = findRoom(next, roomKey);
+  if (!room) return next;
+  const base = room.name;
+  const used = new Set<string>();
+  const pick = (current: string): string => {
+    if (!used.has(current)) return current; // already unique — leave it
+    for (let n = 2; ; n++) {
+      const cand = `${base} ${n}`;
+      if (!used.has(cand)) return cand;
+    }
+  };
+  for (const set of [...room.sets].sort((a, b) => a.id.localeCompare(b.id))) {
+    set.name = pick(set.name);
+    used.add(set.name);
+  }
+  for (const sp of [...room.tray].sort((a, b) => a.uid.localeCompare(b.uid))) {
+    sp.name = pick(sp.name);
+    used.add(sp.name);
+  }
+  return next;
+}
+
 /** A freed satellite: a sub is homeless (global pool); a real speaker returns to the
  * tray and (World B) takes a room-derived name, since it's now its own zone again. */
 function release(rooms: Room[], room: Room, ch: Channel, sp: EditorSpeaker): void {

@@ -125,6 +125,14 @@ export interface Room {
   tray: EditorSpeaker[];
 }
 
+/** True when two zones in the room share a Sonos name (a bonded set OR a tray speaker).
+ * The de-dup convention ("<room> 2/3") normally prevents this, but a rename that didn't
+ * land on the device can leave a collision — this is what surfaces it in the UI. */
+export function roomNameCollision(room: Room): boolean {
+  const names = [...room.sets.map((s) => s.name), ...room.tray.map((s) => s.name)];
+  return new Set(names).size !== names.length;
+}
+
 function speakerOf(m: {
   uid: string;
   name: string | null;

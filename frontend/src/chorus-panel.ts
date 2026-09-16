@@ -4,6 +4,7 @@ import type { BondGraph, HomeAssistant } from "./types.js";
 import {
   buildRooms,
   setKind,
+  roomNameCollision,
   CHANNELS,
   AVAILABLE_SUBS_KEY,
   type Room,
@@ -534,6 +535,11 @@ export class ChorusPanel extends LitElement {
           <div class="rmeta">
             <h2 class="rname">${r.name}</h2>
             <span class="rsum">${this._roomSummary(r)}</span>
+            ${roomNameCollision(r)
+              ? html`<span class="warn-chip" title="Two speakers share a name — open the editor to fix"
+                  >⚠ Name conflict</span
+                >`
+              : nothing}
           </div>
           <button
             class="edit"
@@ -786,6 +792,16 @@ export class ChorusPanel extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .warn-chip {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--warning-color, #b26a00);
+      background: color-mix(in srgb, var(--warning-color, #f0a020) 16%, transparent);
+      border-radius: 8px;
+      padding: 1px 7px;
     }
     .edit {
       flex: none;

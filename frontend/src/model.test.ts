@@ -10,6 +10,7 @@ import {
   buildRooms,
   setKind,
   openSlots,
+  roomNameCollision,
   AVAILABLE_SUBS_KEY,
 } from "./model.js";
 import type { BondGraph } from "./types.js";
@@ -304,5 +305,27 @@ describe("buildRooms — zone volume threads from the unit onto sets and tray sp
 
   it("normalizes a missing volume to null (not undefined)", () => {
     expect(find("Office").tray[0].volume).toBeNull();
+  });
+});
+
+describe("roomNameCollision", () => {
+  const mk = (setNames: string[], trayNames: string[]): any => ({
+    key: "r",
+    name: "Media Room",
+    area: null,
+    sets: setNames.map((n, i) => ({ id: `S${i}`, name: n })),
+    tray: trayNames.map((n, i) => ({ uid: `U${i}`, name: n })),
+  });
+
+  it("flags two tray speakers sharing a name", () => {
+    expect(roomNameCollision(mk([], ["Media Room 2", "Media Room 2"]))).toBe(true);
+  });
+
+  it("passes when every zone name is unique", () => {
+    expect(roomNameCollision(mk(["Media Room"], ["Media Room 2", "Media Room 3"]))).toBe(false);
+  });
+
+  it("catches a set name colliding with a tray speaker", () => {
+    expect(roomNameCollision(mk(["Media Room 2"], ["Media Room 2"]))).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ import {
   canPair,
   isBar,
   setKind,
+  roomNameCollision,
   CHANNELS,
   CHANNEL_NAME,
   AVAILABLE_SUBS_KEY,
@@ -30,6 +31,7 @@ import {
   moveSpeaker,
   renameSpeaker,
   setupHT,
+  dedupeRoomNames,
 } from "./layout.js";
 import { planChanges, applyPlan, isEmpty } from "./staged.js";
 import {
@@ -656,6 +658,14 @@ export class ChorusEditor extends LitElement {
     this._toast("Changes discarded");
   }
 
+  // Resolve a room's duplicate zone names by staging renames (World B de-dup) for the
+  // colliding zones only. Review + Apply like any edit.
+  private _dedupeNames(roomKey: string): void {
+    this._working = dedupeRoomNames(this._rooms, roomKey);
+    this._dirty = true;
+    this._toast("Staged name fixes — review and Apply");
+  }
+
   private async _apply(): Promise<void> {
     const plan = this._plan();
     if (isEmpty(plan) || this._applying) return;
@@ -911,6 +921,16 @@ export class ChorusEditor extends LitElement {
         <span class="grow"></span>
         ${ht ? this._dots(() => this._openRoomMenu(r, ht)) : nothing}
       </div>
+      ${roomNameCollision(r)
+        ? html`<div class="warn" role="status">
+            <span class="warn-txt"
+              >Two speakers here share a name. Sonos can't tell them apart.</span
+            >
+            <button type="button" class="warn-fix" @click=${() => this._dedupeNames(r.key)}>
+              Fix names
+            </button>
+          </div>`
+        : nothing}
       ${this._availableSubsStrip(r)}
       ${ht ? html`<div class="sec">Home theater</div>` : nothing}
       ${ht ? this._htStage(r, ht) : this._setupCta(r)}
@@ -1295,6 +1315,43 @@ export class ChorusEditor extends LitElement {
       align-items: center;
       gap: 10px;
       margin: 0 2px 12px;
+    }
+    /* Name-collision banner: two zones in the room share a Sonos name. */
+    .warn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 2px 14px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--primary-text-color);
+      background: color-mix(in srgb, var(--warning-color, #f0a020) 14%, var(--card-background-color));
+      border: 1px solid color-mix(in srgb, var(--warning-color, #f0a020) 45%, transparent);
+    }
+    .warn-txt {
+      flex: 1;
+      min-width: 0;
+    }
+    .warn-fix {
+      flex: none;
+      font: inherit;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--primary-text-color);
+      background: var(--card-background-color);
+      border: 1px solid var(--divider-color);
+      border-radius: 999px;
+      padding: 4px 12px;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .warn-fix:hover {
+      border-color: var(--warning-color, #f0a020);
+    }
+    .warn-fix:focus-visible {
+      outline: 2px solid var(--warning-color, #f0a020);
+      outline-offset: 1px;
     }
     .head h1 {
       font-size: 24px;
