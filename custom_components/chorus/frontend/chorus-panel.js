@@ -2374,7 +2374,25 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       @room-change=${e=>this._go("editor",e.detail||void 0)}
       @chorus-graph=${e=>{this._graph=e.detail,this._loading=!1}}
       @chorus-refresh=${()=>this._load(!0)}
-    ></chorus-editor>`}_overview(){if(this._loading&&!this._graph)return B`<div class="msg">Reading your speakers…</div>`;if(this._error)return B`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;const e=Pe(this._graph).filter(e=>e.key!==Ee);if(!e.length)return B`<div class="msg">No Sonos speakers discovered yet.</div>`;const t=[...e].sort((e,t)=>this._roomRank(e)-this._roomRank(t)||e.name.localeCompare(t.name,void 0,{numeric:!0}));return B`<div class="grid">${t.map(e=>this._roomCard(e))}</div>`}_htSet(e){return e.sets.find(e=>"home_theater"===Se(e))}_pairSets(e){return e.sets.filter(e=>"stereo_pair"===Se(e))}_roomRank(e){return this._htSet(e)?0:this._pairSets(e).length?1:2}_roomGlyphModel(e){return this._htSet(e)?.primary.model??e.sets[0]?.primary.model??e.tray[0]?.model??""}_roomTint(e){return this._htSet(e)?"t-bar":this._pairSets(e).length?"t-front":"t-neutral"}_roomSummary(e){const t=[],r=this._htSet(e);if(r){const e=be.filter(e=>"SW"!==e&&r.slots[e]).length;t.push(`Home theater · ${e}.${r.slots.SW?"1":"0"}`)}const o=this._pairSets(e).length;o&&t.push(1===o?"Stereo pair":`${o} pairs`);const s=e.tray.length;return s&&!r&&t.push(1===s?"1 speaker":`${s} speakers`),t.join(" · ")||"No speakers"}_spName(e){return e.name&&!/^RINCON_/i.test(e.name)?e.name:Ne(e.model)||"Speaker"}_roomGroups(e){const t=[],r=(e,t)=>({ch:e,name:this._spName(t),model:t.model});for(const o of e.sets){const e=Se(o),s=[];if("home_theater"===e){s.push(r("CC",o.primary));for(const e of be){const t=o.slots[e];t&&s.push(r(e,t))}t.push({label:"Home theater",entries:s})}else"stereo_pair"===e?(s.push(r("LF",o.primary)),o.slots.RF&&s.push(r("RF",o.slots.RF)),o.slots.SW&&s.push(r("SW",o.slots.SW)),t.push({label:"Stereo pair",entries:s})):(s.push(r(null,o.primary)),o.slots.SW&&s.push(r("SW",o.slots.SW)),t.push({label:"Speaker + sub",entries:s}))}return e.tray.length&&t.push({label:e.sets.length?"Other speakers":"Speakers",entries:e.tray.map(e=>r(null,e))}),t}_openInEditor(e){this._go("editor",e.key)}_roomCard(e){const t=this._roomGroups(e);return B`
+    ></chorus-editor>`}_overview(){if(this._loading&&!this._graph)return B`<div class="msg">Reading your speakers…</div>`;if(this._error)return B`<div class="msg err">Couldn't load the speaker graph: ${this._error}</div>`;const e=Pe(this._graph).filter(e=>e.key!==Ee);if(!e.length)return B`<div class="msg">No Sonos speakers discovered yet.</div>`;const t=[...e].sort((e,t)=>this._roomRank(e)-this._roomRank(t)||e.name.localeCompare(t.name,void 0,{numeric:!0}));return B`
+      <div class="grid">${t.map(e=>this._roomCard(e))}</div>
+      ${this._supportNote()}
+    `}_supportNote(){return B`
+      <a
+        class="support"
+        href="https://github.com/willblaschko/chorus#how-to-support"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Chorus is free — if you'd like to give back, support wildlife"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 21s-6.7-4.35-9.33-8.24C1.1 10.36 1.62 7.3 3.9 5.9c1.9-1.17 4.2-.6 5.5 1 .3.37.45.6.6.82.15-.22.3-.45.6-.82 1.3-1.6 3.6-2.17 5.5-1 2.28 1.4 2.8 4.46 1.23 6.86C18.7 16.65 12 21 12 21z"
+          />
+        </svg>
+        Like Chorus? Support wildlife instead →
+      </a>
+    `}_htSet(e){return e.sets.find(e=>"home_theater"===Se(e))}_pairSets(e){return e.sets.filter(e=>"stereo_pair"===Se(e))}_roomRank(e){return this._htSet(e)?0:this._pairSets(e).length?1:2}_roomGlyphModel(e){return this._htSet(e)?.primary.model??e.sets[0]?.primary.model??e.tray[0]?.model??""}_roomTint(e){return this._htSet(e)?"t-bar":this._pairSets(e).length?"t-front":"t-neutral"}_roomSummary(e){const t=[],r=this._htSet(e);if(r){const e=be.filter(e=>"SW"!==e&&r.slots[e]).length;t.push(`Home theater · ${e}.${r.slots.SW?"1":"0"}`)}const o=this._pairSets(e).length;o&&t.push(1===o?"Stereo pair":`${o} pairs`);const s=e.tray.length;return s&&!r&&t.push(1===s?"1 speaker":`${s} speakers`),t.join(" · ")||"No speakers"}_spName(e){return e.name&&!/^RINCON_/i.test(e.name)?e.name:Ne(e.model)||"Speaker"}_roomGroups(e){const t=[],r=(e,t)=>({ch:e,name:this._spName(t),model:t.model});for(const o of e.sets){const e=Se(o),s=[];if("home_theater"===e){s.push(r("CC",o.primary));for(const e of be){const t=o.slots[e];t&&s.push(r(e,t))}t.push({label:"Home theater",entries:s})}else"stereo_pair"===e?(s.push(r("LF",o.primary)),o.slots.RF&&s.push(r("RF",o.slots.RF)),o.slots.SW&&s.push(r("SW",o.slots.SW)),t.push({label:"Stereo pair",entries:s})):(s.push(r(null,o.primary)),o.slots.SW&&s.push(r("SW",o.slots.SW)),t.push({label:"Speaker + sub",entries:s}))}return e.tray.length&&t.push({label:e.sets.length?"Other speakers":"Speakers",entries:e.tray.map(e=>r(null,e))}),t}_openInEditor(e){this._go("editor",e.key)}_roomCard(e){const t=this._roomGroups(e);return B`
       <div class="card">
         <div class="rhead">
           <span class="ric ${this._roomTint(e)}" aria-hidden="true"
@@ -2525,6 +2543,31 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 14px;
+    }
+    /* Unobtrusive footer link under the overview grid: "support wildlife instead". */
+    .support {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 22px auto 4px;
+      width: fit-content;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+      text-decoration: none;
+      border: 1px solid var(--divider-color);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .support:hover {
+      color: var(--chorus-front, var(--primary-color));
+      border-color: color-mix(in srgb, var(--chorus-front, var(--primary-color)) 45%, transparent);
+    }
+    .support svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+      flex: none;
     }
     .card {
       background: var(--card-background-color, var(--ha-card-background));

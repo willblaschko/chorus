@@ -263,7 +263,31 @@ export class ChorusPanel extends LitElement {
         this._roomRank(a) - this._roomRank(b) ||
         a.name.localeCompare(b.name, undefined, { numeric: true })
     );
-    return html`<div class="grid">${sorted.map((r) => this._roomCard(r))}</div>`;
+    return html`
+      <div class="grid">${sorted.map((r) => this._roomCard(r))}</div>
+      ${this._supportNote()}
+    `;
+  }
+
+  // Chorus is free; if it earned its keep, we point goodwill at wildlife instead of
+  // a tip jar. Links to the README's "How to support" section (which has the donate link).
+  private _supportNote(): TemplateResult {
+    return html`
+      <a
+        class="support"
+        href="https://github.com/willblaschko/chorus#how-to-support"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Chorus is free — if you'd like to give back, support wildlife"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 21s-6.7-4.35-9.33-8.24C1.1 10.36 1.62 7.3 3.9 5.9c1.9-1.17 4.2-.6 5.5 1 .3.37.45.6.6.82.15-.22.3-.45.6-.82 1.3-1.6 3.6-2.17 5.5-1 2.28 1.4 2.8 4.46 1.23 6.86C18.7 16.65 12 21 12 21z"
+          />
+        </svg>
+        Like Chorus? Support wildlife instead →
+      </a>
+    `;
   }
 
   // ---- room derivations (mirror chorus-editor's private helpers) -------
@@ -535,6 +559,31 @@ export class ChorusPanel extends LitElement {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 14px;
+    }
+    /* Unobtrusive footer link under the overview grid: "support wildlife instead". */
+    .support {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 22px auto 4px;
+      width: fit-content;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.85em;
+      color: var(--secondary-text-color);
+      text-decoration: none;
+      border: 1px solid var(--divider-color);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .support:hover {
+      color: var(--chorus-front, var(--primary-color));
+      border-color: color-mix(in srgb, var(--chorus-front, var(--primary-color)) 45%, transparent);
+    }
+    .support svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+      flex: none;
     }
     .card {
       background: var(--card-background-color, var(--ha-card-background));

@@ -186,6 +186,19 @@ YAML? Every action is also a service — see
 
 ---
 
+## How to support
+
+Chorus is free, and I'm not looking for donations — I do alright. But if it earned
+its keep in your home and you'd like to give back, please put it toward something
+that needs it more than I do:
+
+**❤ [Donate to the World Wildlife Fund →](https://protect.worldwildlife.org/)**
+
+That's the only "support" ask you'll find here. (Businesses shipping Chorus
+commercially: see the [License](#license) below.)
+
+---
+
 ## License
 
 Chorus is **dual-licensed**:
