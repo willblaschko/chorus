@@ -79,7 +79,9 @@ export class ChorusToast extends LitElement {
       position: fixed;
       /* Centre under the editor content (var set by chorus-editor), not the viewport. */
       left: var(--chorus-bar-left, 50%);
-      bottom: 30px;
+      /* Sits ABOVE the change bar (fixed at bottom:22px, ~54px tall) so an edit's
+         confirmation toast never overlaps the Apply bar it just triggered. */
+      bottom: 88px;
       transform: translateX(-50%);
       z-index: 1000;
       display: flex;

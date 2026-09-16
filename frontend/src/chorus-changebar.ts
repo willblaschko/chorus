@@ -341,26 +341,19 @@ export class ChorusChangebar extends LitElement {
       cursor: default;
       opacity: 0.85;
     }
-    /* Once the bar has sat untouched (see NUDGE_DELAY), a warm "flame" comet chases the
-       border so pending changes don't get missed. A masked conic-gradient keeps it inside
-       the bar's rounded box (which clips overflow). */
-    .bar.nudge::before {
+    /* Once the bar has sat untouched (see NUDGE_DELAY), a soft blue→green border glows
+       around it so a pending Apply doesn't get missed. Two masked layers keep it inside
+       the bar's rounded box: ::before is a constant, understated ring; ::after is a
+       brighter flare that travels around that ring. Colors use the app's own
+       --chorus-front/-rear (they inherit through the shadow boundary; fallbacks keep it
+       working standalone). */
+    .bar.nudge::before,
+    .bar.nudge::after {
       content: "";
       position: absolute;
       inset: 0;
       border-radius: inherit;
-      padding: 3px;
-      /* A blue→green comet in the app's own palette (--chorus-front/-rear inherit
-         through the shadow boundary; fallbacks keep it working standalone). */
-      background: conic-gradient(
-        from var(--chorus-flame, 0deg),
-        transparent 0deg,
-        var(--chorus-rear, #129d9d) 40deg,
-        var(--chorus-front, #2f6fed) 90deg,
-        #7cc5ff 120deg,
-        transparent 175deg,
-        transparent 360deg
-      );
+      padding: 2px;
       -webkit-mask:
         linear-gradient(#000 0 0) content-box,
         linear-gradient(#000 0 0);
@@ -369,8 +362,29 @@ export class ChorusChangebar extends LitElement {
         linear-gradient(#000 0 0) content-box,
         linear-gradient(#000 0 0);
       mask-composite: exclude;
-      animation: chorusFlame 2.4s linear infinite;
       pointer-events: none;
+    }
+    /* The constant ring — quiet enough to live with while changes are pending. */
+    .bar.nudge::before {
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--chorus-front, #2f6fed) 30%, transparent),
+        color-mix(in srgb, var(--chorus-rear, #129d9d) 30%, transparent)
+      );
+    }
+    /* The moving flare — a short bright arc that sweeps around on top of the ring. */
+    .bar.nudge::after {
+      background: conic-gradient(
+        from var(--chorus-flame, 0deg),
+        transparent 0deg,
+        transparent 30deg,
+        color-mix(in srgb, var(--chorus-rear, #129d9d) 70%, transparent) 55deg,
+        #7cc5ff 75deg,
+        color-mix(in srgb, var(--chorus-front, #2f6fed) 70%, transparent) 95deg,
+        transparent 120deg,
+        transparent 360deg
+      );
+      animation: chorusFlame 3s linear infinite;
     }
 
     .apply-spin {
@@ -533,9 +547,9 @@ export class ChorusChangebar extends LitElement {
       .state.running {
         animation: none;
       }
-      /* No motion — the static warm border arc still flags the pending Apply. */
-      .bar.nudge::before {
-        animation: none;
+      /* No motion — keep the constant ring, drop the travelling flare. */
+      .bar.nudge::after {
+        display: none;
       }
       /* No sweep: show a static, subtly-filled bar so the strip still reads
          as "in progress" without motion. */
