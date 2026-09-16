@@ -33,13 +33,17 @@ def _fails_then_ok(code, times):
     return fn
 
 
-def test_rides_out_1034_then_succeeds():
-    # The sub-just-left-a-home-theater case: CreateStereoPair 1034s until the sub is
-    # fully bondable, then takes. Regression for the reported failure.
+def test_1034_is_not_retried():
+    # 1034 = a sub mid-group-transition; retrying thrashes it. It must raise on the first
+    # failure (subs don't use this loop, but lock the code out of the retry set anyway).
     with _NoSleep():
-        fn = _fails_then_ok("1034", 2)
-        assert sonos.SonosBackend()._apply_with_settle(fn) == "OK"
-        assert fn.state["n"] == 3
+        fn = _fails_then_ok("1034", 5)
+        try:
+            sonos.SonosBackend()._apply_with_settle(fn)
+            assert False, "should have raised"
+        except sonos.SonosSoapError as err:
+            assert err.code == "1034"
+        assert fn.state["n"] == 1
 
 
 def test_rides_out_800_then_succeeds():
@@ -54,19 +58,6 @@ def test_rides_out_a_codeless_reset_then_succeeds():
         fn = _fails_then_ok(None, 1)
         assert sonos.SonosBackend()._apply_with_settle(fn) == "OK"
         assert fn.state["n"] == 2
-
-
-def test_retry_free_waits_for_the_device_to_return_between_attempts():
-    # For a sub, a failed attempt pulls it out and it reverts; retry_free makes the loop
-    # wait for it to come back (via _wait_free) before each retry, not fire on a timer.
-    with _NoSleep():
-        b = sonos.SonosBackend()
-        waited = []
-        b._wait_free = lambda ip, uid: waited.append(uid)  # stub the return-wait
-        fn = _fails_then_ok("1034", 2)
-        assert b._apply_with_settle(fn, retry_free=("ip", "SUB")) == "OK"
-        assert fn.state["n"] == 3
-        assert waited == ["SUB", "SUB"]  # waited for the sub to return before each retry
 
 
 def test_a_hard_code_is_not_retried():
@@ -86,9 +77,9 @@ def test_gives_up_after_the_deadline():
     with _NoSleep():
         b = sonos.SonosBackend()
         b.settle_timeout = 0.0  # deadline is already past on the first failure
-        fn = _fails_then_ok("1034", 999)
+        fn = _fails_then_ok("800", 999)
         try:
             b._apply_with_settle(fn)
             assert False, "should have raised"
         except sonos.SonosSoapError as err:
-            assert err.code == "1034"
+            assert err.code == "800"

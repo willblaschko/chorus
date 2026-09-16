@@ -12,6 +12,9 @@ CHANNEL_CC = "CC"
 # SOAP error codes observed on real hardware (see docs/SPIKE_FINDINGS.md).
 ERR_PRIMARY_NOT_SOUNDBAR = "401"
 ERR_NOT_SETTLED_OR_BAD = "800"
+# A sub still in a group/coordinator transition — it just left another bond and can't
+# hop straight into a new set. Retrying only thrashes it; the two-step path is reliable.
+ERR_SUB_NOT_SETTLED = "1034"
 
 # Service names.
 SERVICE_CREATE_STEREO_PAIR = "create_stereo_pair"

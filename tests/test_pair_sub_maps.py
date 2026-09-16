@@ -23,20 +23,16 @@ def test_sub_on_a_lone_speaker_gives_it_both_channels():
 # --- the add/remove orchestration (SOAP body + action) ---------------------
 class RecordingDP(sonos.SonosBackend):
     def __init__(self):
-        super().__init__()
+        super().__init__(sub_settle_pause=0)  # don't actually sleep in tests
         self.calls = []  # (action, body)
         self.freed = []  # uids add_pair_sub waited to become free
-        self.timeouts = []  # timeout override passed to _apply_with_settle
-        self.retry_frees = []  # retry_free tuple passed to _apply_with_settle
 
     def _dp(self, ip, action, body=""):
         self.calls.append((action, body))
         return "OK"
 
-    def _apply_with_settle(self, fn, **kw):
-        self.timeouts.append(kw.get("timeout"))
-        self.retry_frees.append(kw.get("retry_free"))
-        return fn()  # skip the poll-until-settled loop
+    def _apply_with_settle(self, fn, **_kw):
+        return fn()  # skip the poll-until-settled loop (used by remove_pair_sub's re-pair)
 
     def _wait_free(self, ip, uid, **_kw):
         self.freed.append(uid)  # skip the topology poll; just record the wait
@@ -50,28 +46,14 @@ def test_add_pair_sub_creates_stereo_pair_with_the_sub_map():
     ]
 
 
-def test_add_pair_sub_waits_for_the_sub_to_be_free_before_bonding():
-    # Regression: a sub freed from an HT in the same Apply must settle before we claim
-    # it, else CreateStereoPair 800s. The wait targets the sub, not the pair speakers.
+def test_add_pair_sub_waits_for_the_sub_to_be_free_then_fires_once():
+    # A sub freed from an HT must settle before we claim it. add_pair_sub waits on is_free
+    # (the sub, not the pair speakers) and then issues a SINGLE CreateStereoPair — no retry
+    # loop, because retrying thrashes the sub.
     b = RecordingDP()
     b.add_pair_sub("ip", "PL", "SUB", "PR")
     assert b.freed == ["SUB"]
-
-
-def test_add_pair_sub_uses_the_wide_sub_settle_window():
-    # The sub's 1034 window outlasts the general 25s, so the bond retry gets the wider
-    # sub_settle_timeout to ride it out.
-    b = RecordingDP()
-    b.add_pair_sub("ip", "PL", "SUB", "PR")
-    assert b.timeouts == [b.sub_settle_timeout]
-
-
-def test_add_pair_sub_retries_only_once_the_sub_returns_to_free():
-    # Each failed CreateStereoPair pulls the sub out and it reverts; the retry must wait
-    # for it to come back (retry_free = the sub) rather than re-fire mid-transition.
-    b = RecordingDP()
-    b.add_pair_sub("ip", "PL", "SUB", "PR")
-    assert b.retry_frees == [("ip", "SUB")]
+    assert len(b.calls) == 1  # exactly one attempt
 
 
 def test_add_pair_sub_on_lone_speaker_uses_both_fronts():
