@@ -36,7 +36,7 @@ class RecordingBackend(SonosBackend):
         self.adds.append((sat_uid, channel))
         return "ok"
 
-    def remove_ht_satellite(self, soundbar_ip, sat_uid):
+    def remove_ht_satellite(self, soundbar_ip, sat_uid, soundbar_uid=None):
         self.removes.append(sat_uid)
         return "ok"
 

@@ -71,6 +71,26 @@ def test_era_300_full_capability_dict():
     }
 
 
+# --- portables: Move 2+ can surround (Sonos "Portable Surrounds") ----------
+def test_move_2_can_surround_but_move_1_and_roam_cannot():
+    # Move 2+ became home-theater-surround-capable; older portables did not.
+    assert const.can_surround("Sonos Move 2") is True
+    assert const.can_surround("Sonos Move 3") is True  # future Move N inherits it
+    assert const.capabilities("Sonos Move 2")["family"] == "portable"
+    for model in ("Sonos Move", "Sonos Roam", "Sonos Roam 2"):
+        assert const.can_surround(model) is False, model
+        assert const.capabilities(model) == {"family": "portable"}, model
+
+
+def test_move_2_is_surround_only_not_pair_bar_or_sub():
+    # Tagged `surround` only — not a standalone stereo pair, a soundbar, a sub, or height.
+    assert const.capabilities("Sonos Move 2") == {"family": "portable", "surround": True}
+    assert const.can_pair("Sonos Move 2") is False
+    assert const.is_soundbar("Sonos Move 2") is False
+    assert const.is_sub("Sonos Move 2") is False
+    assert const.has_height("Sonos Move 2") is False
+
+
 # --- unknown / future models degrade gracefully to the fallback -----------
 def test_unknown_model_degrades_to_generic_home_speaker():
     caps = const.capabilities("Sonos Quantum 9000")  # does not exist
