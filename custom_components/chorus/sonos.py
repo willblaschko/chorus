@@ -52,6 +52,7 @@ class SonosBackend:
         timeout: float = 10.0,
         settle_timeout: float = 25.0,
         sub_settle_timeout: float = 90.0,
+        retry_settle_pause: float = 5.0,
     ) -> None:
         self.timeout = timeout
         self.settle_timeout = settle_timeout
@@ -60,6 +61,11 @@ class SonosBackend:
         # and CreateStereoPair 1034s the whole time. Give the sub-bond retry a wider
         # window than the general 25s so it rides the 1034 out instead of giving up.
         self.sub_settle_timeout = sub_settle_timeout
+        # Each failed CreateStereoPair briefly pulls the sub out and it reverts back; a
+        # blind 2s retry fires mid-transition and just thrashes it. For a sub we instead
+        # wait for it to return to free, then pause this long to let it fully stabilize
+        # before the next attempt.
+        self.retry_settle_pause = retry_settle_pause
 
     # -- low level ---------------------------------------------------------
     def _soap(self, ip: str, path: str, ns: str, action: str, body: str) -> str:
@@ -186,14 +192,19 @@ class SonosBackend:
                 pass
             time.sleep(1.0)
 
-    def _apply_with_settle(self, apply_fn, wait_uid=None, wait_ip=None, timeout=None):
-        """Poll-until-standalone (if given) then apply with retry-on-800.
+    def _apply_with_settle(self, apply_fn, wait_uid=None, wait_ip=None, timeout=None, retry_free=None):
+        """Poll-until-standalone (if given) then apply with retry-on-transient.
 
         After a Remove/Separate both the satellite AND the soundbar pass through a
-        transient "limbo" state; re-bonding too soon returns UPnPError 800. So we
+        transient "limbo" state; re-bonding too soon returns UPnPError 800/1034. So we
         wait for the target to settle, pause for the primary, then retry the op
         until it takes or the deadline passes. `timeout` overrides settle_timeout for
         slow paths (e.g. sub bonding, which rides a 1034 for much longer).
+
+        `retry_free=(ip, uid)`: between failed attempts, wait for that device to return
+        to a FREE state before retrying instead of a blind sleep. Each failed sub bond
+        briefly pulls the sub out and it reverts back; retrying on a 2s timer fires
+        mid-revert and thrashes it — so we retry only once it has actually come back.
         """
         deadline = time.monotonic() + (self.settle_timeout if timeout is None else timeout)
         if wait_uid and wait_ip:
@@ -211,10 +222,16 @@ class SonosBackend:
             except SonosSoapError as err:
                 # Retry the transient states while there's still time (see
                 # _RETRYABLE_CODES). Past the deadline it raises -> a clean 400.
-                if err.code in _RETRYABLE_CODES and time.monotonic() < deadline:
+                if err.code not in _RETRYABLE_CODES or time.monotonic() >= deadline:
+                    raise
+                if retry_free:
+                    # Let the failed attempt's revert begin, wait for the device to come
+                    # back to free, then pause to stabilize — never re-fire mid-transition.
                     time.sleep(2.0)
-                    continue
-                raise
+                    self._wait_free(*retry_free)
+                    time.sleep(self.retry_settle_pause)
+                else:
+                    time.sleep(2.0)
 
     # -- stereo pair -------------------------------------------------------
     def create_stereo_pair(self, left_ip: str, left_uid: str, right_uid: str) -> str:
@@ -256,10 +273,12 @@ class SonosBackend:
         self._wait_free(primary_ip, sub_uid)
         body = f"<ChannelMapSet>{self._set_map(primary_uid, sub_uid, right_uid)}</ChannelMapSet>"
         # Ride out the transient 800/1034 while the freed sub finishes becoming bondable —
-        # a wider window than general ops, since this settle runs long (see __init__).
+        # a wider window than general ops, since this settle runs long (see __init__). Each
+        # failed try briefly pulls the sub out and it reverts, so retry only once it's back.
         return self._apply_with_settle(
             lambda: self._dp(primary_ip, "CreateStereoPair", body),
             timeout=self.sub_settle_timeout,
+            retry_free=(primary_ip, sub_uid),
         )
 
     def remove_pair_sub(
@@ -301,6 +320,7 @@ class SonosBackend:
             return self._apply_with_settle(
                 lambda: self._dp(soundbar_ip, "AddHTSatellite", body),
                 timeout=self.sub_settle_timeout,
+                retry_free=(soundbar_ip, sat_uid),
             )
         return self._apply_with_settle(
             lambda: self._dp(soundbar_ip, "AddHTSatellite", body),

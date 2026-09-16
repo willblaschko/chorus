@@ -14,6 +14,7 @@ class HTRecorder(sonos.SonosBackend):
         self.freed = []          # uids waited via is_free
         self.settle_waits = []   # (wait_uid, wait_ip) passed to _apply_with_settle
         self.timeouts = []       # timeout override passed to _apply_with_settle
+        self.retry_frees = []    # retry_free tuple passed to _apply_with_settle
 
     def _dp(self, ip, action, body=""):
         self.calls.append((action, body))
@@ -22,9 +23,10 @@ class HTRecorder(sonos.SonosBackend):
     def _wait_free(self, ip, uid, **_kw):
         self.freed.append(uid)
 
-    def _apply_with_settle(self, fn, wait_uid=None, wait_ip=None, timeout=None):
+    def _apply_with_settle(self, fn, wait_uid=None, wait_ip=None, timeout=None, retry_free=None):
         self.settle_waits.append((wait_uid, wait_ip))
         self.timeouts.append(timeout)
+        self.retry_frees.append(retry_free)
         return fn()
 
 
@@ -34,6 +36,7 @@ def test_sub_on_sw_waits_on_is_free_and_skips_the_standalone_poll():
     assert b.freed == ["SUB"]                # waited on is_free
     assert b.settle_waits == [(None, None)]  # no is_standalone poll (would never settle)
     assert b.timeouts == [b.sub_settle_timeout]  # wider window for the slow sub settle
+    assert b.retry_frees == [("bar_ip", "SUB")]  # retry only once the sub returns to free
     assert b.calls == [("AddHTSatellite", "<HTSatChanMapSet>BAR:CC;SUB:SW</HTSatChanMapSet>")]
 
 
@@ -49,6 +52,7 @@ def test_a_surround_still_polls_the_satellite_to_standalone():
     assert b.freed == []                       # not a sub — no is_free wait
     assert b.settle_waits == [("SAT", "sat_ip")]
     assert b.timeouts == [None]                 # general path keeps the default window
+    assert b.retry_frees == [None]              # a normal satellite isn't retry-gated on free
     assert b.calls == [("AddHTSatellite", "<HTSatChanMapSet>BAR:CC;SAT:LR</HTSatChanMapSet>")]
 
 

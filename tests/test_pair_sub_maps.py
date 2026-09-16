@@ -27,6 +27,7 @@ class RecordingDP(sonos.SonosBackend):
         self.calls = []  # (action, body)
         self.freed = []  # uids add_pair_sub waited to become free
         self.timeouts = []  # timeout override passed to _apply_with_settle
+        self.retry_frees = []  # retry_free tuple passed to _apply_with_settle
 
     def _dp(self, ip, action, body=""):
         self.calls.append((action, body))
@@ -34,6 +35,7 @@ class RecordingDP(sonos.SonosBackend):
 
     def _apply_with_settle(self, fn, **kw):
         self.timeouts.append(kw.get("timeout"))
+        self.retry_frees.append(kw.get("retry_free"))
         return fn()  # skip the poll-until-settled loop
 
     def _wait_free(self, ip, uid, **_kw):
@@ -62,6 +64,14 @@ def test_add_pair_sub_uses_the_wide_sub_settle_window():
     b = RecordingDP()
     b.add_pair_sub("ip", "PL", "SUB", "PR")
     assert b.timeouts == [b.sub_settle_timeout]
+
+
+def test_add_pair_sub_retries_only_once_the_sub_returns_to_free():
+    # Each failed CreateStereoPair pulls the sub out and it reverts; the retry must wait
+    # for it to come back (retry_free = the sub) rather than re-fire mid-transition.
+    b = RecordingDP()
+    b.add_pair_sub("ip", "PL", "SUB", "PR")
+    assert b.retry_frees == [("ip", "SUB")]
 
 
 def test_add_pair_sub_on_lone_speaker_uses_both_fronts():

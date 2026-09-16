@@ -56,6 +56,19 @@ def test_rides_out_a_codeless_reset_then_succeeds():
         assert fn.state["n"] == 2
 
 
+def test_retry_free_waits_for_the_device_to_return_between_attempts():
+    # For a sub, a failed attempt pulls it out and it reverts; retry_free makes the loop
+    # wait for it to come back (via _wait_free) before each retry, not fire on a timer.
+    with _NoSleep():
+        b = sonos.SonosBackend()
+        waited = []
+        b._wait_free = lambda ip, uid: waited.append(uid)  # stub the return-wait
+        fn = _fails_then_ok("1034", 2)
+        assert b._apply_with_settle(fn, retry_free=("ip", "SUB")) == "OK"
+        assert fn.state["n"] == 3
+        assert waited == ["SUB", "SUB"]  # waited for the sub to return before each retry
+
+
 def test_a_hard_code_is_not_retried():
     # 402 (bad args) is a real rejection — raise immediately, don't waste the window.
     with _NoSleep():
