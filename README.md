@@ -57,9 +57,9 @@ flowchart TD
 **Working and installed on real Home Assistant.**
 
 - ✅ **Bonding on hardware** — create/dissolve stereo pairs, add/remove
-  home-theater satellites (rears *and* front surrounds), bond a sub to a pair or
-  a lone speaker, snapshot & restore. Topology parsed live from `ZoneGroupState`,
-  including bonded/invisible members, so everything resolves by name or UID.
+  home-theater satellites (rears *and* front surrounds), and bond a sub to a pair
+  or a lone speaker. Topology parsed live from `ZoneGroupState`, including
+  bonded/invisible members, so everything resolves by name or UID.
 - ✅ **Native editor panel** — drag-and-drop (desktop) / tap-to-assign (mobile)
   for building layouts, a live **Overview**, and a settle-progress bar that names
   each speaker as it reconnects.
@@ -131,9 +131,6 @@ exposed it. Chorus does, entirely on your LAN:
 - **Audio settings, surfaced not reinvented** — EQ (bass/treble/loudness), sub /
   surround levels, night sound, speech enhancement already exist as HA entities;
   Chorus shows them in the room view. It owns the one thing HA can't: **bonding**.
-- **Home-theater snapshot & restore** — building a home theater snapshots the
-  soundbar's layout first (a mid-sequence failure is recoverable), and
-  `chorus.snapshot` / `chorus.restore` save and re-apply an HT layout on demand.
 
 ### Safety
 
