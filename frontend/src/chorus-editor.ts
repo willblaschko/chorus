@@ -912,6 +912,10 @@ export class ChorusEditor extends LitElement {
     }
     const pairs = this._pairSets(r).length;
     if (pairs) parts.push(pairs === 1 ? "Stereo pair" : `${pairs} pairs`);
+    // A speaker+sub (1.1) is a SET, not a tray speaker — count it, or the room reads
+    // "No speakers" despite having a speaker and a sub.
+    const spkSubs = this._speakerSets(r).length;
+    if (spkSubs) parts.push(spkSubs === 1 ? "Speaker + sub" : `${spkSubs} speakers + sub`);
     const solo = r.tray.length;
     if (solo && !ht) parts.push(solo === 1 ? "1 speaker" : `${solo} speakers`);
     return parts.join(" · ") || "No speakers";

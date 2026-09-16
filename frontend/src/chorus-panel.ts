@@ -465,6 +465,10 @@ export class ChorusPanel extends LitElement {
     }
     const pairs = this._pairSets(r).length;
     if (pairs) parts.push(pairs === 1 ? "Stereo pair" : `${pairs} pairs`);
+    // A "speaker" set is a lone speaker bonded to a sub (a 1.1) — it lives in r.sets, not
+    // the tray, so it was being missed and the room read "No speakers".
+    const spkSubs = r.sets.filter((s) => setKind(s) === "speaker").length;
+    if (spkSubs) parts.push(spkSubs === 1 ? "Speaker + sub" : `${spkSubs} speakers + sub`);
     const solo = r.tray.length;
     if (solo && !ht) parts.push(solo === 1 ? "1 speaker" : `${solo} speakers`);
     return parts.join(" · ") || "No speakers";
