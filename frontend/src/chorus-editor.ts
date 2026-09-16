@@ -718,6 +718,14 @@ export class ChorusEditor extends LitElement {
     let last: BondGraph | undefined;
     let prevFull = " "; // sentinel so the first poll can never count as "stable"
     const start = Date.now();
+    // Once the change is FUNCTIONALLY done (bonds correct + every released speaker back —
+    // settleView reports that as ratio >= FINISHING_RATIO), the risky mid-swap plateau is
+    // over. The strict settled() additionally waits for names to resolve + the graph to be
+    // identical across two polls — cosmetic label sync that can lag ~a minute. Don't hold
+    // the spinner that whole time: give it a short grace, then declare done (not timed out).
+    const FINISHING_RATIO = 0.92;
+    const FINISH_GRACE_MS = 6000;
+    let finishingSince: number | undefined;
     while (Date.now() - start < budgetMs) {
       let fresh: BondGraph;
       try {
@@ -731,6 +739,12 @@ export class ChorusEditor extends LitElement {
       // Publish live progress for the banner: which released speakers are back yet.
       this._settleView = settleView(intendedMap, freshMap, this._releasedUids);
       if (settled(intended, topo, fresh, prevFull)) return fresh;
+      if (this._settleView.ratio >= FINISHING_RATIO) {
+        finishingSince ??= Date.now();
+        if (Date.now() - finishingSince >= FINISH_GRACE_MS) return fresh; // functionally done
+      } else {
+        finishingSince = undefined; // regressed out of the finishing state — reset
+      }
       prevFull = fullSignature(fresh);
       await new Promise((r) => window.setTimeout(r, 1500));
     }
