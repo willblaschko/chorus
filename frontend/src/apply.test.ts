@@ -228,6 +228,62 @@ describe("planLanes", () => {
     expect(sepIdx).toBeLessThan(addIdx);
   });
 
+  it("within a lane, a freed speaker's rename runs BEFORE the re-bonds", () => {
+    // HT rearrange (one lane, shared soundbar): S1 is unbonded (keeps the set's inherited
+    // name) and renamed to its de-duped name; S2 is added. The rename must land right after
+    // the un-bond and BEFORE the re-bond, so S1 doesn't sit as a duplicate "Media Room"
+    // through the whole operation.
+    const BAR = "RINCON_BAR3";
+    const S1 = "RINCON_S1X";
+    const S2 = "RINCON_S2X";
+    const applied: LayoutMap = {
+      [BAR]: { room: "Media Room", role: "CC", anchorUid: BAR, name: "Media Room" },
+      [S1]: { room: "Media Room", role: "LR", anchorUid: BAR, name: "Media Room" },
+    };
+    const working = clone(applied);
+    working[S1] = { room: "Media Room", role: "solo", anchorUid: S1, name: "Media Room 2" };
+    working[S2] = { room: "Media Room", role: "RR", anchorUid: BAR, name: "Media Room" };
+
+    const lane = planLanes(computeOps(applied, working)).find((l) =>
+      l.some((o) => o.type === "rename")
+    ) as Op[];
+    expect(lane).toBeDefined();
+    const idx = (t: string) => lane.findIndex((o) => o.type === t);
+    expect(idx("remove_ht")).toBeLessThan(idx("rename")); // freed first
+    expect(idx("rename")).toBeLessThan(idx("add_ht")); // renamed BEFORE the re-bond
+  });
+
+  it("within a lane, MOVE runs before RENAME, and a moved speaker is never also renamed", () => {
+    // Separate a pair: L moves to another room; R stays put and is renamed in place. The
+    // separate links them into one lane. MOVE (which itself renames the zone) must precede
+    // the in-place RENAME so the two can't race on the room's names.
+    const L = "RINCON_PL";
+    const R = "RINCON_PR";
+    const applied: LayoutMap = {
+      [L]: { room: "Office", role: "pairL", anchorUid: L, name: "Office" },
+      [R]: { room: "Office", role: "pairR", anchorUid: L, name: "Office" },
+    };
+    const working = clone(applied);
+    working[L] = { room: "Media Room", role: "solo", anchorUid: L, name: "Media Room 2" }; // moved
+    working[R] = { room: "Office", role: "solo", anchorUid: R, name: "Office 2" }; // renamed in place
+
+    const ops = computeOps(applied, working);
+    // A moved speaker is NOT also emitted as a rename (mutual exclusion).
+    const renameTargets = ops
+      .filter((o) => o.type === "rename")
+      .map((o) => (o.service.data as { speaker: string }).speaker);
+    expect(renameTargets).toContain(R);
+    expect(renameTargets).not.toContain(L);
+
+    const lane = planLanes(ops).find(
+      (l) => l.some((o) => o.type === "move") && l.some((o) => o.type === "rename")
+    ) as Op[];
+    expect(lane).toBeDefined();
+    const idx = (t: string) => lane.findIndex((o) => o.type === t);
+    expect(idx("separate")).toBeLessThan(idx("move"));
+    expect(idx("move")).toBeLessThan(idx("rename"));
+  });
+
   it("no ops -> no lanes", () => {
     expect(planLanes([])).toEqual([]);
   });

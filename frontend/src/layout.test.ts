@@ -495,3 +495,51 @@ describe("dedupeRoomNames", () => {
     expect(room.tray.map((sp: any) => sp.name)).toEqual(["Den", "Den 2"]);
   });
 });
+
+describe("moving + naming never collide", () => {
+  it("a speaker moved into a room whose name is taken gets a de-duped name", () => {
+    const rooms: any = [
+      {
+        key: "media_room",
+        name: "Media Room",
+        area: "Media Room",
+        sets: [{ id: "BAR", name: "Media Room", primary: { uid: "BAR" }, slots: {} }],
+        tray: [],
+      },
+      {
+        key: "office",
+        name: "Office",
+        area: "Office",
+        sets: [],
+        tray: [{ uid: "SPK", name: "Office", model: "Sonos One" }],
+      },
+    ];
+    const mr = moveSpeaker(rooms, "SPK", "Media Room").find((r: any) => r.name === "Media Room");
+    const spk = mr.tray.find((s: any) => s.uid === "SPK");
+    expect(spk.name).toBe("Media Room 2"); // not "Media Room" — de-duped against the HT
+    const names = [...mr.sets.map((s: any) => s.name), ...mr.tray.map((s: any) => s.name)];
+    expect(new Set(names).size).toBe(names.length); // no collision in the room
+  });
+
+  it("a second speaker moved into the same room takes the next free number", () => {
+    const rooms: any = [
+      {
+        key: "media_room",
+        name: "Media Room",
+        area: "Media Room",
+        sets: [{ id: "BAR", name: "Media Room", primary: { uid: "BAR" }, slots: {} }],
+        tray: [{ uid: "A", name: "Media Room 2" }],
+      },
+      {
+        key: "office",
+        name: "Office",
+        area: "Office",
+        sets: [],
+        tray: [{ uid: "B", name: "Office" }],
+      },
+    ];
+    const mr = moveSpeaker(rooms, "B", "Media Room").find((r: any) => r.name === "Media Room");
+    const b = mr.tray.find((s: any) => s.uid === "B");
+    expect(b.name).toBe("Media Room 3"); // "Media Room" + "Media Room 2" taken -> 3
+  });
+});

@@ -79,18 +79,26 @@ const CHANNEL_FIELD: Record<string, string> = {
   SW: "sw",
 };
 
-// Phase within a lane: separate(0) -> move(1) -> create_pair/add_ht/remove_ht(2).
-// Ordering within a lane: 0 UNBOND (free speakers) -> 1 MOVE (re-home the freed
-// speakers, so a later pair/HT forms in the right room) -> 2 BOND -> 3 RENAME.
+// Ordering within a lane: 0 UNBOND (free speakers) -> 1 MOVE (re-home them) -> 2 RENAME
+// (give them de-duped names) -> 3 BOND (re-bond).
+// - RENAME is NOT last: a speaker unbonded from a set keeps that set's zone name until
+//   renamed, so in a single-lane HT rearrange (every op shares the soundbar) a trailing
+//   rename would leave it colliding with the set for the WHOLE operation. Doing it right
+//   after the un-bond closes that window. The de-duped names are already in the plan, so
+//   this is pure scheduling. (Rename only targets speakers that END standalone/coordinator,
+//   never one about to be bonded away, so it's safe before the re-bonds.)
+// - MOVE strictly precedes RENAME (distinct phases, not just emit order): a move already
+//   renames the zone to its room-derived name, so ordering it first avoids any chance of a
+//   move + an in-place rename racing on the same room's names.
 const PHASE: Record<OpType, number> = {
   separate: 0,
   remove_ht: 0,
   remove_pair_sub: 0,
   move: 1,
-  create_pair: 2,
-  add_ht: 2,
-  add_pair_sub: 2,
-  rename: 3,
+  rename: 2,
+  create_pair: 3,
+  add_ht: 3,
+  add_pair_sub: 3,
 };
 
 function isHTSat(p: Placement | undefined): p is Placement {
