@@ -682,14 +682,24 @@ export class ChorusEditor extends LitElement {
     await applyPlan(this.hass, plan, (rows) => {
       this._rows = [...rows];
     });
-    // The service calls have returned, but Sonos keeps re-syncing for a beat after.
-    // Wait for the live topology to actually converge to what we asked for before
-    // reporting done — mirror what the Sonos app does.
-    const intendedMap = roomsToLayout(this._rooms);
-    const intended = bondSignature(intendedMap);
-    const budgetMs = Math.round(expectedSettleMs(plan.ops.map((o) => o.type)) * 1.5);
-    const fresh = await this._awaitConvergence(intended, intendedMap, budgetMs);
     const failed = this._rows.filter((r) => r.status === "error").length;
+    // If everything applied, wait for the live topology to actually converge to what we
+    // asked for (Sonos keeps re-syncing for a beat). If something FAILED, the intended
+    // state can never be reached — don't spin the whole convergence budget; refresh once
+    // and surface "Retry" right away.
+    let fresh: BondGraph | undefined;
+    if (failed > 0) {
+      try {
+        fresh = await this.hass.connection.sendMessagePromise<BondGraph>({ type: "chorus/refresh" });
+      } catch {
+        fresh = undefined;
+      }
+    } else {
+      const intendedMap = roomsToLayout(this._rooms);
+      const intended = bondSignature(intendedMap);
+      const budgetMs = Math.round(expectedSettleMs(plan.ops.map((o) => o.type)) * 1.5);
+      fresh = await this._awaitConvergence(intended, intendedMap, budgetMs);
+    }
     this._applying = false;
     // Keep the intent staged when anything failed, so the recomputed plan shows just the
     // unfinished steps and the change bar offers "Retry". A clean apply clears it.
