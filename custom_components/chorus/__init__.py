@@ -19,7 +19,6 @@ from .const import (
     CHANNELS,
     DOMAIN,
     ERR_PRIMARY_NOT_SOUNDBAR,
-    ERR_SUB_NOT_SETTLED,
     SERVICE_ADD_PAIR_SUB,
     SERVICE_CREATE_STEREO_PAIR,
     SERVICE_MOVE,
@@ -116,16 +115,12 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         except SonosSoapError as err:
             if err.code == ERR_PRIMARY_NOT_SOUNDBAR:
                 raise HomeAssistantError("Must target a soundbar (Arc, Beam, Ray).") from err
-            # 1034 = the sub is mid-group-transition (it just left another bond). It can't
-            # hop straight into a new set — the two-step path is the reliable one.
-            if err.code == ERR_SUB_NOT_SETTLED:
-                raise HomeAssistantError(
-                    "That sub can't move to a new set in one step. Remove it, then add it "
-                    "from ‘Available subs’ once it appears there."
-                ) from err
             # A code-less error is a timeout / unreachable speaker, not a real rejection.
             if err.code:
-                raise HomeAssistantError(f"Sonos rejected it (code {err.code}).") from err
+                # Surface the device's own errorDescription when present — the code alone
+                # ("1034") is opaque; the description says what the speaker actually rejected.
+                detail = f": {err.description}" if err.description else ""
+                raise HomeAssistantError(f"Sonos rejected it (code {err.code}{detail}).") from err
             raise HomeAssistantError("Couldn't reach the speaker — try again.") from err
 
     # --- stereo pair ------------------------------------------------------

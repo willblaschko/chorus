@@ -35,11 +35,13 @@ _ENVELOPE = (
 
 
 class SonosSoapError(Exception):
-    """A UPnP SOAP fault. `code` is the Sonos errorCode, e.g. '800' or '401'."""
+    """A UPnP SOAP fault. `code` is the Sonos errorCode, e.g. '800' or '401';
+    `description` is the device's errorDescription text when the fault carries one."""
 
-    def __init__(self, code: str | None, message: str) -> None:
+    def __init__(self, code: str | None, message: str, description: str | None = None) -> None:
         super().__init__(message)
         self.code = code
+        self.description = description
 
 
 class SonosBackend:
@@ -75,7 +77,12 @@ class SonosBackend:
         except urllib.error.HTTPError as err:
             text = err.read().decode("utf-8", "replace")
             match = re.search(r"<errorCode>(\d+)</errorCode>", text)
-            raise SonosSoapError(match.group(1) if match else None, text) from err
+            desc = re.search(r"<errorDescription>([^<]*)</errorDescription>", text)
+            raise SonosSoapError(
+                match.group(1) if match else None,
+                text,
+                desc.group(1).strip() if desc else None,
+            ) from err
         except (urllib.error.URLError, TimeoutError, OSError) as err:
             # A connection reset / timeout while the device is mid-reconfigure (the
             # window right after a Separate/Remove). Surface as a code-less SoapError
