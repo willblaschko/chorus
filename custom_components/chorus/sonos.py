@@ -50,10 +50,15 @@ class SonosBackend:
     def __init__(
         self,
         timeout: float = 10.0,
-        settle_timeout: float = 25.0,
+        settle_timeout: float = 40.0,
         sub_settle_pause: float = 4.0,
     ) -> None:
         self.timeout = timeout
+        # How long the retry/poll loops wait for a device to settle after a bond change.
+        # Measured un-bond settle is ~30-54s, and slower speakers (Symfonisk) can exhaust a
+        # tighter window mid-rearrange — so 40s, not 25s, to cut first-try failures. The
+        # cost is that a genuinely failing op takes this long to surface (hard rejections
+        # still fail instantly; only transient 800/reset/reappear waits use the full window).
         self.settle_timeout = settle_timeout
         # Sub bonding takes ONE settled shot (retrying thrashes it), so after the sub is
         # free we pause this long to let it fully stabilize before the single attempt.
