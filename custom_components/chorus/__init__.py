@@ -286,7 +286,8 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             for m in u["members"]:
                 if m["uid"] == speaker["uid"] and (m.get("invisible") or u.get("kind") != "standalone"):
                     raise HomeAssistantError(
-                        "This speaker is still bonded — apply your changes first, then identify it."
+                        "This speaker is grouped with others, so it can't chime on its own. "
+                        "Apply your changes first, then identify each one."
                     )
         try:
             base = get_url(hass, prefer_external=False, allow_internal=True)
