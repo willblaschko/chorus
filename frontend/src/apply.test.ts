@@ -164,6 +164,17 @@ describe("computeOps — moves", () => {
     expect(ops[0].touches).toEqual([uid]);
     expect(ops[0].summary).toBe("Kitchen Speaker — move to Office");
   });
+
+  it("a summary never shows a raw RINCON uid — falls back to the model", () => {
+    const UID = "RINCON_38420B972FDE01400"; // an unresolved (e.g. offline) speaker
+    const applied: LayoutMap = {
+      [UID]: { room: "Guest Bedroom", role: "solo", anchorUid: UID, name: UID, model: "Table lamp" },
+    };
+    const working = clone(applied);
+    working[UID].name = "Guest Bedroom";
+    const op = computeOps(applied, working).find((o) => o.type === "rename")!;
+    expect(op.summary).toBe("Table lamp — rename to Guest Bedroom");
+  });
 });
 
 describe("planLanes", () => {

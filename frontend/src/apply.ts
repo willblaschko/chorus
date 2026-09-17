@@ -106,12 +106,15 @@ function isHTSat(p: Placement | undefined): p is Placement {
 }
 
 // A device label for change-bar summaries: the speaker's name + its (short) model, so a
-// row says WHICH physical unit, not just a room. `model` is already the short form. Avoids
-// redundancy like "Sub Mini (Sub Mini)".
+// row says WHICH physical unit, not just a room. `model` is already the short form. Never
+// surfaces a raw "RINCON_…" uid (an unresolved name) — falls back to the model, then a
+// generic label. Avoids redundancy like "Sub Mini (Sub Mini)".
 function dev(p: { name?: string; model?: string } | undefined): string {
-  const name = p?.name ?? "";
+  const raw = p?.name ?? "";
+  const name = /^RINCON_/i.test(raw) ? "" : raw; // a raw UID is not a usable name
   const model = p?.model ?? "";
-  if (!model || name === model || name.includes(model)) return name || model || "a speaker";
+  if (!name) return model || "a speaker";
+  if (!model || name === model || name.includes(model)) return name;
   return `${name} (${model})`;
 }
 
