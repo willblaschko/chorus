@@ -128,6 +128,9 @@ exposed it. Chorus does, entirely on your LAN:
 
 ### Rooms & naming
 
+Chorus is **opinionated about naming** — it takes a deliberate stance so you don't
+have to manage zone names by hand.
+
 - **Names follow the room** — a bonded set is one zone with one name; swapping
   L/R never renames it, and creating or moving a set adopts the room's name
   (de-duplicated `Room 2` when a room holds more than one zone).
