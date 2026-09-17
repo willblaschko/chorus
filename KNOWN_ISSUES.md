@@ -40,6 +40,25 @@ dependable. Not currently worth more retry heuristics (they backfired).
 
 ---
 
+## 2. A move's rename isn't confirmed before the Apply reports done
+
+**Symptom.** Moving a speaker to another room renames its Sonos zone to follow the new room
+(World B). The move is applied, but Chorus doesn't wait for that rename to be *confirmed* on
+the device the way an in-place rename does, and the change bar folds it into the "move to X"
+row rather than showing the rename as its own step.
+
+**Why.** The `move` service issues the zone rename but returns without the verify-and-retry
+loop that a standalone rename uses, so on a slow speaker the new name can lag briefly after
+the Apply says done.
+
+**Workaround.** None needed — the name does land; it just isn't gated. If it looks stale,
+the panel's normal refresh (~12s) catches up.
+
+**Status.** Low priority. Planned: route the move's rename through the same verify loop and
+surface it as an explicit action.
+
+---
+
 <!-- Template for new entries:
 
 ## N. Short title

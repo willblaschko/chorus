@@ -106,9 +106,14 @@ exposed it. Chorus does, entirely on your LAN:
   positions around your seat; drop a speaker onto a position to bond it.
 - **Live Overview** — an at-a-glance map of every room and its bonded sets.
 - **Staged changes with a plain-language Apply** — arrange freely, see exactly
-  what will change, and commit in one step (independent changes run in parallel,
-  dependent ones serialize), with a **settle-progress bar** that names each
-  speaker as it reconnects.
+  what will change (every row names the *device* and what happens to it), and
+  commit in one step. Independent changes run in parallel, dependent ones
+  serialize, with a progress bar that tracks actions completed then the settle.
+- **Move by dragging** — drop a loose speaker onto another room in the list to
+  move it there (its Sonos zone follows the new room).
+- **Deep links & resume** — every view has its own URL (refresh and the browser
+  Back button just work), and if part of an Apply fails you get a one-click
+  **Retry** for exactly the steps that didn't land.
 
 ### Bonding — the thing Home Assistant can't do
 
@@ -117,6 +122,8 @@ exposed it. Chorus does, entirely on your LAN:
   surrounds**, with mixed-model satellites (Era 300s, Symfonisks) as fronts *or*
   rears.
 - **Subs** — bond a sub to a soundbar, a **stereo pair**, or a **lone speaker**.
+  Free-floating subs show on the Overview under **Available subs** — add one to
+  any set in a click.
 - **Swap L/R, separate, dissolve** — take a layout apart as easily as you built it.
 
 ### Rooms & naming
@@ -126,6 +133,9 @@ exposed it. Chorus does, entirely on your LAN:
   (de-duplicated `Room 2` when a room holds more than one zone).
 - **Move between rooms** — reassigns the Home Assistant Area *and* renames the
   Sonos zone.
+- **Opinionated & self-healing** — if two zones in a room end up sharing a name,
+  Chorus detects it and stages the fix automatically; **offline speakers**
+  (unplugged / powered off) are flagged and never operated on blindly.
 
 ### Extras
 
