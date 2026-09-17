@@ -33,6 +33,7 @@ export interface Placement {
   name: string; // speaker friendly name (for service calls that take names)
   model?: string; // short model label, to disambiguate a device in summaries (a bonded
   // sub's `name` is the inherited room name, so "move to X" alone reads ambiguously)
+  offline?: boolean; // no LAN address — unreachable (unplugged/off); never auto-operate on it
 }
 
 // speakerUid -> placement. One map for the last-applied state, one for the staged/working state.
@@ -330,7 +331,8 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
       a.name !== b.name &&
       a.room === b.room &&
       a.room !== AVAILABLE_SUBS_KEY &&
-      NAME_BEARING.indexOf(b.role) !== -1
+      NAME_BEARING.indexOf(b.role) !== -1 &&
+      !a.offline // never auto-rename an unreachable speaker — it can only fail
     ) {
       ops.push({
         type: "rename",

@@ -9,6 +9,12 @@ export function shortModel(model: string | null | undefined): string {
   return (model || "").replace("Sonos ", "").replace("Symfonisk ", "");
 }
 
+/** A speaker with no LAN address isn't reachable — it's in the topology as a bond record
+ * but powered off / unplugged / off the network. We show it, but never auto-operate on it. */
+export function isOffline(sp: { ip: string | null }): boolean {
+  return sp.ip === null;
+}
+
 export type Channel = "LF" | "RF" | "LR" | "RR" | "SW";
 export const CHANNELS: Channel[] = ["LF", "RF", "LR", "RR", "SW"];
 export const CHANNEL_NAME: Record<Channel, string> = {

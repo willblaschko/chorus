@@ -22,7 +22,7 @@ const spk = (uid: string, name: string, model = "Sonos One"): EditorSpeaker => (
   uid,
   name,
   model,
-  ip: null,
+  ip: "10.0.0.9", // online; use null explicitly in a test to model an offline speaker
 });
 
 // Media Room: an Arc home-theater SET (id "BAR") with only Rear-L bonded, plus two

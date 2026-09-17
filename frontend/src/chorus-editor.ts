@@ -7,6 +7,7 @@ import {
   canPair,
   isBar,
   setKind,
+  isOffline,
   CHANNELS,
   CHANNEL_NAME,
   AVAILABLE_SUBS_KEY,
@@ -1108,12 +1109,13 @@ export class ChorusEditor extends LitElement {
   }
 
   private _pcSlot(side: string, sp: EditorSpeaker | null): TemplateResult {
+    const off = sp ? isOffline(sp) : false;
     return html`
-      <div class="pc-slot ${sp ? "" : "empty"}">
+      <div class="pc-slot ${sp ? "" : "empty"} ${off ? "offline" : ""}">
         ${sp
           ? html`<span class="badge orb t-front">${iconFor(sp.model)}</span>`
           : html`<span class="badge empty-badge">${side}</span>`}
-        <span class="pc-side">${side}</span>
+        <span class="pc-side">${side}${off ? " · Offline" : ""}</span>
       </div>
     `;
   }
@@ -1139,7 +1141,7 @@ export class ChorusEditor extends LitElement {
   private _speakerRow(s: EditorSpeaker, roomKey: string): TemplateResult {
     return html`
       <div
-        class="row drag"
+        class="row drag ${isOffline(s) ? "offline" : ""}"
         draggable="true"
         @dragstart=${(e: DragEvent) => {
           // Don't start a drag from the ••• button (or its menu).
@@ -1157,7 +1159,10 @@ export class ChorusEditor extends LitElement {
         }}
       >
         <span class="rt">${iconFor(s.model)}</span>
-        <span class="rx"><b>${this._name(s)}</b><span>${shortModel(s.model)}</span></span>
+        <span class="rx">
+          <b>${this._name(s)}${isOffline(s) ? html`<span class="offbadge">Offline</span>` : nothing}</b>
+          <span>${shortModel(s.model)}</span>
+        </span>
         <span class="grow"></span>
         ${this._dots(() => this._openSpeakerMenu(s, roomKey))}
       </div>
@@ -1846,6 +1851,24 @@ export class ChorusEditor extends LitElement {
     .rx span {
       font-size: 12px;
       color: var(--secondary-text-color);
+    }
+    /* Offline (unreachable) speaker: dim the row and flag it. */
+    .row.offline,
+    .pc-slot.offline {
+      opacity: 0.6;
+    }
+    .offbadge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: var(--error-color, #d33);
+      background: color-mix(in srgb, var(--error-color, #d33) 15%, transparent);
+      border-radius: 6px;
+      padding: 1px 6px;
+      vertical-align: middle;
     }
     /* The full-width "no speakers" message. Renamed off ".empty" so it can't bleed
        into the empty-channel tiles (which carry a "postile empty" modifier). */

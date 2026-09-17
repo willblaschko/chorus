@@ -165,6 +165,16 @@ describe("computeOps — moves", () => {
     expect(ops[0].summary).toBe("Kitchen Speaker — move to Office");
   });
 
+  it("never auto-renames an offline speaker (it can only fail)", () => {
+    const UID = "RINCON_OFFLINE";
+    const applied: LayoutMap = {
+      [UID]: { room: "Guest Bedroom", role: "solo", anchorUid: UID, name: UID, model: "Table lamp", offline: true },
+    };
+    const working = clone(applied);
+    working[UID].name = "Guest Bedroom"; // World B would rename it — but it's offline
+    expect(computeOps(applied, working).filter((o) => o.type === "rename")).toHaveLength(0);
+  });
+
   it("a summary never shows a raw RINCON uid — falls back to the model", () => {
     const UID = "RINCON_38420B972FDE01400"; // an unresolved (e.g. offline) speaker
     const applied: LayoutMap = {

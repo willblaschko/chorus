@@ -118,6 +118,17 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         speaker = coordinator.players.get(ident) or coordinator.by_name(ident)
         if speaker:
             return speaker
+        # Known-offline (in the bond graph as a member, but no reachable IP) -> fail fast
+        # with a clear reason, rather than burning the whole settle window waiting for a
+        # speaker that's powered off / unplugged. (A UID absent from the graph is a freed
+        # speaker that's mid-reappear — fall through and wait for it.)
+        for unit in coordinator.bond_graph:
+            for m in unit.get("members", []):
+                if m["uid"] == ident and not m.get("ip"):
+                    raise HomeAssistantError(
+                        "This speaker appears to be offline (powered off or unplugged). "
+                        "Reconnect it, then try again."
+                    )
         seed = next(iter(coordinator.players.values()), None)
         if not seed:
             raise HomeAssistantError("No Sonos speakers available to query")
