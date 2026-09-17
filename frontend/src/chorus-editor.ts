@@ -893,7 +893,14 @@ export class ChorusEditor extends LitElement {
   private _roomButton(r: Room, sel?: Room): TemplateResult {
     const on = sel?.key === r.key;
     return html`
-      <button type="button" class="room ${on ? "sel" : ""}" @click=${() => this._pickRoom(r.key)}>
+      <button
+        type="button"
+        class="room ${on ? "sel" : ""}"
+        @click=${() => this._pickRoom(r.key)}
+        @dragover=${(e: DragEvent) => this._onRoomDragOver(e, r)}
+        @dragleave=${(e: DragEvent) => (e.currentTarget as HTMLElement).classList.remove("drop")}
+        @drop=${(e: DragEvent) => this._onRoomDrop(e, r)}
+      >
         <span class="ric ${this._roomTint(r)}">${iconFor(this._roomGlyphModel(r))}</span>
         <span class="rmeta">
           <b>${r.name}</b>
@@ -902,6 +909,47 @@ export class ChorusEditor extends LitElement {
         <span class="chev">›</span>
       </button>
     `;
+  }
+
+  // Drag a loose speaker onto a room in the list to move it there (its zone name follows
+  // the new room — World B — handled by the move op). Only tray speakers move this way; a
+  // free sub (from the Available subs pool) can't just "move to a room", so it's rejected.
+  private _canDropRoom(r: Room): boolean {
+    const d = this._drag;
+    return !!d && d.roomKey !== AVAILABLE_SUBS_KEY && d.roomKey !== r.key;
+  }
+  private _onRoomDragOver(e: DragEvent, r: Room): void {
+    if (!this._canDropRoom(r)) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).classList.add("drop");
+  }
+  private _onRoomDrop(e: DragEvent, r: Room): void {
+    (e.currentTarget as HTMLElement).classList.remove("drop");
+    if (!this._canDropRoom(r)) return;
+    e.preventDefault();
+    const drag = this._drag!;
+    this._drag = undefined;
+    this._working = moveSpeaker(this._rooms, drag.uid, r.name);
+    this._dirty = true;
+    this._toast(`Moving ${shortModel(drag.model) || "speaker"} to ${r.name}`);
+  }
+
+  // A clean drag ghost: a styled clone of the row WITHOUT the ••• menu / chevron, appended
+  // to the shadow root (so component CSS applies), snapshotted by the browser, then removed.
+  private _setDragGhost(e: DragEvent, row: HTMLElement): void {
+    if (!e.dataTransfer) return;
+    const ghost = row.cloneNode(true) as HTMLElement;
+    ghost.querySelectorAll(".dots, .chev").forEach((n) => n.remove());
+    ghost.classList.remove("dragging");
+    ghost.style.position = "fixed";
+    ghost.style.top = "-9999px";
+    ghost.style.left = "0";
+    ghost.style.width = `${row.offsetWidth}px`;
+    ghost.style.opacity = "1";
+    ghost.style.pointerEvents = "none";
+    this.renderRoot.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 24, row.offsetHeight / 2);
+    window.setTimeout(() => ghost.remove(), 0);
   }
 
   private _roomSummary(r: Room): string {
@@ -1151,6 +1199,7 @@ export class ChorusEditor extends LitElement {
           }
           this._drag = { uid: s.uid, roomKey, model: s.model };
           if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+          this._setDragGhost(e, e.currentTarget as HTMLElement);
           (e.currentTarget as HTMLElement).classList.add("dragging");
         }}
         @dragend=${(e: DragEvent) => {
@@ -1212,7 +1261,9 @@ export class ChorusEditor extends LitElement {
       <div class="backdrop" @click=${() => (this._pairPick = undefined)}>
         <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
           <div class="sheet-h">
-            ${first ? "Pick the partner speaker" : "Create stereo pair — pick the first speaker"}
+            ${first
+              ? "Pick the right speaker (Front R)"
+              : "Create stereo pair — pick the left speaker (Front L)"}
           </div>
           ${candidates.length
             ? candidates.map(
@@ -1278,6 +1329,11 @@ export class ChorusEditor extends LitElement {
     }
     .room.sel {
       background: color-mix(in srgb, var(--primary-color) 13%, transparent);
+    }
+    /* Drop target while dragging a speaker onto a room in the list. */
+    .room.drop {
+      background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+      box-shadow: inset 0 0 0 2px var(--primary-color);
     }
     .ric {
       width: 30px;
