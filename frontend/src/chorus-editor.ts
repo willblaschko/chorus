@@ -1261,9 +1261,7 @@ export class ChorusEditor extends LitElement {
       <div class="backdrop" @click=${() => (this._pairPick = undefined)}>
         <div class="sheet" @click=${(e: Event) => e.stopPropagation()}>
           <div class="sheet-h">
-            ${first
-              ? "Pick the right speaker (Front R)"
-              : "Create stereo pair — pick the left speaker (Front L)"}
+            ${first ? "Pick the right speaker" : "Create stereo pair — pick the left speaker"}
           </div>
           ${candidates.length
             ? candidates.map(

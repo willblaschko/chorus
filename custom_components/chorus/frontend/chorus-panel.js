@@ -1246,7 +1246,7 @@ function e(e,t,r,o){var s,i=arguments.length,a=i<3?t:null===o?o=Object.getOwnPro
       <div class="backdrop" @click=${()=>this._pairPick=void 0}>
         <div class="sheet" @click=${e=>e.stopPropagation()}>
           <div class="sheet-h">
-            ${t?"Pick the right speaker (Front R)":"Create stereo pair — pick the left speaker (Front L)"}
+            ${t?"Pick the right speaker":"Create stereo pair — pick the left speaker"}
           </div>
           ${o.length?o.map(e=>B`
                   <button type="button" class="sheet-item" @click=${()=>this._pickPairMember(e)}>
