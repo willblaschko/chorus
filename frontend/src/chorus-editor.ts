@@ -118,6 +118,7 @@ export class ChorusEditor extends LitElement {
   @state() private _dirty = false;
   @state() private _applying = false;
   @state() private _lastFailed = 0; // error rows from the previous apply (drives "Retry")
+  @state() private _keepName = new Set<string>(); // uids the user unchecked (keep current name)
   @state() private _rows: ChangeRow[] = []; // live rows during apply
   @state() private _settleView: SettleView | null = null; // live settle progress
   private _releasedUids: string[] = []; // speakers this apply un-bonds (awaited back)
@@ -165,6 +166,7 @@ export class ChorusEditor extends LitElement {
       // that didn't land shows up as a staged fix (a "Rename to …" in the change bar)
       // instead of a silent duplicate. No banner, no button — Chorus just insists.
       this._working = dedupeAllRooms(buildRooms(this.graph));
+      this._keepName = new Set(); // fresh baseline — drop stale keep choices
     }
     // A fresh graph carries the true volumes — drop optimistic overrides.
     if (changed.has("graph")) this._vol = {};
@@ -207,9 +209,17 @@ export class ChorusEditor extends LitElement {
   }
 
   // ---- staged plan + apply -------------------------------------------
-  private _plan() {
+  // `honorKeeps` (apply only): for uids the user unchecked, restore the current name so no
+  // rename is emitted (and a move carries the kept name). The DISPLAY plan leaves them in
+  // so the checklist can show every rename candidate.
+  private _plan(honorKeeps = false) {
     const base = roomsToLayout(buildRooms(this.graph));
     const working = roomsToLayout(this._rooms);
+    if (honorKeeps) {
+      for (const uid of this._keepName) {
+        if (working[uid] && base[uid]) working[uid] = { ...working[uid], name: base[uid].name };
+      }
+    }
     return planChanges(base, working);
   }
 
@@ -659,12 +669,22 @@ export class ChorusEditor extends LitElement {
     this._working = dedupeAllRooms(buildRooms(this.graph));
     this._dirty = false;
     this._lastFailed = 0;
+    this._keepName = new Set();
     this._picker = undefined;
     this._toast("Changes discarded");
   }
 
+  // Uncheck/re-check a rename in the change bar's checklist (keep the current name vs let
+  // it follow the room). Required renames are disabled in the UI, so this only fires for
+  // optional ones. Reassign the Set so Lit re-renders.
+  private _toggleKeep(uid: string): void {
+    const next = new Set(this._keepName);
+    next.has(uid) ? next.delete(uid) : next.add(uid);
+    this._keepName = next;
+  }
+
   private async _apply(): Promise<void> {
-    const plan = this._plan();
+    const plan = this._plan(true); // honor unchecked renames (keep those names)
     if (isEmpty(plan) || this._applying) return;
     // The speakers this plan un-bonds are the ones we'll wait to see reappear as
     // standalones -- measured to be the slow part of settling (~30-54s). Track them
@@ -833,10 +853,12 @@ export class ChorusEditor extends LitElement {
         .rows=${rows}
         .busy=${this._applying}
         .failed=${this._lastFailed}
+        .kept=${[...this._keepName]}
         .statusLabel=${this._settleView?.label ?? ""}
         .progress=${this._settleView?.ratio ?? -1}
         @apply=${this._apply}
         @discard=${this._discard}
+        @keep-toggle=${(e: Event) => this._toggleKeep((e as CustomEvent).detail as string)}
       ></chorus-changebar>
       <chorus-toast></chorus-toast>
     `;

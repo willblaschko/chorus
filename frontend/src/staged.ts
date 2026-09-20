@@ -25,7 +25,11 @@ export function planChanges(applied: LayoutMap, working: LayoutMap): StagedPlan 
   const lanes = planLanes(computeOps(applied, working));
   // Flatten in lane order to match runApply's flat progress ordering.
   const ops: Op[] = lanes.flat();
-  const rows: ChangeRow[] = ops.map((op) => ({ summary: op.summary, status: "pending" }));
+  const rows: ChangeRow[] = ops.map((op) => ({
+    summary: op.summary,
+    status: "pending",
+    ...(op.keep ? { keep: { uid: op.keep.uid, required: op.keep.required } } : {}),
+  }));
   return { ops, lanes, rows };
 }
 
@@ -44,7 +48,12 @@ export function applyPlan(
   onRows: (rows: ChangeRow[]) => void,
 ): Promise<ChangeRow[]> {
   const toRows = (progress: readonly OpProgress[]): ChangeRow[] =>
-    progress.map((p) => ({ summary: p.op.summary, status: p.status, error: p.error }));
+    progress.map((p) => ({
+      summary: p.op.summary,
+      status: p.status,
+      error: p.error,
+      ...(p.op.keep ? { keep: { uid: p.op.keep.uid, required: p.op.keep.required } } : {}),
+    }));
 
   return runApply(hass, plan.lanes, {
     onUpdate: (progress) => onRows(toRows(progress)),

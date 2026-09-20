@@ -24,6 +24,9 @@ export interface ChangeRow {
   summary: string; // plain-language, e.g. "Media Room — add Rear L"
   status: RowStatus;
   error?: string; // failure detail (e.g. "Sonos rejected it (code 1034).") when status is "error"
+  // A rename-bearing row the user can UNCHECK to keep the current name. `required` locks
+  // the checkbox (unchecking would clash with another zone).
+  keep?: { uid: string; required: boolean };
 }
 
 /**
@@ -55,6 +58,9 @@ export class ChorusChangebar extends LitElement {
   /** error steps from the previous apply; when > 0 the pending rows are the unfinished
    *  ones and the primary action reads "Retry" instead of "Apply". */
   @property({ type: Number }) public failed = 0;
+
+  /** uids of rename-bearing rows the user has UNCHECKED (keep the current name). */
+  @property({ attribute: false }) public kept: string[] = [];
 
   /** whether the details list is expanded (collapsed by default) */
   @state() private open = false;
@@ -195,19 +201,38 @@ export class ChorusChangebar extends LitElement {
         </div>
 
         <div class="list" ?hidden=${!expanded}>
-          ${this.rows.map(
-            (row) => html`
-              <div class="row ${row.status}">
-                ${this.renderStatus(row.status)}
+          ${this.rows.map((row) => {
+            const unchecked = !!row.keep && this.kept.includes(row.keep.uid);
+            return html`
+              <div class="row ${row.status} ${unchecked ? "kept" : ""}">
+                ${!this.busy && row.keep
+                  ? html`<input
+                      type="checkbox"
+                      class="keepbox"
+                      .checked=${!unchecked}
+                      ?disabled=${row.keep.required}
+                      title=${row.keep.required
+                        ? "Required — keeping this name would clash with another zone"
+                        : "Uncheck to keep the current name"}
+                      @change=${() =>
+                        this.dispatchEvent(
+                          new CustomEvent("keep-toggle", {
+                            detail: row.keep!.uid,
+                            bubbles: true,
+                            composed: true,
+                          })
+                        )}
+                    />`
+                  : this.renderStatus(row.status)}
                 <span class="summary">
-                  <span class="summary-text">${row.summary}</span>
+                  <span class="summary-text">${row.summary}${unchecked ? " (keeping name)" : ""}</span>
                   ${row.status === "error" && row.error
                     ? html`<span class="row-err">${row.error}</span>`
                     : nothing}
                 </span>
               </div>
-            `,
-          )}
+            `;
+          })}
         </div>
 
         ${this.busy
@@ -434,6 +459,21 @@ export class ChorusChangebar extends LitElement {
       padding: 9px 2px;
       border-top: 1px solid var(--divider-color);
       font-size: 12.5px;
+    }
+    /* Uncheckable rename row: a checkbox instead of the status dot. */
+    .keepbox {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      accent-color: var(--primary-color);
+      cursor: pointer;
+    }
+    .keepbox:disabled {
+      cursor: default;
+      opacity: 0.5;
+    }
+    .row.kept .summary-text {
+      color: var(--secondary-text-color);
     }
 
     .summary {

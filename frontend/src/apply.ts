@@ -54,6 +54,10 @@ export interface Op {
   touches: string[]; // device UIDs this op reads/writes (for lane planning)
   service: { domain: "chorus"; service: string; data: Record<string, unknown> };
   summary: string; // plain-language, e.g. "Office (Era 300) — add as Rear L in Media Room"
+  // For ops that rename a zone (rename, and the rename half of a move): lets the user
+  // uncheck it to KEEP the current name. `required` means keeping it would clash with
+  // another zone in the room, so it can't be unchecked. `currentName` is what to keep.
+  keep?: { uid: string; required: boolean; currentName: string };
 }
 
 // ── Channel vocabulary ────────────────────────────────────────────────────────
@@ -117,6 +121,15 @@ function dev(p: { name?: string; model?: string } | undefined): string {
   if (!name) return model || "a speaker";
   if (!model || name === model || name.includes(model)) return name;
   return `${name} (${model})`;
+}
+
+// keep-info for a rename-bearing op: can the user uncheck it (keep the current name), or
+// is it REQUIRED because keeping `currentName` would clash with another zone in `room`?
+function keepInfo(uid: string, currentName: string, room: string, working: LayoutMap): Op["keep"] {
+  const clash = Object.keys(working).some(
+    (u) => u !== uid && working[u].room === room && working[u].name === currentName
+  );
+  return { uid, required: clash, currentName };
 }
 
 // Two placements describe the same home-theater satellite bond.
@@ -232,6 +245,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           data: { speaker: uid, name: b.name, area: b.room },
         },
         summary: `${dev(a)} — move to ${b.room}`,
+        keep: keepInfo(uid, a.name, b.room, working),
       });
     }
   }
@@ -339,6 +353,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         touches: [uid],
         service: { domain: "chorus", service: "rename", data: { speaker: uid, name: b.name } },
         summary: `${dev(a)} — rename to ${b.name}`,
+        keep: keepInfo(uid, a.name, b.room, working),
       });
     }
   }

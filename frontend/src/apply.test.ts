@@ -165,6 +165,30 @@ describe("computeOps — moves", () => {
     expect(ops[0].summary).toBe("Kitchen Speaker — move to Office");
   });
 
+  it("a follow-room rename is keepable (not required) and carries the current name", () => {
+    const UID = "RINCON_RN";
+    const applied: LayoutMap = {
+      [UID]: { room: "Office", role: "solo", anchorUid: UID, name: "Reading Nook", model: "One" },
+    };
+    const working = clone(applied);
+    working[UID].name = "Office"; // World B wants it to follow the room
+    const op = computeOps(applied, working).find((o) => o.type === "rename")!;
+    expect(op.keep).toEqual({ uid: UID, required: false, currentName: "Reading Nook" });
+  });
+
+  it("a collision-fix rename is required (can't be unchecked)", () => {
+    const A = "RINCON_A";
+    const B = "RINCON_B";
+    const applied: LayoutMap = {
+      [A]: { room: "Office", role: "solo", anchorUid: A, name: "Office", model: "One" },
+      [B]: { room: "Office", role: "solo", anchorUid: B, name: "Office", model: "One" },
+    };
+    const working = clone(applied);
+    working[B].name = "Office 2"; // de-dup B; keeping "Office" would clash with A
+    const op = computeOps(applied, working).find((o) => o.type === "rename" && o.keep?.uid === B)!;
+    expect(op.keep!.required).toBe(true);
+  });
+
   it("never auto-renames an offline speaker (it can only fail)", () => {
     const UID = "RINCON_OFFLINE";
     const applied: LayoutMap = {
