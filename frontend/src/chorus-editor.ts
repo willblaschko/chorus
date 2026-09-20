@@ -42,6 +42,7 @@ import {
   settleView,
   type SettleView,
 } from "./settle.js";
+import { withKeptNames } from "./apply.js";
 import type { LayoutMap } from "./apply.js";
 import "./chorus-changebar.js";
 import "./chorus-toast.js";
@@ -214,12 +215,9 @@ export class ChorusEditor extends LitElement {
   // so the checklist can show every rename candidate.
   private _plan(honorKeeps = false) {
     const base = roomsToLayout(buildRooms(this.graph));
-    const working = roomsToLayout(this._rooms);
-    if (honorKeeps) {
-      for (const uid of this._keepName) {
-        if (working[uid] && base[uid]) working[uid] = { ...working[uid], name: base[uid].name };
-      }
-    }
+    const working = honorKeeps
+      ? withKeptNames(base, roomsToLayout(this._rooms), this._keepName)
+      : roomsToLayout(this._rooms);
     return planChanges(base, working);
   }
 

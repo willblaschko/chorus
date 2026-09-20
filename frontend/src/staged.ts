@@ -28,7 +28,7 @@ export function planChanges(applied: LayoutMap, working: LayoutMap): StagedPlan 
   const rows: ChangeRow[] = ops.map((op) => ({
     summary: op.summary,
     status: "pending",
-    ...(op.keep ? { keep: { uid: op.keep.uid, required: op.keep.required } } : {}),
+    ...(op.keep ? { keep: { uid: op.keep.uid, required: op.keep.required, move: op.keep.move, targetName: op.keep.targetName } } : {}),
   }));
   return { ops, lanes, rows };
 }
@@ -52,7 +52,7 @@ export function applyPlan(
       summary: p.op.summary,
       status: p.status,
       error: p.error,
-      ...(p.op.keep ? { keep: { uid: p.op.keep.uid, required: p.op.keep.required } } : {}),
+      ...(p.op.keep ? { keep: { uid: p.op.keep.uid, required: p.op.keep.required, move: p.op.keep.move, targetName: p.op.keep.targetName } } : {}),
     }));
 
   return runApply(hass, plan.lanes, {

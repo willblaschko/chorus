@@ -56,8 +56,10 @@ export interface Op {
   summary: string; // plain-language, e.g. "Office (Era 300) — add as Rear L in Media Room"
   // For ops that rename a zone (rename, and the rename half of a move): lets the user
   // uncheck it to KEEP the current name. `required` means keeping it would clash with
-  // another zone in the room, so it can't be unchecked. `currentName` is what to keep.
-  keep?: { uid: string; required: boolean; currentName: string };
+  // another zone in the room, so it can't be unchecked. `currentName` is what to keep,
+  // `targetName` the room-derived name it would get, and `move` is true when the rename is
+  // the sub-part of a MOVE (so the UI shows it as a sub-item, not a checkbox on the row).
+  keep?: { uid: string; required: boolean; currentName: string; targetName: string; move: boolean };
 }
 
 // ── Channel vocabulary ────────────────────────────────────────────────────────
@@ -123,13 +125,35 @@ function dev(p: { name?: string; model?: string } | undefined): string {
   return `${name} (${model})`;
 }
 
+// Honor the checklist's "keep this name" choices: restore each kept uid's CURRENT name into
+// the working map, so the diff emits no in-place rename for it and a move carries the old
+// name. Pure — the editor's apply path runs this before planning.
+export function withKeptNames(
+  base: LayoutMap,
+  working: LayoutMap,
+  kept: Iterable<string>
+): LayoutMap {
+  const out = { ...working };
+  for (const uid of kept) {
+    if (out[uid] && base[uid]) out[uid] = { ...out[uid], name: base[uid].name };
+  }
+  return out;
+}
+
 // keep-info for a rename-bearing op: can the user uncheck it (keep the current name), or
 // is it REQUIRED because keeping `currentName` would clash with another zone in `room`?
-function keepInfo(uid: string, currentName: string, room: string, working: LayoutMap): Op["keep"] {
+function keepInfo(
+  uid: string,
+  currentName: string,
+  targetName: string,
+  room: string,
+  working: LayoutMap,
+  move: boolean
+): NonNullable<Op["keep"]> {
   const clash = Object.keys(working).some(
     (u) => u !== uid && working[u].room === room && working[u].name === currentName
   );
-  return { uid, required: clash, currentName };
+  return { uid, required: clash, currentName, targetName, move };
 }
 
 // Two placements describe the same home-theater satellite bond.
@@ -245,7 +269,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
           data: { speaker: uid, name: b.name, area: b.room },
         },
         summary: `${dev(a)} — move to ${b.room}`,
-        keep: keepInfo(uid, a.name, b.room, working),
+        keep: keepInfo(uid, a.name, b.name, b.room, working, true),
       });
     }
   }
@@ -353,7 +377,7 @@ export function computeOps(applied: LayoutMap, working: LayoutMap): Op[] {
         touches: [uid],
         service: { domain: "chorus", service: "rename", data: { speaker: uid, name: b.name } },
         summary: `${dev(a)} — rename to ${b.name}`,
-        keep: keepInfo(uid, a.name, b.room, working),
+        keep: keepInfo(uid, a.name, b.name, b.room, working, false),
       });
     }
   }

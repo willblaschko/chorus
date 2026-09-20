@@ -24,9 +24,10 @@ export interface ChangeRow {
   summary: string; // plain-language, e.g. "Media Room — add Rear L"
   status: RowStatus;
   error?: string; // failure detail (e.g. "Sonos rejected it (code 1034).") when status is "error"
-  // A rename-bearing row the user can UNCHECK to keep the current name. `required` locks
-  // the checkbox (unchecking would clash with another zone).
-  keep?: { uid: string; required: boolean };
+  // A rename-bearing row the user can UNCHECK to keep the current name. `required` locks it
+  // (unchecking would clash). `move` = the rename is a sub-part of a move (rendered as an
+  // indented sub-item so the move itself clearly still happens); `targetName` is the new name.
+  keep?: { uid: string; required: boolean; move: boolean; targetName: string };
 }
 
 /**
@@ -104,6 +105,23 @@ export class ChorusChangebar extends LitElement {
     // While applying, the list is force-open to show progress; ignore toggles.
     if (this.busy) return;
     this.open = !this.open;
+  }
+
+  // The keep/skip checkbox for a rename (on the row for in-place, in the sub-item for a move).
+  private _keepbox(k: NonNullable<ChangeRow["keep"]>, kept: boolean): TemplateResult {
+    return html`<input
+      type="checkbox"
+      class="keepbox"
+      .checked=${!kept}
+      ?disabled=${k.required}
+      title=${k.required
+        ? "Required — keeping this name would clash with another zone"
+        : "Uncheck to keep the current name"}
+      @change=${() =>
+        this.dispatchEvent(
+          new CustomEvent("keep-toggle", { detail: k.uid, bubbles: true, composed: true })
+        )}
+    />`;
   }
 
   private emit(name: "discard" | "apply"): void {
@@ -202,35 +220,32 @@ export class ChorusChangebar extends LitElement {
 
         <div class="list" ?hidden=${!expanded}>
           ${this.rows.map((row) => {
-            const unchecked = !!row.keep && this.kept.includes(row.keep.uid);
+            const k = row.keep;
+            const kept = !!k && this.kept.includes(k.uid);
+            // A MOVE's rename shows as an indented sub-item, so the move itself clearly
+            // still happens; an in-place rename puts the checkbox on the row.
+            const rowBox = !this.busy && k && !k.move;
+            const subItem = !this.busy && k && k.move;
             return html`
-              <div class="row ${row.status} ${unchecked ? "kept" : ""}">
-                ${!this.busy && row.keep
-                  ? html`<input
-                      type="checkbox"
-                      class="keepbox"
-                      .checked=${!unchecked}
-                      ?disabled=${row.keep.required}
-                      title=${row.keep.required
-                        ? "Required — keeping this name would clash with another zone"
-                        : "Uncheck to keep the current name"}
-                      @change=${() =>
-                        this.dispatchEvent(
-                          new CustomEvent("keep-toggle", {
-                            detail: row.keep!.uid,
-                            bubbles: true,
-                            composed: true,
-                          })
-                        )}
-                    />`
-                  : this.renderStatus(row.status)}
+              <div class="row ${row.status} ${kept && rowBox ? "kept" : ""}">
+                ${rowBox ? this._keepbox(k!, kept) : this.renderStatus(row.status)}
                 <span class="summary">
-                  <span class="summary-text">${row.summary}${unchecked ? " (keeping name)" : ""}</span>
+                  <span class="summary-text"
+                    >${row.summary}${kept && rowBox ? " (keeping name)" : ""}</span
+                  >
                   ${row.status === "error" && row.error
                     ? html`<span class="row-err">${row.error}</span>`
                     : nothing}
                 </span>
               </div>
+              ${subItem
+                ? html`<div class="subrow ${kept ? "kept" : ""}">
+                    ${this._keepbox(k!, kept)}
+                    <span class="subtext"
+                      >${kept ? "Keep its current name" : `Rename to ${k!.targetName}`}</span
+                    >
+                  </div>`
+                : nothing}
             `;
           })}
         </div>
@@ -474,6 +489,18 @@ export class ChorusChangebar extends LitElement {
     }
     .row.kept .summary-text {
       color: var(--secondary-text-color);
+    }
+    /* A move's rename, shown indented under the move so the move itself clearly still happens. */
+    .subrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 2px 6px 30px;
+      font-size: 12px;
+      color: var(--secondary-text-color);
+    }
+    .subrow.kept .subtext {
+      opacity: 0.75;
     }
 
     .summary {

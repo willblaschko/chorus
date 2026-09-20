@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeOps, planLanes } from "./apply.js";
+import { computeOps, planLanes, withKeptNames } from "./apply.js";
 import type { LayoutMap, Op, Placement } from "./apply.js";
 
 // ── Synthetic fixtures ─────────────────────────────────────────────────────────
@@ -173,7 +173,13 @@ describe("computeOps — moves", () => {
     const working = clone(applied);
     working[UID].name = "Office"; // World B wants it to follow the room
     const op = computeOps(applied, working).find((o) => o.type === "rename")!;
-    expect(op.keep).toEqual({ uid: UID, required: false, currentName: "Reading Nook" });
+    expect(op.keep).toEqual({
+      uid: UID,
+      required: false,
+      currentName: "Reading Nook",
+      targetName: "Office",
+      move: false,
+    });
   });
 
   it("a collision-fix rename is required (can't be unchecked)", () => {
@@ -187,6 +193,28 @@ describe("computeOps — moves", () => {
     working[B].name = "Office 2"; // de-dup B; keeping "Office" would clash with A
     const op = computeOps(applied, working).find((o) => o.type === "rename" && o.keep?.uid === B)!;
     expect(op.keep!.required).toBe(true);
+  });
+
+  it("withKeptNames drops the in-place rename for a kept uid", () => {
+    const UID = "RINCON_K1";
+    const base: LayoutMap = {
+      [UID]: { room: "Office", role: "solo", anchorUid: UID, name: "Reading Nook", model: "One" },
+    };
+    const working = clone(base);
+    working[UID].name = "Office"; // would rename
+    const ops = computeOps(base, withKeptNames(base, working, [UID]));
+    expect(ops.filter((o) => o.type === "rename")).toHaveLength(0);
+  });
+
+  it("withKeptNames keeps the name on a move but still moves the area", () => {
+    const UID = "RINCON_K2";
+    const base: LayoutMap = {
+      [UID]: { room: "Office", role: "solo", anchorUid: UID, name: "Reading Nook", model: "One" },
+    };
+    const working = clone(base);
+    working[UID] = { room: "Den", role: "solo", anchorUid: UID, name: "Den", model: "One" }; // moved + renamed
+    const move = computeOps(base, withKeptNames(base, working, [UID])).find((o) => o.type === "move")!;
+    expect(move.service.data).toMatchObject({ speaker: UID, name: "Reading Nook", area: "Den" });
   });
 
   it("never auto-renames an offline speaker (it can only fail)", () => {
