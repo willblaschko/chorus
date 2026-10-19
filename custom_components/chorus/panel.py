@@ -54,18 +54,23 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         websocket_api.async_register_command(hass, ws_output_fixed)
         ui["ws"] = True
 
+    # Reading the ~170 KB bundle is blocking file I/O — keep it off the event loop.
+    version = await hass.async_add_executor_job(_bundle_version)
+
+    # Admin-only: the panel's Apply moves speakers between HA Areas, which edits device
+    # registry entries owned by the core Sonos integration. Apply is the confirmation.
     frontend.async_register_built_in_panel(
         hass,
         component_name="custom",
         sidebar_title="Chorus",
         sidebar_icon="mdi:speaker-multiple",
         frontend_url_path=PANEL_URL_PATH,
-        require_admin=False,
+        require_admin=True,
         update=True,  # overwrite instead of raising if it's already registered
         config={
             "_panel_custom": {
                 "name": PANEL_ELEMENT,
-                "module_url": f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={_bundle_version()}",
+                "module_url": f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={version}",
                 "embed_iframe": False,
                 "trust_external": False,
             }

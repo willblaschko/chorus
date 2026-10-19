@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.network import NoURLAvailableError, get_url
+from homeassistant.helpers.service import async_register_admin_service
 
 from .const import (
     CHANNELS,
@@ -356,8 +357,10 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             vol.Optional("satellite"): name,
         }),
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_MOVE, move,
+    # Admin-only: move reassigns the speaker's HA Area, editing a device registry entry
+    # owned by the core Sonos integration.
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_MOVE, move,
         schema=vol.Schema({
             vol.Required("speaker"): name, vol.Required("name"): name, vol.Optional("area"): name,
         }),
