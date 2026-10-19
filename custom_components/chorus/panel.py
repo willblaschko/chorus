@@ -119,14 +119,16 @@ def ws_bond_graph(hass: HomeAssistant, connection, msg) -> None:
 @websocket_api.websocket_command({"type": "chorus/refresh"})
 @websocket_api.async_response
 async def ws_refresh(hass: HomeAssistant, connection, msg) -> None:
-    """Force a fresh Sonos re-discovery, then return the settled graph.
+    """Re-read the live topology, then return the graph.
 
-    Used after Apply: the plain bond_graph read returns the cached graph, which may
-    still be mid-cycle right after a bonding change — this re-scans first.
+    Drives the open panel's live view and the post-Apply settle loop, which compares
+    consecutive results — so this must be a REAL read, never HA's debounced refresh
+    (that returns cached data for 10s, making "unchanged" look like "settled"). On a
+    failed read the last good graph is returned.
     """
     coordinator = _first_coordinator(hass)
     if coordinator is not None:
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
     connection.send_result(msg["id"], _graph_payload(hass, coordinator))
 
 

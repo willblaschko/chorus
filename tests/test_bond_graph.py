@@ -148,3 +148,17 @@ def test_is_free_true_once_the_sub_is_its_own_invisible_member():
 
 def test_is_free_false_for_a_uid_absent_from_the_topology():
     assert _backend_seeing(ZGS).is_free("x", "RINCON_GHOST0000000000001400") is False
+
+
+def test_players_from_graph_keeps_only_visible_reachable_members():
+    # Mirrors soco.discover(): satellites + the pair's invisible right are excluded.
+    players = SonosBackend.players_from_graph(SonosBackend.parse_bond_graph(ZGS))
+    assert set(players) == {BAR, PL, SOLO}
+    assert players[BAR] == {"uid": BAR, "ip": "10.0.0.1", "name": "Media Room", "model": ""}
+    assert players[SOLO]["name"] == "Kitchen"
+
+
+def test_players_from_graph_skips_offline_member_without_ip():
+    units = SonosBackend.parse_bond_graph(ZGS)
+    _member(_by_name(units, "Kitchen"), SOLO)["ip"] = None  # powered off / unplugged
+    assert SOLO not in SonosBackend.players_from_graph(units)

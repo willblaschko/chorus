@@ -5,6 +5,7 @@ Assistant services. The drag-and-drop panel (v0.2) drives these same services.
 """
 from __future__ import annotations
 
+import functools
 import logging
 
 import voluptuous as vol
@@ -153,7 +154,19 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
                 raise HomeAssistantError(f"Sonos rejected it (code {err.code}{detail}).") from err
             raise HomeAssistantError("Couldn't reach the speaker — try again.") from err
 
+    def fresh(handler):
+        # Re-read the topology first if it's stale: with no background poll, an
+        # automation calling a service while the panel is closed would otherwise act on
+        # IPs/names from the last time anyone looked.
+        @functools.wraps(handler)
+        async def wrapper(call: ServiceCall) -> None:
+            await coordinator.async_ensure_fresh()
+            await handler(call)
+
+        return wrapper
+
     # --- stereo pair ------------------------------------------------------
+    @fresh
     async def create_stereo_pair(call: ServiceCall) -> None:
         left_id, right_id = call.data["left"], call.data["right"]
         # An L/R swap is separate -> re-create reversed: the re-created "left" is a speaker
@@ -165,8 +178,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             if not can_pair(p["model"]):
                 raise HomeAssistantError(f"{p['name']} ({p['model']}) can't be stereo-paired")
         await run(backend.create_stereo_pair, left["ip"], left["uid"], right["uid"])
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def separate(call: ServiceCall) -> None:
         left = resolve(call.data["left"])
         # The right channel is an invisible member (shares the pair's name); take its
@@ -174,8 +188,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         right = call.data["right"]
         right_uid = right if right.startswith("RINCON_") else resolve(right)["uid"]
         await run(backend.separate_stereo_pair, left["ip"], left["uid"], right_uid)
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def add_pair_sub(call: ServiceCall) -> None:
         # `left` is the set's visible primary (a pair-left or a lone speaker); sub is a
         # UID; `right` is the pair's other half (omit it for a lone speaker + sub).
@@ -183,16 +198,18 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await run(
             backend.add_pair_sub, primary["ip"], primary["uid"], call.data["sub"], call.data.get("right")
         )
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def remove_pair_sub(call: ServiceCall) -> None:
         primary = resolve(call.data["left"])
         await run(
             backend.remove_pair_sub, primary["ip"], primary["uid"], call.data["sub"], call.data.get("right")
         )
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
     # --- home theater -----------------------------------------------------
+    @fresh
     async def set_home_theater(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
         if not is_soundbar(bar["model"]):
@@ -217,8 +234,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             await run(
                 backend.add_ht_satellite, bar["ip"], bar["uid"], sat["uid"], channel, sat["ip"]
             )
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def remove_home_theater(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
         channel = (call.data.get("channel") or "").upper()
@@ -238,9 +256,10 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         else:  # dissolve: remove every satellite currently on the bar (by UID)
             for uid in backend.satellites_to_remove(current, bar["uid"]):
                 await run(backend.remove_ht_satellite, bar["ip"], uid, bar["uid"])
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
     # --- move (rename the zone == move to another room) -------------------
+    @fresh
     async def move(call: ServiceCall) -> None:
         ident = call.data["speaker"]
         name = call.data["name"]
@@ -254,8 +273,9 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         await run(backend.set_zone_name, speaker["ip"], name)
         # Move the HA Area too, so it re-groups in Chorus's view (not just Sonos).
         set_speaker_area(hass, speaker["uid"], area)
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def rename(call: ServiceCall) -> None:
         # Rename the speaker's Sonos zone only — keep its room (no Area change). A speaker
         # re-bonded/moved earlier in the same Apply may briefly be missing from the
@@ -263,14 +283,16 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
         ident = call.data["speaker"]
         speaker = await resolve_settling(ident)
         await run(backend.set_zone_name, speaker["ip"], call.data["name"])
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def set_fixed_output(call: ServiceCall) -> None:
         # Toggle a speaker's fixed line-out level (Port/Connect/Amp/Five) via RenderingControl.
         speaker = resolve(call.data["speaker"])
         await run(backend.set_output_fixed, speaker["ip"], bool(call.data["enabled"]))
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
+    @fresh
     async def identify(call: ServiceCall) -> None:
         # Play a chime on ONE speaker so the user can tell which physical unit it is.
         # Fully independent of HA's Sonos integration: resolve the IP from Chorus's own
@@ -302,19 +324,22 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             raise HomeAssistantError("No local Home Assistant URL available for the chime.") from err
         await run(backend.play_chime, speaker["ip"], f"{base}/chorus_static/chime.mp3")
 
+    @fresh
     async def set_volume(call: ServiceCall) -> None:
         # Set a zone's volume (RenderingControl Master channel on its coordinator).
         speaker = resolve(call.data["speaker"])
         await run(backend.set_volume, speaker["ip"], int(call.data["level"]))
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
     # --- snapshot / restore of a soundbar's HT layout ---------------------
+    @fresh
     async def snapshot(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
         ht_map = await hass.async_add_executor_job(backend.snapshot_ht, bar["ip"], bar["uid"])
         coordinator.snapshots[bar["uid"]] = {"map": ht_map}
         _LOGGER.info("Snapshotted %s home theater: %s", bar["name"], ht_map)
 
+    @fresh
     async def restore(call: ServiceCall) -> None:
         bar = resolve(call.data["soundbar"])
         snap = coordinator.snapshots.get(bar["uid"])
@@ -322,7 +347,7 @@ def _register_services(hass: HomeAssistant, coordinator: ChorusCoordinator) -> N
             raise HomeAssistantError(f"No saved layout for {bar['name']}")
         sat_ips = {p["uid"]: p["ip"] for p in coordinator.players.values()}
         await run(backend.restore_ht, bar["ip"], bar["uid"], snap["map"], sat_ips)
-        await coordinator.async_request_refresh()
+        await coordinator.async_ensure_fresh(max_age=0)
 
     name = vol.Schema(cv.string)
     hass.services.async_register(

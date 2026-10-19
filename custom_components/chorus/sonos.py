@@ -659,6 +659,26 @@ class SonosBackend:
                 })
         return units
 
+    @staticmethod
+    def players_from_graph(units: list) -> dict:
+        """{uid: {uid, ip, name, model}} for every VISIBLE, reachable member of a parsed
+        (model-enriched) bond graph.
+
+        Equivalent to what soco.discover() returns — soco reads this same ZoneGroupState
+        and keeps members whose Invisible != "1" — so the coordinator can rebuild its
+        player inventory from one ZGS read instead of a 5s multicast discovery. A member
+        with no IP is offline and is left out, as discovery would.
+        """
+        players: dict[str, dict] = {}
+        for unit in units:
+            for m in unit["members"]:
+                if m.get("invisible") or not m.get("ip"):
+                    continue
+                players[m["uid"]] = {
+                    "uid": m["uid"], "ip": m["ip"], "name": m["name"], "model": m.get("model", ""),
+                }
+        return players
+
     # -- model enrichment (for invisible members soco can't see) ----------
     def device_description(self, ip: str) -> str:
         """Fetch a player's UPnP device-description XML (blocking)."""

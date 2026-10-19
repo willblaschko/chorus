@@ -100,10 +100,12 @@ export class ChorusPanel extends LitElement {
 
   public override connectedCallback(): void {
     super.connectedCallback();
-    // Live updates while the panel is open: force a fresh Sonos re-discovery every
-    // few seconds so speakers appear/disappear as the network changes. Only runs
-    // while connected, so it costs nothing when the panel is closed.
+    // Live updates while the panel is open: re-read the Sonos topology every few
+    // seconds so speakers appear/disappear as the network changes. This is the ONLY
+    // thing that refreshes Chorus in the background — it stops when the panel closes
+    // or its tab is hidden (a wall tablet left on Chorus shouldn't poll forever).
     this._pollTimer = window.setInterval(() => void this._poll(), 12000);
+    document.addEventListener("visibilitychange", this._onVisibility);
     // Deep links: restore the view/room from the URL, and follow the browser's
     // back/forward buttons.
     window.addEventListener("popstate", this._onPop);
@@ -117,7 +119,13 @@ export class ChorusPanel extends LitElement {
       this._pollTimer = undefined;
     }
     window.removeEventListener("popstate", this._onPop);
+    document.removeEventListener("visibilitychange", this._onVisibility);
   }
+
+  // Back from a hidden tab: catch up at once instead of waiting out the interval.
+  private _onVisibility = (): void => {
+    if (!document.hidden) void this._poll();
+  };
 
   protected override willUpdate(changed: PropertyValues): void {
     // HA (re)passes `route` on load and navigation — reflect it into view/room.
@@ -157,7 +165,7 @@ export class ChorusPanel extends LitElement {
   }
 
   private async _poll(): Promise<void> {
-    if (this._polling || !this.hass) return;
+    if (this._polling || !this.hass || document.hidden) return;
     this._polling = true;
     try {
       this._graph = await this.hass.connection.sendMessagePromise<BondGraph>({
