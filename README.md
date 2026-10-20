@@ -30,9 +30,8 @@ stops being a walled garden and simply becomes part of your home. Everything run
 - **Staged, not surprising.** Arrange freely; nothing is written to your speakers until you
   review the plan and hit **Apply**.
 
-**Install:** HACS → ⋮ → *Custom repositories* → add this repo as an **Integration** →
-Download → restart Home Assistant → add the **Chorus** integration. Local, account-free.
-([full steps ↓](#install-hacs-custom-repository))
+**Install:** search for **Chorus** in HACS → Download → restart Home Assistant → add the
+**Chorus** integration. Local, account-free. ([full steps ↓](#install))
 
 ## The idea
 
@@ -72,7 +71,7 @@ flowchart TD
 - ✅ **Identify** — chime one speaker to find it, played directly over SOAP (no
   dependency on HA's Sonos integration, so it works on freshly-freed speakers).
 - ✅ **Fixed line-out volume** toggle for a Connect / Port / Amp / Five.
-- 🔜 **Next:** HACS default-store submission + a brand icon.
+- ✅ **In the HACS default store** — search for Chorus in HACS.
 
 ---
 
@@ -174,11 +173,11 @@ service**, and the bonding runs over local SOAP on your LAN. Dig in:
 
 ---
 
-## Install (HACS custom repository)
+## Install
 
-1. In **HACS → ⋮ → Custom repositories**, add this repo with category
-   **Integration**.
-2. Open **Chorus** and **Download** it, then **restart Home Assistant**.
+1. In **HACS**, search for **Chorus** and open it — or
+   [open it in HACS directly](https://my.home-assistant.io/redirect/hacs_repository/?owner=willblaschko&repository=chorus&category=integration).
+2. **Download** it, then **restart Home Assistant**.
 3. **Settings → Devices & Services → Add Integration → Chorus.** (It's local and
    account-free — one click to enable.)
 
@@ -193,8 +192,6 @@ YAML? Every action is also a service — see
 
 ## What's next
 
-- Submit to the **HACS default store** and add a brand icon via
-  `home-assistant/brands`.
 - Broaden device coverage and keep the bonding editor sharp. Bonding stays the
   core — Chorus is deliberately *not* a general "Sonos everything" app.
 
